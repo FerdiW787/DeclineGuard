@@ -58,9 +58,11 @@ export const handleLemonSqueezyWebhook = httpAction(
       eventName === "subscription_payment_failed" ||
       eventName === "subscription_payment_recovered";
 
+    const isSubscriptionLifecycleEvent = eventName === "subscription_updated";
+
     // Record every signed delivery we can attribute to a store — including LS
     // "Send test" / non-payment events — so onboarding can verify the webhook.
-    if (!isPaymentEvent) {
+    if (!isPaymentEvent && !isSubscriptionLifecycleEvent) {
       if (storeIdEarly) {
         const resourceId =
           typeof data?.id === "string" || typeof data?.id === "number"
@@ -81,12 +83,22 @@ export const handleLemonSqueezyWebhook = httpAction(
     }
 
     const storeId = storeIdEarly;
-    const subscriptionId = stringifyId(attrs.subscription_id);
+    // For subscription_updated, data IS the subscription (use data.id)
+    // For payment events, data is an invoice (use attrs.subscription_id)
+    const subscriptionId =
+      isSubscriptionLifecycleEvent
+        ? stringifyId(data.id)
+        : stringifyId(attrs.subscription_id);
     if (!storeId || !subscriptionId) {
       return new Response("Missing store or subscription id", { status: 400 });
     }
 
-    const eventKey = `${eventName}:${data.type ?? "resource"}:${data.id}`;
+    // Event key must allow subsequent lifecycle events (cancelled then expired)
+    // For subscription_updated: include status + updated_at to differentiate
+    // For payment events: resource id is unique per invoice
+    const eventKey = isSubscriptionLifecycleEvent
+      ? `${eventName}:${data.id}:${attrs.status ?? "unknown"}:${attrs.updated_at ?? Date.now()}`
+      : `${eventName}:${data.type ?? "resource"}:${data.id}`;
     const already = await ctx.runQuery(
       internal.functions.recoveries.hasProcessedEvent,
       { eventKey },
@@ -142,7 +154,7 @@ export const handleLemonSqueezyWebhook = httpAction(
         : undefined;
 
     if (eventName === "subscription_payment_failed") {
-      const failureId = await ctx.runMutation(
+      const result = await ctx.runMutation(
         internal.functions.recoveries.upsertFailedPayment,
         {
           userId: binding.userId,
@@ -163,13 +175,19 @@ export const handleLemonSqueezyWebhook = httpAction(
         },
       );
 
-      // Day-0 recovery email (Resend). Failures here must not fail the webhook.
-      await ctx.scheduler.runAfter(
-        0,
-        internal.functions.recoveryEmails.sendForFailure,
-        { failureId },
-      );
-    } else {
+      // Only send recovery emails when policy says to (attempt >= 2)
+      // Attempt 1 = wait (don't stack on LS's own failure email)
+      if (
+        result.recoveryAction === "nudge_update_pm" ||
+        result.recoveryAction === "push_update_pm"
+      ) {
+        await ctx.scheduler.runAfter(
+          0,
+          internal.functions.recoveryEmails.sendForFailure,
+          { failureId: result.failureId },
+        );
+      }
+    } else if (eventName === "subscription_payment_recovered") {
       await ctx.runMutation(internal.functions.recoveries.markPaymentRecovered, {
         userId: binding.userId,
         storeId,
@@ -181,6 +199,24 @@ export const handleLemonSqueezyWebhook = httpAction(
         recoveredAt: occurredAt,
         eventName,
       });
+    } else if (eventName === "subscription_updated") {
+      // Handle lifecycle stop: cancelled, expired, or unpaid → stop sequence
+      const status =
+        typeof attrs.status === "string" ? attrs.status : "";
+      const lifecycleStopStatuses = ["cancelled", "expired", "unpaid"];
+
+      if (lifecycleStopStatuses.includes(status)) {
+        await ctx.runMutation(
+          internal.functions.recoveries.handleSubscriptionLifecycleStop,
+          {
+            storeId,
+            subscriptionId,
+            newStatus: status as "cancelled" | "expired" | "unpaid",
+            eventName,
+            occurredAt,
+          },
+        );
+      }
     }
 
     await ctx.runMutation(internal.functions.recoveries.recordWebhookEvent, {
@@ -277,14 +313,17 @@ function extractProductName(
   return undefined;
 }
 
-/** Best-effort decline / billing reason from LS attributes. */
+/**
+ * Extract lifecycle label from LS attributes.
+ * LS does not expose issuer decline_code (insufficient_funds, do_not_honor, etc.)
+ * so we use the subscription/invoice status which is publicly available.
+ */
 function extractDeclineReason(
   attrs: Record<string, unknown>,
 ): string | undefined {
   return (
     asNonEmptyString(attrs.status_formatted) ??
-    asNonEmptyString(attrs.billing_reason) ??
-    asNonEmptyString(attrs.card_brand) ??
-    asNonEmptyString(attrs.status)
+    asNonEmptyString(attrs.status) ??
+    asNonEmptyString(attrs.billing_reason)
   );
 }

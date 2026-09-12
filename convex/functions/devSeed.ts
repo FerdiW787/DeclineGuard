@@ -136,7 +136,21 @@ type SeedCase = {
     status: "queued" | "delivered" | "bounced";
   }>;
   declineReason: string;
+  attemptIndex: number;
 };
+
+/**
+ * Lifecycle labels for decline reason (LS does not expose issuer decline_code).
+ * These reflect the subscription state, not card-specific failure reasons.
+ */
+const LIFECYCLE_LABELS = [
+  "past_due",
+  "awaiting_update",
+] as const;
+
+function lifecycleLabelAt(i: number): string {
+  return LIFECYCLE_LABELS[i % LIFECYCLE_LABELS.length]!;
+}
 
 function buildCases(now: number): SeedCase[] {
   const cases: SeedCase[] = [];
@@ -175,7 +189,8 @@ function buildCases(now: number): SeedCase[] {
       status: "recovered",
       recoveredAt,
       emails,
-      declineReason: n % 2 === 0 ? "insufficient_funds" : "generic_decline",
+      declineReason: lifecycleLabelAt(n),
+      attemptIndex: 2 + (n % 2),
     });
     n += 1;
   }
@@ -200,7 +215,8 @@ function buildCases(now: number): SeedCase[] {
           status: "delivered",
         },
       ],
-      declineReason: "card_expired",
+      declineReason: "past_due",
+      attemptIndex: 2,
     });
     n += 1;
   }
@@ -209,25 +225,29 @@ function buildCases(now: number): SeedCase[] {
     daysAgo: number;
     emails: SeedCase["emails"];
     reason: string;
+    attemptIndex: number;
   }> = [
     {
       daysAgo: 0.4,
       emails: [],
-      reason: "insufficient_funds",
+      reason: "past_due",
+      attemptIndex: 1,
     },
     {
       daysAgo: 1.2,
       emails: [
         { step: "day0", sentAt: now - 1.1 * DAY_MS, status: "delivered" },
       ],
-      reason: "do_not_honor",
+      reason: "past_due",
+      attemptIndex: 2,
     },
     {
       daysAgo: 2.3,
       emails: [
         { step: "day0", sentAt: now - 2.2 * DAY_MS, status: "delivered" },
       ],
-      reason: "insufficient_funds",
+      reason: "past_due",
+      attemptIndex: 2,
     },
     {
       daysAgo: 3.4,
@@ -235,7 +255,8 @@ function buildCases(now: number): SeedCase[] {
         { step: "day0", sentAt: now - 3.3 * DAY_MS, status: "delivered" },
         { step: "day2", sentAt: now - 1.3 * DAY_MS, status: "delivered" },
       ],
-      reason: "card_expired",
+      reason: "awaiting_update",
+      attemptIndex: 3,
     },
     {
       daysAgo: 5.1,
@@ -243,7 +264,8 @@ function buildCases(now: number): SeedCase[] {
         { step: "day0", sentAt: now - 5 * DAY_MS, status: "delivered" },
         { step: "day2", sentAt: now - 3 * DAY_MS, status: "bounced" },
       ],
-      reason: "card_expired",
+      reason: "awaiting_update",
+      attemptIndex: 3,
     },
     {
       daysAgo: 6.2,
@@ -252,7 +274,8 @@ function buildCases(now: number): SeedCase[] {
         { step: "day2", sentAt: now - 4.1 * DAY_MS, status: "delivered" },
         { step: "day5", sentAt: now - 1.1 * DAY_MS, status: "delivered" },
       ],
-      reason: "generic_decline",
+      reason: "awaiting_update",
+      attemptIndex: 4,
     },
   ];
 
@@ -266,6 +289,7 @@ function buildCases(now: number): SeedCase[] {
       status: "open",
       emails: spec.emails,
       declineReason: spec.reason,
+      attemptIndex: spec.attemptIndex,
     });
     n += 1;
   }
@@ -311,6 +335,15 @@ async function seedMerchantDashboard(ctx: MutationCtx): Promise<{
       ? undefined
       : lastEmail?.status;
 
+    const recoveryAction =
+      item.status === "recovered"
+        ? "stop"
+        : item.attemptIndex <= 1
+          ? "wait"
+          : item.attemptIndex === 2
+            ? "nudge_update_pm"
+            : "push_update_pm";
+
     const failureId = await ctx.db.insert("failedPayments", {
       userId: user._id,
       connectionId: connection._id,
@@ -331,6 +364,8 @@ async function seedMerchantDashboard(ctx: MutationCtx): Promise<{
           ? "subscription_payment_success"
           : "subscription_payment_failed",
       testMode: false,
+      attemptIndex: item.attemptIndex,
+      recoveryAction,
       lastEmailSentAt: lastEmail?.sentAt,
       emailsSentCount,
       day0SentAt: day0?.sentAt,

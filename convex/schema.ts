@@ -8,6 +8,20 @@ export const deletedByValidator = v.union(
   v.literal("system"),
 );
 
+/**
+ * Recovery policy action — sole source of truth for what to do next.
+ * - wait: Do not send email yet (LS is still retrying)
+ * - nudge_update_pm: Send gentle update-PM email (attempt 2)
+ * - push_update_pm: Send direct/urgent update-PM email (attempt 3+)
+ * - stop: Sequence complete — recovered, cancelled, or expired
+ */
+export const recoveryActionValidator = v.union(
+  v.literal("wait"),
+  v.literal("nudge_update_pm"),
+  v.literal("push_update_pm"),
+  v.literal("stop"),
+);
+
 export const accountStatusValidator = v.union(
   v.literal("active"),
   v.literal("frozen"),
@@ -130,6 +144,16 @@ export default defineSchema({
     recoveredAt: v.optional(v.number()),
     lastEventName: v.string(),
     testMode: v.boolean(),
+    /**
+     * Number of subscription_payment_failed webhooks since entering past_due.
+     * Attempt 1 → wait; Attempt 2 → nudge; Attempt 3+ → push.
+     */
+    attemptIndex: v.optional(v.number()),
+    /**
+     * Current recovery policy action — sole source of truth for email logic.
+     * Set by webhook handler based on attemptIndex and lifecycle state.
+     */
+    recoveryAction: v.optional(recoveryActionValidator),
     /** Recovery email tracking */
     lastEmailSentAt: v.optional(v.number()),
     lastEmailInvoiceId: v.optional(v.string()),

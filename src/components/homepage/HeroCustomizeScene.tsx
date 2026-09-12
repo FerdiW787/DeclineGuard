@@ -17,7 +17,7 @@ const HEADER_IMAGE =
 
 const DEMO_BLOCKS = blocksFromGuided({
   headline: "Quick update on your subscription",
-  body: "We couldn’t charge **{{amount}}** for **{{product}}**. Update your card below — takes about a minute.",
+  body: "The payment of **{{amount}}** for **{{product}}** didn't go through. Update your card below — takes about a minute.",
   ctaLabel: "Update payment method",
   image: {
     enabled: true,
@@ -106,7 +106,7 @@ export function HeroCustomizeScene() {
                 className="ln-customize-email__card px-6 py-8"
                 content={{
                   headline: "Quick update on your subscription",
-                  body: "We couldn’t charge €29 for Pro Monthly. Update your card below — takes about a minute.",
+                  body: "The payment of €29 for Pro Monthly didn't go through. Update your card below — takes about a minute.",
                   cta: "Update payment method",
                 }}
                 blocks={DEMO_BLOCKS}

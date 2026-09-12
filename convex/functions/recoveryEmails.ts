@@ -2,13 +2,14 @@
 
 import { v } from "convex/values";
 import { internalAction, type ActionCtx } from "../_generated/server";
-import { internal } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import {
   buildRecoveryEmail,
   type RecoveryTemplateId,
 } from "../lib/recoveryEmailTemplate";
 import { resolveFromAddress } from "../lib/recoveryEmailFrom";
+import { safePaymentUpdateUrl } from "../lib/safeUrl";
 
 const sequenceStepValidator = v.union(
   v.literal("day0"),
@@ -59,6 +60,51 @@ export const sendSequenceStep = internalAction({
   },
 });
 
+/**
+ * Send push email for unpaid subscription (direct/urgent, NOT gentle).
+ * Called when subscription_updated reports unpaid status.
+ * Sends the next unsent push step: day2 (direct) or day5 (urgent).
+ * Skips day0/gentle entirely — unpaid needs aggressive tone.
+ */
+export const sendPushForUnpaid = internalAction({
+  args: { failureId: v.id("failedPayments") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const payload = await ctx.runQuery(
+      internal.functions.recoveries.getFailureEmailPayload,
+      { failureId: args.failureId },
+    );
+    if (!payload || payload.status !== "open") return null;
+
+    // Determine which push step to send (skip gentle, go direct or urgent)
+    // If day2 not sent → send day2 (direct)
+    // If day2 sent but not day5 → send day5 (urgent)
+    // If all sent → nothing to do
+    let step: SequenceStep;
+    if (payload.day2SentAt == null) {
+      step = "day2";
+    } else if (payload.day5SentAt == null) {
+      step = "day5";
+    } else {
+      // All push steps already sent
+      return null;
+    }
+
+    await runSequenceStep(ctx, args.failureId, step);
+
+    // After sending day2 push, re-schedule day5 so Email 3 can fire
+    // (unpaid cancelled day5JobId before calling us)
+    if (step === "day2") {
+      await ctx.runMutation(
+        internal.functions.recoveries.scheduleDay5AfterPush,
+        { failureId: args.failureId },
+      );
+    }
+
+    return null;
+  },
+});
+
 async function runSequenceStep(
   ctx: ActionCtx,
   failureId: Id<"failedPayments">,
@@ -85,20 +131,25 @@ async function runSequenceStep(
     return;
   }
 
-  // Per-step idempotency
+  // Check recovery action — stop means no more emails
+  if (payload.recoveryAction === "stop") {
+    return;
+  }
+
+  // wait action means don't send yet (attempt 1 — let LS handle initial notification)
+  // IMPORTANT: null/undefined also treated as wait (fail closed, don't send)
+  if (payload.recoveryAction === "wait" || payload.recoveryAction == null) {
+    return;
+  }
+
+  // Per-step idempotency — don't restart Day 0 for same open failure
+  // even if a new invoice arrives (Denis C: prevent restart on new invoice)
   if (step === "day0" && payload.day0SentAt != null) {
-    if (payload.lastEmailInvoiceId === payload.subscriptionInvoiceId) {
-      // Already sent — still repair missing follow-up schedule
-      await ctx.runMutation(
-        internal.functions.recoveries.ensureSequenceScheduled,
-        { failureId },
-      );
-      return;
-    }
-    // New invoice on same open failure → restart sequence
-    await ctx.runMutation(internal.functions.recoveries.cancelSequenceJobs, {
-      failureId,
-    });
+    await ctx.runMutation(
+      internal.functions.recoveries.ensureSequenceScheduled,
+      { failureId },
+    );
+    return;
   }
   if (step === "day2" && payload.day2SentAt != null) {
     await ctx.runMutation(
@@ -122,6 +173,45 @@ async function runSequenceStep(
     return;
   }
 
+  // Fetch fresh update-PM URL from Lemon Squeezy API
+  // Also check subscription status — stop if cancelled/expired
+  let updatePaymentUrl = payload.updatePaymentUrl;
+  try {
+    const freshData = await ctx.runAction(
+      internal.functions.lemonSqueezyActions.fetchFreshSubscriptionUrl,
+      {
+        connectionId: payload.connectionId,
+        subscriptionId: payload.subscriptionId,
+      },
+    );
+
+    // Honor fresh subscription status — stop if cancelled/expired
+    // Must patch recoveryAction to stop AND cancel scheduled jobs
+    const freshStatus = freshData?.subscriptionStatus;
+    if (freshStatus === "cancelled" || freshStatus === "expired") {
+      console.log(
+        `Stopping sequence — subscription ${payload.subscriptionId} is ${freshStatus}`,
+      );
+      // Patch to stop and cancel jobs (not just return)
+      await ctx.runMutation(
+        internal.functions.recoveries.stopSequenceOnLifecycleEnd,
+        { failureId, status: freshStatus },
+      );
+      return;
+    }
+
+    if (freshData?.updatePaymentMethodUrl) {
+      updatePaymentUrl = freshData.updatePaymentMethodUrl;
+    } else if (freshData?.customerPortalUrl) {
+      updatePaymentUrl = freshData.customerPortalUrl;
+    }
+  } catch (err) {
+    console.warn("Failed to fetch fresh subscription URL, using cached:", err);
+  }
+
+  // Final fallback to safeUrl
+  const finalUpdatePaymentUrl = safePaymentUpdateUrl(updatePaymentUrl);
+
   const templateId = STEP_TEMPLATE[step];
   const primaryColor = settings?.brandColor ?? "#0c0c0c";
   const secondaryColor = settings?.secondaryColor ?? "#6b6b70";
@@ -131,7 +221,6 @@ async function runSequenceStep(
   const supportEmail =
     settings?.supportEmail?.trim() || replyTo || undefined;
 
-  // Free tier until billing lands — always show DeclineGuard attribution
   const showDeclineGuardBadge = true;
 
   const email = buildRecoveryEmail({
@@ -144,7 +233,7 @@ async function runSequenceStep(
     customerEmail: payload.customerEmail,
     productName: payload.productName?.trim() || "your subscription",
     amountLabel,
-    updatePaymentUrl: payload.updatePaymentUrl,
+    updatePaymentUrl: finalUpdatePaymentUrl,
     supportEmail: supportEmail ?? null,
     socials: {
       x: settings?.socialX,

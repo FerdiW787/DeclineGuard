@@ -36,7 +36,7 @@ export const TEMPLATE_META: Record<
   gentle: {
     label: "Gentle",
     day: "Day 0",
-    when: "Immediately after failure",
+    when: "After 2nd failed attempt",
   },
   direct: {
     label: "Direct",
@@ -55,13 +55,13 @@ export const DEFAULT_EMAIL_COPY: Record<RecoveryTemplateId, EditableEmailCopy> =
     gentle: {
       subject: "Your payment for {{product}} didn’t go through",
       headline: "Quick update on your subscription",
-      body: "We couldn’t charge {{amount}} for {{product}}. Update your card below — takes about a minute.",
+      body: "The payment of {{amount}} for {{product}} didn't go through. Update your card below — takes about a minute.",
       cta: "Update payment method",
     },
     direct: {
-      subject: "2nd notice: unsuccessful payment for {{product}}",
+      subject: "2nd notice: payment still needed for {{product}}",
       headline: "Still need an updated card",
-      body: "Another attempt for {{product}} ({{amount}}) didn’t work. Update billing so your access stays on.",
+      body: "Your payment for {{product}} ({{amount}}) is still pending. Update billing so your access stays on.",
       cta: "Update billing",
     },
     urgent: {

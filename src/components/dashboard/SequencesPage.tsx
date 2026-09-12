@@ -51,8 +51,8 @@ const STEPS = [
     day: "Day 0",
     tone: "Gentle" as const,
     templateId: "gentle" as const,
-    whenLabel: "Immediately after the failure",
-    shortWhen: "Sends immediately",
+    whenLabel: "After 2nd failed payment attempt",
+    shortWhen: "After 2nd attempt",
   },
   {
     id: "day2" as const,

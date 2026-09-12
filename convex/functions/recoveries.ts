@@ -9,8 +9,23 @@ import {
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import { resolveProductUserOrNull } from "../lib/accountGuard";
+import { recoveryActionValidator } from "../schema";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+export type RecoveryAction = "wait" | "nudge_update_pm" | "push_update_pm" | "stop";
+
+/**
+ * Compute the recovery policy action based on attempt index.
+ * - Attempt 1: wait (LS is still retrying, don't stack on their fail email)
+ * - Attempt 2: nudge_update_pm (gentle Email 1)
+ * - Attempt 3+: push_update_pm (direct/urgent Emails 2-3)
+ */
+export function computeRecoveryAction(attemptIndex: number): RecoveryAction {
+  if (attemptIndex <= 1) return "wait";
+  if (attemptIndex === 2) return "nudge_update_pm";
+  return "push_update_pm";
+}
 
 function isFastSequence(): boolean {
   return (
@@ -193,7 +208,11 @@ export const upsertFailedPayment = internalMutation({
     eventName: v.string(),
     testMode: v.boolean(),
   },
-  returns: v.id("failedPayments"),
+  returns: v.object({
+    failureId: v.id("failedPayments"),
+    attemptIndex: v.number(),
+    recoveryAction: recoveryActionValidator,
+  }),
   handler: async (ctx, args) => {
     const open = await ctx.db
       .query("failedPayments")
@@ -206,11 +225,14 @@ export const upsertFailedPayment = internalMutation({
       .first();
 
     let failureId: Id<"failedPayments">;
+    let attemptIndex: number;
 
     if (open) {
+      // Increment attempt index for each new failure webhook on the same open failure
+      attemptIndex = (open.attemptIndex ?? 1) + 1;
+      const recoveryAction = computeRecoveryAction(attemptIndex);
+
       await ctx.db.patch(open._id, {
-        // Reconnects create a new lemonConnections row — keep the open
-        // failure pointed at the current binding so email branding resolves.
         userId: args.userId,
         connectionId: args.connectionId,
         subscriptionInvoiceId: args.subscriptionInvoiceId,
@@ -224,9 +246,15 @@ export const upsertFailedPayment = internalMutation({
         failedAt: args.failedAt,
         lastEventName: args.eventName,
         testMode: args.testMode,
+        attemptIndex,
+        recoveryAction,
       });
       failureId = open._id;
     } else {
+      // First failure for this subscription — attempt 1 → wait
+      attemptIndex = 1;
+      const recoveryAction = computeRecoveryAction(attemptIndex);
+
       failureId = await ctx.db.insert("failedPayments", {
         userId: args.userId,
         connectionId: args.connectionId,
@@ -244,9 +272,12 @@ export const upsertFailedPayment = internalMutation({
         failedAt: args.failedAt,
         lastEventName: args.eventName,
         testMode: args.testMode,
+        attemptIndex,
+        recoveryAction,
       });
     }
 
+    const recoveryAction = computeRecoveryAction(attemptIndex);
     const amountLabel = formatMoney(args.amountCents, args.currency);
     await ctx.db.insert("activityEvents", {
       userId: args.userId,
@@ -263,7 +294,7 @@ export const upsertFailedPayment = internalMutation({
       occurredAt: args.failedAt,
     });
 
-    return failureId;
+    return { failureId, attemptIndex, recoveryAction };
   },
 });
 
@@ -272,6 +303,7 @@ export const getFailureEmailPayload = internalQuery({
   returns: v.union(
     v.object({
       userId: v.id("users"),
+      connectionId: v.id("lemonConnections"),
       storeId: v.string(),
       storeName: v.string(),
       storeAvatarUrl: v.union(v.string(), v.null()),
@@ -280,12 +312,14 @@ export const getFailureEmailPayload = internalQuery({
         v.literal("recovered"),
         v.literal("cancelled"),
       ),
+      recoveryAction: v.union(recoveryActionValidator, v.null()),
       customerEmail: v.string(),
       customerName: v.union(v.string(), v.null()),
       productName: v.union(v.string(), v.null()),
       amountCents: v.number(),
       currency: v.string(),
       updatePaymentUrl: v.union(v.string(), v.null()),
+      subscriptionId: v.string(),
       subscriptionInvoiceId: v.string(),
       lastEmailInvoiceId: v.union(v.string(), v.null()),
       day0SentAt: v.union(v.number(), v.null()),
@@ -302,7 +336,6 @@ export const getFailureEmailPayload = internalQuery({
     if (!owner) return null;
     const status = owner.accountStatus ?? "active";
     if (status === "frozen" || status === "disabled") {
-      // Persist data while frozen, but do not send recovery emails.
       return null;
     }
 
@@ -313,16 +346,19 @@ export const getFailureEmailPayload = internalQuery({
 
     return {
       userId: failure.userId,
+      connectionId: failure.connectionId,
       storeId: failure.storeId,
       storeName,
       storeAvatarUrl,
       status: failure.status,
+      recoveryAction: failure.recoveryAction ?? null,
       customerEmail: failure.customerEmail,
       customerName: failure.customerName ?? null,
       productName: failure.productName ?? null,
       amountCents: failure.amountCents,
       currency: failure.currency,
       updatePaymentUrl: failure.updatePaymentUrl ?? null,
+      subscriptionId: failure.subscriptionId,
       subscriptionInvoiceId: failure.subscriptionInvoiceId,
       lastEmailInvoiceId: failure.lastEmailInvoiceId ?? null,
       day0SentAt: failure.day0SentAt ?? null,
@@ -499,6 +535,79 @@ export const ensureSequenceScheduled = internalMutation({
   },
 });
 
+/**
+ * Stop sequence when fresh LS fetch reveals cancelled/expired status.
+ * Called from send path when we discover the subscription ended.
+ */
+export const stopSequenceOnLifecycleEnd = internalMutation({
+  args: {
+    failureId: v.id("failedPayments"),
+    status: v.union(v.literal("cancelled"), v.literal("expired")),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const failure = await ctx.db.get(args.failureId);
+    if (!failure) return null;
+
+    // Cancel any scheduled jobs
+    if (failure.day2JobId) {
+      try {
+        await ctx.scheduler.cancel(failure.day2JobId);
+      } catch {
+        /* already finished or cancelled */
+      }
+    }
+    if (failure.day5JobId) {
+      try {
+        await ctx.scheduler.cancel(failure.day5JobId);
+      } catch {
+        /* already finished or cancelled */
+      }
+    }
+
+    // Mark as stopped
+    await ctx.db.patch(args.failureId, {
+      status: "cancelled",
+      recoveryAction: "stop",
+      day2JobId: undefined,
+      day5JobId: undefined,
+    });
+
+    return null;
+  },
+});
+
+/**
+ * Schedule day5 after a push day2 send (called from sendPushForUnpaid).
+ * Unpaid handling cancels day5JobId before sending, so we must re-schedule.
+ */
+export const scheduleDay5AfterPush = internalMutation({
+  args: { failureId: v.id("failedPayments") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const failure = await ctx.db.get(args.failureId);
+    if (!failure || failure.status !== "open") return null;
+
+    // Only schedule if day5 not already sent and no job pending
+    if (failure.day5SentAt != null || failure.day5JobId != null) return null;
+
+    // Schedule day5 for 3 days after day2 (or 60s in fast mode)
+    const fast = isFastSequence();
+    const delay = fast ? 60_000 : 3 * DAY_MS;
+    const day5JobId = await ctx.scheduler.runAfter(
+      delay,
+      internal.functions.recoveryEmails.sendSequenceStep,
+      { failureId: args.failureId, step: "day5" },
+    );
+    await ctx.db.patch(args.failureId, { day5JobId });
+    console.log(
+      `Scheduled Email 3 for ${args.failureId} in ${delay}ms after push day2`,
+    );
+
+    return null;
+  },
+});
+
 export const cancelSequenceJobs = internalMutation({
   args: { failureId: v.id("failedPayments") },
   returns: v.null(),
@@ -582,6 +691,7 @@ export const markPaymentRecovered = internalMutation({
       recoveredAt: args.recoveredAt,
       subscriptionInvoiceId: args.subscriptionInvoiceId,
       lastEventName: args.eventName,
+      recoveryAction: "stop",
       day2JobId: undefined,
       day5JobId: undefined,
     });
@@ -622,6 +732,122 @@ export const markPaymentRecovered = internalMutation({
           });
         }
       }
+    }
+
+    return open._id;
+  },
+});
+
+/**
+ * Handle subscription lifecycle change.
+ * Called when subscription_updated shows status change to cancelled/expired/unpaid.
+ * - cancelled/expired → stop sequence (no more emails)
+ * - unpaid → send aggressive push email (direct/urgent, not gentle)
+ */
+export const handleSubscriptionLifecycleStop = internalMutation({
+  args: {
+    storeId: v.string(),
+    subscriptionId: v.string(),
+    newStatus: v.union(
+      v.literal("cancelled"),
+      v.literal("expired"),
+      v.literal("unpaid"),
+    ),
+    eventName: v.string(),
+    occurredAt: v.number(),
+  },
+  returns: v.union(v.id("failedPayments"), v.null()),
+  handler: async (ctx, args) => {
+    const open = await ctx.db
+      .query("failedPayments")
+      .withIndex("by_store_subscription_status", (q) =>
+        q
+          .eq("storeId", args.storeId)
+          .eq("subscriptionId", args.subscriptionId)
+          .eq("status", "open"),
+      )
+      .first();
+
+    if (!open) return null;
+
+    // For unpaid, send aggressive push email (if past attempt-1 wait)
+    // For cancelled/expired, set status to "cancelled" and action to "stop"
+    if (args.newStatus === "unpaid") {
+      // Respect attempt-1 wait policy — don't jump the wait window
+      const attemptIndex = open.attemptIndex ?? 1;
+      if (attemptIndex <= 1) {
+        // Still in wait window — do NOT change recoveryAction (stay in wait)
+        // Keep scheduled follow-ups intact (don't cancel jobs)
+        // Just record the event, let normal sequence continue at attempt 2+
+        await ctx.db.patch(open._id, {
+          lastEventName: args.eventName,
+        });
+      } else {
+        // Past wait window — cancel pending jobs and send push immediately
+        if (open.day2JobId) {
+          try {
+            await ctx.scheduler.cancel(open.day2JobId);
+          } catch {
+            /* already finished or cancelled */
+          }
+        }
+        if (open.day5JobId) {
+          try {
+            await ctx.scheduler.cancel(open.day5JobId);
+          } catch {
+            /* already finished or cancelled */
+          }
+        }
+
+        await ctx.db.patch(open._id, {
+          recoveryAction: "push_update_pm",
+          lastEventName: args.eventName,
+          day2JobId: undefined,
+          day5JobId: undefined,
+        });
+
+        // Send immediate push email (direct/urgent, NOT gentle)
+        await ctx.scheduler.runAfter(
+          0,
+          internal.functions.recoveryEmails.sendPushForUnpaid,
+          { failureId: open._id },
+        );
+      }
+    } else {
+      // Cancelled or expired → cancel scheduled jobs and stop sequence
+      if (open.day2JobId) {
+        try {
+          await ctx.scheduler.cancel(open.day2JobId);
+        } catch {
+          /* already finished or cancelled */
+        }
+      }
+      if (open.day5JobId) {
+        try {
+          await ctx.scheduler.cancel(open.day5JobId);
+        } catch {
+          /* already finished or cancelled */
+        }
+      }
+      // Cancelled or expired → stop sequence entirely
+      await ctx.db.patch(open._id, {
+        status: "cancelled",
+        recoveryAction: "stop",
+        lastEventName: args.eventName,
+        day2JobId: undefined,
+        day5JobId: undefined,
+      });
+
+      await ctx.db.insert("activityEvents", {
+        userId: open.userId,
+        storeId: args.storeId,
+        type: "payment_failed",
+        title: `${open.customerEmail} / subscription ${args.newStatus}`,
+        detail: "Recovery sequence stopped — subscription ended",
+        customerEmail: open.customerEmail,
+        relatedFailureId: open._id,
+        occurredAt: args.occurredAt,
+      });
     }
 
     return open._id;
@@ -1045,6 +1271,8 @@ function sequenceLabelForFailure(row: {
   day5SentAt?: number;
   day2JobId?: unknown;
   day5JobId?: unknown;
+  recoveryAction?: string | null;
+  attemptIndex?: number | null;
 }): string {
   if (row.day5SentAt != null) return "Email 3 · Day 5 sent";
   if (row.day2SentAt != null) {
@@ -1053,7 +1281,16 @@ function sequenceLabelForFailure(row: {
   if (row.day0SentAt != null) {
     return row.day2JobId ? "Email 1 · Day 2 pending" : "Email 1 · Day 0 sent";
   }
-  return "Queued · Day 0";
+  // Honest label for wait/null action (attempt 1)
+  if (row.recoveryAction === "wait" || row.recoveryAction == null) {
+    const attempt = row.attemptIndex ?? 1;
+    return `Waiting · Attempt ${attempt}`;
+  }
+  if (row.recoveryAction === "stop") {
+    return "Stopped";
+  }
+  // nudge_update_pm or push_update_pm with no emails sent yet
+  return "Queued · Email pending";
 }
 
 /** ETA for the next scheduled recovery email (prod timing: +2d / +5d from Day 0). */
