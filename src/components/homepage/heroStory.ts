@@ -19,7 +19,7 @@ export const HERO_STORY_CAPTIONS: Record<
   },
   2: {
     kicker: "Live recovery",
-    title: "We retry it as you.",
+    title: "We send as you.",
     sub: "Day 0 email, from their domain — not ours.",
   },
   3: {

@@ -1299,7 +1299,7 @@ function CasePanel({
         </div>
         {row.declineReason?.trim() ? (
           <div className="flex justify-between gap-3">
-            <dt className="text-black/40">Reason</dt>
+            <dt className="text-black/40">Status</dt>
             <dd className="max-w-[60%] truncate text-right font-medium">
               {row.declineReason}
             </dd>
