@@ -354,6 +354,29 @@ export const getConnectionSecret = internalQuery({
   },
 });
 
+/** Fetch connection secret by ID (for internal recovery email sending) */
+export const getConnectionSecretById = internalQuery({
+  args: { connectionId: v.id("lemonConnections") },
+  returns: v.union(
+    v.object({
+      apiKeyCipher: v.string(),
+      storeId: v.string(),
+      testMode: v.boolean(),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.connectionId);
+    if (!row || isSoftDeleted(row)) return null;
+
+    return {
+      apiKeyCipher: row.apiKeyCipher,
+      storeId: row.storeId,
+      testMode: row.testMode,
+    };
+  },
+});
+
 export const patchStores = internalMutation({
   args: {
     connectionId: v.id("lemonConnections"),

@@ -59,16 +59,16 @@ const TEMPLATES: Record<RecoveryTemplateId, TemplateCopy> = {
     subject: "Your payment for {{product}} didn’t go through",
     headline: "Quick update on your subscription",
     bodyHtml:
-      "We couldn’t charge <strong>{{amount}}</strong> for <strong>{{product}}</strong>. Update your card below — takes about a minute.",
+      "The payment of <strong>{{amount}}</strong> for <strong>{{product}}</strong> didn't go through. Update your card below — takes about a minute.",
     cta: "Update payment method",
     ignoreNote:
       "If you already updated your card, you can safely ignore this email.",
   },
   direct: {
-    subject: "2nd notice: unsuccessful payment for {{product}}",
+    subject: "2nd notice: payment still needed for {{product}}",
     headline: "Still need an updated card",
     bodyHtml:
-      "Another attempt for <strong>{{product}}</strong> ({{amount}}) didn’t work. Update billing so your access stays on.",
+      "Your payment for <strong>{{product}}</strong> ({{amount}}) is still pending. Update billing so your access stays on.",
     cta: "Update billing",
     ignoreNote: "Already fixed it? You’re all set — no action needed.",
   },

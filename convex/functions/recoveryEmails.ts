@@ -2,13 +2,14 @@
 
 import { v } from "convex/values";
 import { internalAction, type ActionCtx } from "../_generated/server";
-import { internal } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import {
   buildRecoveryEmail,
   type RecoveryTemplateId,
 } from "../lib/recoveryEmailTemplate";
 import { resolveFromAddress } from "../lib/recoveryEmailFrom";
+import { safePaymentUpdateUrl } from "../lib/safeUrl";
 
 const sequenceStepValidator = v.union(
   v.literal("day0"),
@@ -85,17 +86,25 @@ async function runSequenceStep(
     return;
   }
 
+  // Check recovery action — stop means no more emails
+  if (payload.recoveryAction === "stop") {
+    return;
+  }
+
+  // wait action means don't send yet (attempt 1 — let LS handle initial notification)
+  if (payload.recoveryAction === "wait") {
+    return;
+  }
+
   // Per-step idempotency
   if (step === "day0" && payload.day0SentAt != null) {
     if (payload.lastEmailInvoiceId === payload.subscriptionInvoiceId) {
-      // Already sent — still repair missing follow-up schedule
       await ctx.runMutation(
         internal.functions.recoveries.ensureSequenceScheduled,
         { failureId },
       );
       return;
     }
-    // New invoice on same open failure → restart sequence
     await ctx.runMutation(internal.functions.recoveries.cancelSequenceJobs, {
       failureId,
     });
@@ -122,6 +131,28 @@ async function runSequenceStep(
     return;
   }
 
+  // Fetch fresh update-PM URL from Lemon Squeezy API
+  let updatePaymentUrl = payload.updatePaymentUrl;
+  try {
+    const freshData = await ctx.runAction(
+      api.functions.lemonSqueezyActions.fetchFreshSubscriptionUrl,
+      {
+        connectionId: payload.connectionId,
+        subscriptionId: payload.subscriptionId,
+      },
+    );
+    if (freshData?.updatePaymentMethodUrl) {
+      updatePaymentUrl = freshData.updatePaymentMethodUrl;
+    } else if (freshData?.customerPortalUrl) {
+      updatePaymentUrl = freshData.customerPortalUrl;
+    }
+  } catch (err) {
+    console.warn("Failed to fetch fresh subscription URL, using cached:", err);
+  }
+
+  // Final fallback to safeUrl
+  const finalUpdatePaymentUrl = safePaymentUpdateUrl(updatePaymentUrl);
+
   const templateId = STEP_TEMPLATE[step];
   const primaryColor = settings?.brandColor ?? "#0c0c0c";
   const secondaryColor = settings?.secondaryColor ?? "#6b6b70";
@@ -131,7 +162,6 @@ async function runSequenceStep(
   const supportEmail =
     settings?.supportEmail?.trim() || replyTo || undefined;
 
-  // Free tier until billing lands — always show DeclineGuard attribution
   const showDeclineGuardBadge = true;
 
   const email = buildRecoveryEmail({
@@ -144,7 +174,7 @@ async function runSequenceStep(
     customerEmail: payload.customerEmail,
     productName: payload.productName?.trim() || "your subscription",
     amountLabel,
-    updatePaymentUrl: payload.updatePaymentUrl,
+    updatePaymentUrl: finalUpdatePaymentUrl,
     supportEmail: supportEmail ?? null,
     socials: {
       x: settings?.socialX,

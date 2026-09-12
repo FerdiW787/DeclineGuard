@@ -543,3 +543,72 @@ export const sendWebhookTestPing = action({
     return { ok: true as const };
   },
 });
+
+/**
+ * Fetch fresh subscription data from Lemon Squeezy API.
+ * Used before sending recovery emails to get live update_payment_method URL.
+ */
+export const fetchFreshSubscriptionUrl = action({
+  args: {
+    connectionId: v.id("lemonConnections"),
+    subscriptionId: v.string(),
+  },
+  returns: v.union(
+    v.object({
+      updatePaymentMethodUrl: v.union(v.string(), v.null()),
+      customerPortalUrl: v.union(v.string(), v.null()),
+      subscriptionStatus: v.union(v.string(), v.null()),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const connectionSecret = await ctx.runQuery(
+      internal.functions.lemonSqueezy.getConnectionSecretById,
+      { connectionId: args.connectionId },
+    );
+    if (!connectionSecret) return null;
+
+    let apiKey: string;
+    try {
+      apiKey = await decryptApiKey(connectionSecret.apiKeyCipher);
+    } catch {
+      console.warn("Could not decrypt API key for fresh subscription fetch");
+      return null;
+    }
+
+    try {
+      const json = await lsFetch(apiKey, `/subscriptions/${args.subscriptionId}`);
+      const data = json.data as Record<string, unknown> | null | undefined;
+      const attrs =
+        data && typeof data === "object" && "attributes" in data
+          ? (data.attributes as Record<string, unknown>)
+          : null;
+      if (!attrs) return null;
+
+      const urls =
+        attrs.urls && typeof attrs.urls === "object"
+          ? (attrs.urls as Record<string, unknown>)
+          : null;
+
+      const updatePaymentMethodUrl =
+        typeof urls?.update_payment_method === "string"
+          ? urls.update_payment_method
+          : null;
+      const customerPortalUrl =
+        typeof urls?.customer_portal === "string"
+          ? urls.customer_portal
+          : null;
+      const subscriptionStatus =
+        typeof attrs.status === "string" ? attrs.status : null;
+
+      return {
+        updatePaymentMethodUrl,
+        customerPortalUrl,
+        subscriptionStatus,
+      };
+    } catch (err) {
+      console.warn("Failed to fetch fresh subscription data:", err);
+      return null;
+    }
+  },
+});
