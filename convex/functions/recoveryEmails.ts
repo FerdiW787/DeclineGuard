@@ -135,7 +135,7 @@ async function runSequenceStep(
   let updatePaymentUrl = payload.updatePaymentUrl;
   try {
     const freshData = await ctx.runAction(
-      api.functions.lemonSqueezyActions.fetchFreshSubscriptionUrl,
+      internal.functions.lemonSqueezyActions.fetchFreshSubscriptionUrl,
       {
         connectionId: payload.connectionId,
         subscriptionId: payload.subscriptionId,

@@ -199,14 +199,14 @@ const FLOW_CARDS: FlowCard[] = [
     variant: "trigger",
     eyebrow: "Starts when",
     title: "Payment fails / renewal declines",
-    detail: "Lemon Squeezy webhook — then Email 1 sends immediately.",
+    detail: "Lemon Squeezy webhook — Email 1 sends after 2nd attempt.",
   },
   {
     id: "email1",
     number: 1,
     eyebrow: "Day 0 · Gentle",
     title: "Email 1",
-    detail: "Sent right away with your branding.",
+    detail: "Sent after 2nd failed attempt with your branding.",
   },
   {
     id: "email2",

@@ -145,7 +145,6 @@ type SeedCase = {
  */
 const LIFECYCLE_LABELS = [
   "past_due",
-  "payment_retry",
   "awaiting_update",
 ] as const;
 
@@ -239,7 +238,7 @@ function buildCases(now: number): SeedCase[] {
       emails: [
         { step: "day0", sentAt: now - 1.1 * DAY_MS, status: "delivered" },
       ],
-      reason: "payment_retry",
+      reason: "past_due",
       attemptIndex: 2,
     },
     {
@@ -275,7 +274,7 @@ function buildCases(now: number): SeedCase[] {
         { step: "day2", sentAt: now - 4.1 * DAY_MS, status: "delivered" },
         { step: "day5", sentAt: now - 1.1 * DAY_MS, status: "delivered" },
       ],
-      reason: "payment_retry",
+      reason: "awaiting_update",
       attemptIndex: 4,
     },
   ];

@@ -721,6 +721,13 @@ export const handleSubscriptionLifecycleStop = internalMutation({
         day2JobId: undefined,
         day5JobId: undefined,
       });
+
+      // Schedule immediate push email since we cancelled pending follow-ups
+      await ctx.scheduler.runAfter(
+        0,
+        internal.functions.recoveryEmails.sendForFailure,
+        { failureId: open._id },
+      );
     } else {
       // Cancelled or expired → stop sequence entirely
       await ctx.db.patch(open._id, {

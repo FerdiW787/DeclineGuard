@@ -1,7 +1,7 @@
 "use node";
 
 import { v } from "convex/values";
-import { action, type ActionCtx } from "../_generated/server";
+import { action, internalAction, type ActionCtx } from "../_generated/server";
 import { api, internal } from "../_generated/api";
 import { apiKeyLast4, decryptApiKey, encryptApiKey } from "../lib/lsCrypto";
 
@@ -547,8 +547,9 @@ export const sendWebhookTestPing = action({
 /**
  * Fetch fresh subscription data from Lemon Squeezy API.
  * Used before sending recovery emails to get live update_payment_method URL.
+ * Internal-only to prevent public access to merchant LS API keys.
  */
-export const fetchFreshSubscriptionUrl = action({
+export const fetchFreshSubscriptionUrl = internalAction({
   args: {
     connectionId: v.id("lemonConnections"),
     subscriptionId: v.string(),

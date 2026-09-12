@@ -36,7 +36,7 @@ export const TEMPLATE_META: Record<
   gentle: {
     label: "Gentle",
     day: "Day 0",
-    when: "Immediately after failure",
+    when: "After 2nd failed attempt",
   },
   direct: {
     label: "Direct",
