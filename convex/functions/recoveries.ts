@@ -535,6 +535,79 @@ export const ensureSequenceScheduled = internalMutation({
   },
 });
 
+/**
+ * Stop sequence when fresh LS fetch reveals cancelled/expired status.
+ * Called from send path when we discover the subscription ended.
+ */
+export const stopSequenceOnLifecycleEnd = internalMutation({
+  args: {
+    failureId: v.id("failedPayments"),
+    status: v.union(v.literal("cancelled"), v.literal("expired")),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const failure = await ctx.db.get(args.failureId);
+    if (!failure) return null;
+
+    // Cancel any scheduled jobs
+    if (failure.day2JobId) {
+      try {
+        await ctx.scheduler.cancel(failure.day2JobId);
+      } catch {
+        /* already finished or cancelled */
+      }
+    }
+    if (failure.day5JobId) {
+      try {
+        await ctx.scheduler.cancel(failure.day5JobId);
+      } catch {
+        /* already finished or cancelled */
+      }
+    }
+
+    // Mark as stopped
+    await ctx.db.patch(args.failureId, {
+      status: "cancelled",
+      recoveryAction: "stop",
+      day2JobId: undefined,
+      day5JobId: undefined,
+    });
+
+    return null;
+  },
+});
+
+/**
+ * Schedule day5 after a push day2 send (called from sendPushForUnpaid).
+ * Unpaid handling cancels day5JobId before sending, so we must re-schedule.
+ */
+export const scheduleDay5AfterPush = internalMutation({
+  args: { failureId: v.id("failedPayments") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const failure = await ctx.db.get(args.failureId);
+    if (!failure || failure.status !== "open") return null;
+
+    // Only schedule if day5 not already sent and no job pending
+    if (failure.day5SentAt != null || failure.day5JobId != null) return null;
+
+    // Schedule day5 for 3 days after day2 (or 60s in fast mode)
+    const fast = isFastSequence();
+    const delay = fast ? 60_000 : 3 * DAY_MS;
+    const day5JobId = await ctx.scheduler.runAfter(
+      delay,
+      internal.functions.recoveryEmails.sendSequenceStep,
+      { failureId: args.failureId, step: "day5" },
+    );
+    await ctx.db.patch(args.failureId, { day5JobId });
+    console.log(
+      `Scheduled Email 3 for ${args.failureId} in ${delay}ms after push day2`,
+    );
+
+    return null;
+  },
+});
+
 export const cancelSequenceJobs = internalMutation({
   args: { failureId: v.id("failedPayments") },
   returns: v.null(),
@@ -703,10 +776,10 @@ export const handleSubscriptionLifecycleStop = internalMutation({
       // Respect attempt-1 wait policy — don't jump the wait window
       const attemptIndex = open.attemptIndex ?? 1;
       if (attemptIndex <= 1) {
-        // Still in wait window — set push_update_pm for future but don't send now
+        // Still in wait window — do NOT change recoveryAction (stay in wait)
         // Keep scheduled follow-ups intact (don't cancel jobs)
+        // Just record the event, let normal sequence continue at attempt 2+
         await ctx.db.patch(open._id, {
-          recoveryAction: "push_update_pm",
           lastEventName: args.eventName,
         });
       } else {

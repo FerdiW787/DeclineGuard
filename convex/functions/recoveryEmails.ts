@@ -91,6 +91,16 @@ export const sendPushForUnpaid = internalAction({
     }
 
     await runSequenceStep(ctx, args.failureId, step);
+
+    // After sending day2 push, re-schedule day5 so Email 3 can fire
+    // (unpaid cancelled day5JobId before calling us)
+    if (step === "day2") {
+      await ctx.runMutation(
+        internal.functions.recoveries.scheduleDay5AfterPush,
+        { failureId: args.failureId },
+      );
+    }
+
     return null;
   },
 });
@@ -176,10 +186,16 @@ async function runSequenceStep(
     );
 
     // Honor fresh subscription status — stop if cancelled/expired
+    // Must patch recoveryAction to stop AND cancel scheduled jobs
     const freshStatus = freshData?.subscriptionStatus;
     if (freshStatus === "cancelled" || freshStatus === "expired") {
       console.log(
-        `Skipping email — subscription ${payload.subscriptionId} is ${freshStatus}`,
+        `Stopping sequence — subscription ${payload.subscriptionId} is ${freshStatus}`,
+      );
+      // Patch to stop and cancel jobs (not just return)
+      await ctx.runMutation(
+        internal.functions.recoveries.stopSequenceOnLifecycleEnd,
+        { failureId, status: freshStatus },
       );
       return;
     }
