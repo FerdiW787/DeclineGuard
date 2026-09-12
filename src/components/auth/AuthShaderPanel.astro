@@ -1,0 +1,13 @@
+---
+import EarlyFluidBoot from "@/components/homepage/EarlyFluidBoot.astro";
+
+interface Props {
+  mode: "sign-in" | "sign-up";
+}
+
+---
+
+<aside class="relative hidden min-h-dvh overflow-hidden md:block">
+  <EarlyFluidBoot pourFrom="left" variant="auth" />
+
+</aside>

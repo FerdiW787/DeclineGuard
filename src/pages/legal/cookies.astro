@@ -1,0 +1,104 @@
+---
+import LegalLayout from "@/layouts/LegalLayout.astro";
+import { legal } from "@/lib/legal";
+
+const privacyMailto = `mailto:${legal.privacyEmail}`;
+---
+
+<LegalLayout
+  title="Cookie Notice"
+  description={`Cookie Notice for ${legal.brandName}.`}
+  heading="Cookie Notice"
+  eyebrow="Cookies · TTDSG / ePrivacy"
+>
+  <p>
+    This Cookie Notice explains how <strong>{legal.brandName}</strong> (
+    {legal.legalName}) uses cookies and similar technologies on
+    {legal.siteUrl} and related app routes. It supplements our
+    <a href="/legal/privacy">Privacy Policy</a>.
+  </p>
+
+  <h2>1. What are cookies?</h2>
+  <p>
+    Cookies are small text files stored on your device. Similar technologies
+    include local storage, session storage, and pixels. Under German TTDSG/TDDDG
+    § 25, storing or accessing information on a terminal device generally
+    requires consent, except where strictly necessary to provide a service you
+    requested.
+  </p>
+
+  <h2>2. How we use cookies today</h2>
+  <h3>2.1 Strictly necessary — authentication (Clerk)</h3>
+  <p>
+    To sign you in and keep your session secure, our authentication provider
+    <strong>Clerk</strong> sets cookies / storage required for login, session
+    continuity, CSRF protection, and related security (including optional bot
+    challenges via Cloudflare as part of Clerk). These are necessary to provide
+    the account areas you request and do not require consent under TTDSG/TDDDG §
+    25(2).
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Category</th>
+        <th>Provider</th>
+        <th>Purpose</th>
+        <th>Duration (typical)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Strictly necessary</td>
+        <td>Clerk</td>
+        <td>Session, auth state, security</td>
+        <td>Session / up to provider defaults (often months for “remember me”)</td>
+      </tr>
+      <tr>
+        <td>Strictly necessary</td>
+        <td>DeclineGuard / host</td>
+        <td>Security headers, load balancing, abuse prevention (may be cookie-less)</td>
+        <td>As needed for request security</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>2.2 Preferences / functional</h3>
+  <p>
+    We may store non-essential UI preferences in local storage (e.g. dismissed
+    tips). Where required, we will request consent before non-essential storage.
+  </p>
+
+  <h3>2.3 Analytics &amp; marketing</h3>
+  <p>
+    <strong>We do not currently use advertising cookies or third-party
+    analytics pixels</strong> (e.g. Google Analytics, Meta Pixel). If we add
+    them, we will update this Notice, present a consent banner where required,
+    and only set non-essential cookies after opt-in.
+  </p>
+
+  <h3>2.4 Google Fonts</h3>
+  <p>
+    Our site may load fonts from Google Fonts. Your browser may request font
+    files from Google servers, which can involve transmission of your IP address
+    to Google. If you require a fully local font setup, contact us — we can
+    self-host fonts as a hardening step.
+  </p>
+
+  <h2>3. Managing cookies</h2>
+  <p>
+    You can delete or block cookies in your browser settings. Blocking strictly
+    necessary auth cookies will prevent sign-in and dashboard use. For
+    Google/Clerk account cookies, also review those providers’ settings.
+  </p>
+
+  <h2>4. Updates</h2>
+  <p>
+    We will revise this Notice when our cookie practices change. Last updated:
+    {legal.lastUpdated}.
+  </p>
+
+  <h2>5. Contact</h2>
+  <p>
+    <a href={privacyMailto}>{legal.privacyEmail}</a>
+  </p>
+</LegalLayout>

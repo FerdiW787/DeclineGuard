@@ -1,0 +1,13 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import FeatureRequestsPage from "@/components/features/FeatureRequestsPage";
+---
+
+<Layout
+  title="Feature requests — DeclineGuard"
+  description="Vote on ideas and suggest what DeclineGuard should build next."
+  theme="light"
+  showScrollbar
+>
+  <FeatureRequestsPage client:load />
+</Layout>

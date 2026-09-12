@@ -1,0 +1,14 @@
+---
+---
+
+<canvas
+  data-auth-pond
+  class="pointer-events-nonwe fixed inset-0 z-0 h-dvh w-full bg-[#0e0e10]"
+  aria-hidden="true"
+></canvas>
+
+<script>
+  import { autoBootAuthPond } from "@/lib/authPond";
+  autoBootAuthPond();
+  document.addEventListener("astro:page-load", () => autoBootAuthPond());
+</script>

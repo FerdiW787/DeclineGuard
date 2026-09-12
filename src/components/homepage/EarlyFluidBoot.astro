@@ -1,0 +1,45 @@
+---
+/**
+ * Canvas in Astro HTML — boots from a tiny module before the React island.
+ * Fixed “sky” layer; stays put like the nav — below-fold covers it.
+ */
+interface Props {
+  pourFrom?: "top" | "left" | "bottom";
+  /** hero = top strip on homepage; auth = full panel fill */
+  variant?: "hero" | "auth";
+}
+
+const { pourFrom = "bottom", variant = "hero" } = Astro.props;
+---
+
+{
+  variant === "hero" ? (
+    <div
+      class="dg-fluid-host pointer-events-none fixed inset-x-0 top-0 z-[4] h-[20vh] opacity-50 md:h-[18vh]"
+      aria-hidden="true"
+    >
+      <canvas
+        data-fluid
+        data-pour-from={pourFrom}
+        class="absolute inset-0 h-full w-full"
+      />
+    </div>
+  ) : (
+    <section
+      class="pointer-events-none absolute inset-0 z-0 bg-[#0e0e10] opacity-55"
+      aria-hidden="true"
+    >
+      <canvas
+        data-fluid
+        data-fluid-reactive="1"
+        data-pour-from={pourFrom}
+        class="absolute inset-0 h-full w-full"
+      />
+    </section>
+  )
+}
+
+<script>
+  import { autoBootFluids } from "../../lib/fluidGradient";
+  autoBootFluids();
+</script>

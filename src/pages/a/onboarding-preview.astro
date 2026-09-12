@@ -1,0 +1,12 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import OnboardingPreviewPage from "@/components/dashboard/OnboardingPreviewPage";
+
+if (!import.meta.env.DEV) {
+  return Astro.redirect("/a/sign-in");
+}
+---
+
+<Layout theme="light" title="Onboarding preview — DeclineGuard">
+  <OnboardingPreviewPage client:only="react" />
+</Layout>

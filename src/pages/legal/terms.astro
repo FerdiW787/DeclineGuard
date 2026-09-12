@@ -1,0 +1,263 @@
+---
+import LegalLayout from "@/layouts/LegalLayout.astro";
+import { legal } from "@/lib/legal";
+---
+
+<LegalLayout
+  title="Terms of Service"
+  description={`Terms of Service for ${legal.brandName}.`}
+  heading="Terms of Service"
+  eyebrow="AGB · Nutzungsbedingungen"
+>
+  <p>
+    These Terms of Service (“Terms”) form a binding agreement between you
+    (“Customer”, “you”, “Merchant”) and <strong>{legal.legalName}</strong>
+    (“{legal.brandName}”, “we”, “us”) governing access to and use of the
+    DeclineGuard website, dashboard, APIs, and related services (the
+    “Service”). By creating an account, connecting a store, or otherwise using
+    the Service, you agree to these Terms and our
+    <a href="/legal/privacy">Privacy Policy</a>. If you use the Service on
+    behalf of a company, you represent that you have authority to bind that
+    company.
+  </p>
+  <p>
+    Related documents: <a href="/legal/dpa">Data Processing Agreement</a>,
+    <a href="/legal/impressum">Impressum</a>,
+    <a href="/legal/cookies">Cookie Notice</a>.
+  </p>
+
+  <h2>1. The Service</h2>
+  <p>
+    DeclineGuard is a B2B software service that helps Lemon Squeezy merchants
+    recover failed subscription renewals by detecting relevant webhook events
+    and sending branded transactional recovery email sequences with a link for
+    the end customer to update payment via Lemon Squeezy.
+  </p>
+  <ul>
+    <li>We do not process or store payment card numbers.</li>
+    <li>Payment collection from end customers is handled by Lemon Squeezy / the customer’s payment methods — not by DeclineGuard as a payment facilitator for those cards.</li>
+    <li>We are not a bank, payment institution, or substitute for Lemon Squeezy’s merchant agreement.</li>
+  </ul>
+
+  <h2>2. Eligibility &amp; accounts</h2>
+  <ul>
+    <li>You must be at least 18 and able to form a binding contract.</li>
+    <li>The Service is offered to businesses / merchants (B2B), not consumers for private purposes. If you are a consumer under EU/German law despite the B2B positioning, mandatory consumer protections remain unaffected where they cannot be waived.</li>
+    <li>You must provide accurate registration information and keep credentials confidential. You are responsible for activity under your account.</li>
+    <li>We may refuse, suspend, or terminate accounts that violate these Terms or pose risk (fraud, abuse, legal risk).</li>
+  </ul>
+
+  <h2>3. Lemon Squeezy connection</h2>
+  <p>
+    To use core features you must connect a Lemon Squeezy store using an API key
+    (or other credentials we support) and ensure webhooks can reach us. You
+    represent that you are authorised to connect that store and to process your
+    customers’ data as described in the DPA.
+  </p>
+  <ul>
+    <li>You must keep API keys secret; revoke keys if compromised.</li>
+    <li>You remain solely responsible for your Lemon Squeezy account, products, pricing, taxes, refunds, chargebacks, and compliance with Lemon Squeezy’s terms.</li>
+    <li>We may store an encrypted copy of credentials and limited store metadata to operate the Service.</li>
+    <li>Disconnecting a store may delete associated recovery records as implemented in the product; export anything you need first.</li>
+  </ul>
+
+  <h2>4. Plans, fees &amp; founding terms</h2>
+  <h3>4.1 Free plan</h3>
+  <p>
+    On the Free plan, the Service is offered at <strong>$0 per month</strong> with a
+    recovery success fee of <strong>10% of amounts recovered</strong> where a
+    recovery is attributed to DeclineGuard under Section 4.3. Free includes
+    <strong>100 recovery emails per month</strong> and <strong>one Lemon Squeezy
+    store</strong>, with optional add-ons as shown on the pricing page (extra
+    email packs and one-time fees for additional stores). We may limit Free
+    enrolment at any time for new customers.
+  </p>
+  <h3>4.2 Pro plan</h3>
+  <p>
+    Pro is marketed at <strong>$29.99 per month</strong> (or such price as shown
+    at checkout / in-app) with a <strong>4% recovery fee</strong>, and includes
+    higher email volume, unlimited stores, removal of DeclineGuard attribution
+    from emails, and other features described on the pricing page at the time of
+    purchase. Optional email overage packs may apply as shown on the pricing
+    page. Features may evolve; material downgrades to paid plans will be handled
+    reasonably (notice or pro‑rata credit/refund where required by law).
+  </p>
+  <h3>4.3 When a recovery fee is owed</h3>
+  <p>
+    Unless we expressly agree otherwise in writing, a Free-plan recovery fee is
+    owed only when:
+  </p>
+  <ol>
+    <li>a failed-payment event for a subscription is ingested by DeclineGuard for your connected store; and</li>
+    <li>DeclineGuard has started the recovery sequence for that failure (first email queued/sent according to our systems); and</li>
+    <li>we receive a corresponding recovery / success event (or equivalent confirmation) attributable to that subscription/failure within our attribution window of <strong>[ATTRIBUTION WINDOW: e.g. 30 days]</strong>.</li>
+  </ol>
+  <p>
+    If the customer pays successfully <em>before</em> our first recovery email
+    for that failure is sent, no DeclineGuard recovery fee is owed for that
+    event. We calculate fees on the recovered amount and currency reported by
+    Lemon Squeezy events (converted for invoicing if needed using a reasonable
+    market rate or our payment provider’s rate).
+  </p>
+  <h3>4.4 Invoicing &amp; payment of our fees</h3>
+  <p>
+    Fees may be collected via invoice, card/SEPA checkout, Lemon Squeezy, or
+    another processor we designate. You authorise us to invoice and collect
+    amounts due. Late amounts may accrue interest at the statutory rate and/or
+    reasonable collection costs where permitted. We may suspend the Service for
+    non-payment after notice.
+  </p>
+  <h3>4.5 Taxes</h3>
+  <p>
+    Fees are exclusive of VAT and similar taxes unless stated otherwise. If VAT
+    applies, it will be added as required. You are responsible for taxes on your
+    own sales to end customers.
+  </p>
+  <h3>4.6 Price changes</h3>
+  <p>
+    We may change prices for renewals or new subscriptions with reasonable
+    prior notice. Continued use after the effective date constitutes acceptance
+    unless you cancel before the change applies.
+  </p>
+
+  <h2>5. Your responsibilities</h2>
+  <p>You agree to:</p>
+  <ul>
+    <li>Use the Service only for lawful business purposes and in compliance with GDPR/DSGVO, ePrivacy, UWG/unfair competition, CAN-SPAM/CASL where applicable, and your contracts with customers.</li>
+    <li>Ensure you have a valid legal basis to send recovery emails to end customers and that content is accurate and not misleading.</li>
+    <li>Configure brand, from-name, reply-to, and support details correctly; you are responsible for customer replies to those addresses.</li>
+    <li>Not use the Service to spam, phish, harass, or send unlawful content.</li>
+    <li>Not reverse engineer, abuse rate limits, probe for vulnerabilities without authorisation, or resell the Service except as we agree in writing.</li>
+    <li>Not upload malware or infringing content.</li>
+    <li>Promptly notify us of security incidents involving your API keys or unauthorised account use.</li>
+  </ul>
+
+  <h2>6. Email content &amp; brand licence</h2>
+  <p>
+    You grant us a non-exclusive licence to use your store name, logos, brand
+    colours, and related assets solely to send recovery emails and display them
+    in your dashboard as part of the Service. You warrant you have rights to
+    those assets. Free-plan emails may include DeclineGuard attribution.
+  </p>
+
+  <h2>7. Data protection</h2>
+  <p>
+    Each party shall comply with applicable data protection law. For
+    end-customer personal data processed in providing the Service, the
+    <a href="/legal/dpa">DPA</a> applies and prevails on processing terms in
+    case of conflict. You are controller; we are processor for that data.
+  </p>
+
+  <h2>8. Intellectual property</h2>
+  <p>
+    We and our licensors own the Service, software, designs, and DeclineGuard
+    trademarks. Subject to these Terms and timely payment, we grant you a
+    limited, non-exclusive, non-transferable, revocable right to access the
+    Service for your internal business operations. No other licence is granted.
+    Feedback you provide may be used by us without obligation to you.
+  </p>
+
+  <h2>9. Third-party services</h2>
+  <p>
+    The Service depends on third parties (including Clerk, Convex, Resend, Lemon
+    Squeezy, Google). Their terms and availability are outside our full
+    control. We are not liable for third-party outages, API changes, or
+    Lemon Squeezy payment results, except to the extent caused by our wilful
+    misconduct or as mandatory law provides.
+  </p>
+
+  <h2>10. Beta / founding features</h2>
+  <p>
+    Features labelled alpha, beta, founding, or experimental are provided as-is
+    and may change or end. SLAs, if any, do not apply unless expressly stated.
+  </p>
+
+  <h2>11. Warranties &amp; disclaimer</h2>
+  <p>
+    We provide the Service with reasonable skill and care. Except as expressly
+    stated, and to the maximum extent permitted by law, the Service is provided
+    “as is” and “as available” without warranties of uninterrupted operation,
+    error-free recovery rates, or fitness for a particular purpose. We do not
+    guarantee any specific recovery percentage or revenue outcome.
+  </p>
+
+  <h2>12. Liability</h2>
+  <p>
+    Nothing in these Terms excludes liability that cannot be limited under
+    applicable law (e.g. intent, gross negligence, injury to life/body/health,
+    fraud, or mandatory product liability).
+  </p>
+  <p>
+    Subject to the foregoing, our aggregate liability arising out of or related
+    to the Service in any twelve-month period is limited to the greater of
+    (a) fees you paid us for the Service in that period, or (b)
+    <strong>€100</strong>. We are not liable for indirect, incidental, special,
+    consequential, or lost-profit damages, loss of goodwill, or lost data, except
+    where caused by our intent or gross negligence or where mandatory law
+    provides otherwise.
+  </p>
+  <p>
+    You are responsible for verifying recovery emails and payment links before
+    relying on them in production; maintain your own customer support processes.
+  </p>
+
+  <h2>13. Indemnity</h2>
+  <p>
+    You will defend and indemnify us against claims, damages, and reasonable
+    costs arising from: (a) your content, products, or customer relationships;
+    (b) your misuse of the Service or violation of law; (c) your failure to have
+    a lawful basis to contact end customers; or (d) disputes between you and
+    your customers or Lemon Squeezy — except to the extent caused by our breach
+    of these Terms or the DPA.
+  </p>
+
+  <h2>14. Suspension &amp; termination</h2>
+  <p>
+    You may stop using the Service and request account closure by contacting
+    {legal.supportEmail}. We may suspend or terminate for breach, legal risk,
+    non-payment, or extended inactivity after notice where reasonable. Upon
+    termination, your licence ends; Sections that by nature should survive
+    (fees owed, IP, liability, indemnity, governing law) survive. Data handling
+    after termination follows the Privacy Policy and DPA.
+  </p>
+
+  <h2>15. Changes to the Service or Terms</h2>
+  <p>
+    We may modify the Service and these Terms. For material adverse changes to
+    Terms, we will provide notice (email or in-app) at least
+    <strong>14 days</strong> in advance where practicable. If you do not agree,
+    you must stop using the Service and may cancel. Continued use after the
+    effective date constitutes acceptance, except where mandatory law requires
+    explicit consent.
+  </p>
+
+  <h2>16. Export &amp; sanctions</h2>
+  <p>
+    You may not use the Service if you are subject to sanctions or in a
+    prohibited jurisdiction under applicable EU/US/UK export or sanctions laws.
+  </p>
+
+  <h2>17. Governing law &amp; venue</h2>
+  <p>
+    These Terms are governed by {legal.governingLaw}, excluding conflict-of-law
+    rules. Exclusive venue is {legal.venue}, subject to mandatory venues for
+    consumers if applicable. The UN CISG does not apply.
+  </p>
+
+  <h2>18. Miscellaneous</h2>
+  <ul>
+    <li>These Terms plus the DPA, Privacy Policy, and any order form are the entire agreement regarding the Service.</li>
+    <li>If a provision is unenforceable, the remainder stays in effect.</li>
+    <li>Failure to enforce is not a waiver.</li>
+    <li>You may not assign without our consent; we may assign to an affiliate or successor.</li>
+    <li>Notices: {legal.legalEmail} / {legal.supportEmail}; we may notice you via account email.</li>
+  </ul>
+
+  <h2>19. Contact</h2>
+  <p class="meta">
+    {legal.legalName}<br />
+    {legal.streetAddress}<br />
+    {legal.postalCode} {legal.city}, {legal.country}<br />
+    {legal.supportEmail}
+  </p>
+</LegalLayout>

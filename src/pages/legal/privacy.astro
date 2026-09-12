@@ -1,0 +1,301 @@
+---
+import LegalLayout from "@/layouts/LegalLayout.astro";
+import { legal, subprocessors } from "@/lib/legal";
+
+const privacyMailto = `mailto:${legal.privacyEmail}`;
+const supportMailto = `mailto:${legal.supportEmail}`;
+---
+
+<LegalLayout
+  title="Privacy Policy"
+  description={`Privacy Policy (Datenschutzerklärung) for ${legal.brandName} — GDPR / DSGVO.`}
+  heading="Privacy Policy"
+  eyebrow="Datenschutzerklärung · GDPR / DSGVO"
+>
+  <p>
+    This Privacy Policy explains how <strong>{legal.legalName}</strong> ("we",
+    "us", "{legal.brandName}") processes personal data when you visit our
+    website, create a merchant account, connect a Lemon Squeezy store, or use
+    our payment-recovery Service. It is designed for compliance with the EU
+    General Data Protection Regulation (Regulation (EU) 2016/679 — "GDPR" /
+    "DSGVO"), the German BDSG and TTDSG/TDDDG where applicable, and related
+    ePrivacy rules.
+  </p>
+  <p>
+    Controller (unless stated otherwise below):
+  </p>
+  <p class="meta">
+    {legal.legalName}<br />
+    {legal.streetAddress}<br />
+    {legal.postalCode} {legal.city}<br />
+    {legal.country}<br />
+    Email: {legal.privacyEmail}
+  </p>
+  <p>
+    If we appoint a Data Protection Officer, contact details will be published
+    here: <strong>[DPO NAME / CONTACT — if appointed]</strong>.
+  </p>
+
+  <h2>1. Roles: Controller vs Processor</h2>
+  <h3>1.1 Merchant account data — we are Controller</h3>
+  <p>
+    When you sign up for {legal.brandName}, we decide the purposes and means of
+    processing your account data (identity, login, billing relationship with us,
+    support requests). For that data we are the <strong>controller</strong>.
+  </p>
+  <h3>1.2 Your customers’ data — we are Processor</h3>
+  <p>
+    When you connect Lemon Squeezy and we receive failed-payment / recovery
+    events, we process personal data of <strong>your end customers</strong>
+    (e.g. email address, name, product, amount, subscription identifiers) solely
+    to provide the recovery Service on your instructions. For that data we act as
+    your <strong>processor</strong> under Art. 28 GDPR. The merchant is the
+    controller of end-customer data. Our binding processor terms are in the
+    <a href="/legal/dpa">Data Processing Agreement (DPA / AVV)</a>, which forms
+    part of our contract with you.
+  </p>
+
+  <h2>2. Categories of personal data</h2>
+  <h3>2.1 Website visitors</h3>
+  <ul>
+    <li>Technical data: IP address, browser/user-agent, referrer, timestamps, security logs</li>
+    <li>Cookie / similar technology data as described in our <a href="/legal/cookies">Cookie Notice</a></li>
+  </ul>
+  <h3>2.2 Merchant accounts (Controller)</h3>
+  <ul>
+    <li>Identity: first name, last name, display name</li>
+    <li>Contact: email address</li>
+    <li>Auth: password (hashed by our auth provider), session tokens, Google OAuth identifiers if used</li>
+    <li>Profile image URL (if provided by auth provider)</li>
+    <li>Store connection metadata: Lemon Squeezy store id/name/slug/avatar, test mode flags</li>
+    <li>Encrypted Lemon Squeezy API credentials (and last-four display hint)</li>
+    <li>Recovery branding settings: colors, from-name, reply-to / support emails, social URLs</li>
+    <li>Plan / commercial status (e.g. Free or Pro), activity related to your use of the Service</li>
+    <li>Support correspondence you send us</li>
+  </ul>
+  <h3>2.3 End customers of merchants (Processor)</h3>
+  <ul>
+    <li>Customer email address and name (as provided by Lemon Squeezy webhooks)</li>
+    <li>Product / plan name, amount, currency</li>
+    <li>Subscription / invoice / event identifiers</li>
+    <li>Update-payment URL (hosted by Lemon Squeezy)</li>
+    <li>Recovery email send timestamps and related activity log entries</li>
+    <li>Test-mode flags</li>
+  </ul>
+  <p>
+    <strong>We do not receive or store payment card numbers (PAN), CVV, or full
+    card credentials.</strong> Customers update payment methods on Lemon Squeezy.
+  </p>
+  <h3>2.4 Legacy / optional features</h3>
+  <p>
+    If you use any optional tools we still host (e.g. image/editor utilities), we
+    may process uploaded images, titles, and prompts you submit. Those features
+    are not part of the core DeclineGuard recovery product; if retained, the same
+    GDPR principles apply.
+  </p>
+
+  <h2>3. Purposes and legal bases (Controller processing)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Purpose</th>
+        <th>Legal basis (Art. 6 GDPR)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Provide, secure, and maintain the Service; authenticate users</td>
+        <td>Art. 6(1)(b) contract; Art. 6(1)(f) security (legitimate interests)</td>
+      </tr>
+      <tr>
+        <td>Connect Lemon Squeezy and operate recovery sequences you configure</td>
+        <td>Art. 6(1)(b) contract</td>
+      </tr>
+      <tr>
+        <td>Billing, invoices, fee collection, accounting</td>
+        <td>Art. 6(1)(b) contract; Art. 6(1)(c) legal obligation</td>
+      </tr>
+      <tr>
+        <td>Customer support and service communications</td>
+        <td>Art. 6(1)(b) contract; Art. 6(1)(f) legitimate interests</td>
+      </tr>
+      <tr>
+        <td>Improve product reliability and prevent abuse/fraud</td>
+        <td>Art. 6(1)(f) legitimate interests</td>
+      </tr>
+      <tr>
+        <td>Comply with law, enforce Terms, defend legal claims</td>
+        <td>Art. 6(1)(c) legal obligation; Art. 6(1)(f) legitimate interests</td>
+      </tr>
+      <tr>
+        <td>Optional marketing emails (only if you opt in)</td>
+        <td>Art. 6(1)(a) consent (withdraw anytime)</td>
+      </tr>
+      <tr>
+        <td>Strictly necessary cookies / auth storage</td>
+        <td>TTDSG/TDDDG § 25 where applicable; Art. 6(1)(b) and (f)</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    Processor processing of end-customer data is performed on the merchant’s
+    documented instructions (see DPA), based on the merchant’s own legal bases
+    toward those customers (typically Art. 6(1)(b) contract and/or Art. 6(1)(f)).
+  </p>
+
+  <h2>4. Recovery emails</h2>
+  <p>
+    Recovery messages are transactional service emails about a failed
+    subscription renewal and a link to update payment — sent on your behalf via
+    our email provider. Free-tier messages may include a short “Recovery sent by
+    DeclineGuard” attribution unless you are on a plan that removes it.
+  </p>
+  <p>
+    You (the merchant) are responsible for ensuring you have a lawful basis to
+    contact your customers and that recovery sequences comply with applicable
+    marketing / ePrivacy / unfair competition rules in your customers’
+    jurisdictions. You must configure accurate reply-to / support contacts and
+    brand settings. If a customer objects to emails, you must instruct us (e.g.
+    by disconnecting, stopping sequences, or requesting suppression where we
+    offer it) and handle the request as controller.
+  </p>
+
+  <h2>5. Recipients and subprocessors</h2>
+  <p>
+    We use carefully selected service providers (processors / subprocessors)
+    who process data only for specified purposes under contract:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Provider</th>
+        <th>Purpose</th>
+        <th>Typical location</th>
+        <th>Data (summary)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {
+        subprocessors.map((s) => (
+          <tr>
+            <td>{s.name}</td>
+            <td>{s.purpose}</td>
+            <td>{s.location}</td>
+            <td>{s.data}</td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+  <p>
+    We may also disclose data to professional advisors, authorities, or
+    successors in a merger/acquisition where legally required or permitted. We
+    do not sell personal data.
+  </p>
+
+  <h2>6. International transfers</h2>
+  <p>
+    Where personal data is transferred to countries outside the EEA/UK that do
+    not have an adequacy decision, we rely on appropriate safeguards under
+    Chapter V GDPR — typically the EU Standard Contractual Clauses (SCCs),
+    plus supplementary measures where needed — through our providers’ DPAs.
+    Our application database is intended to run in an EU region (currently
+    eu-west-1 for development/deployment configuration); confirm production
+    region with us if material to your DPIA.
+  </p>
+
+  <h2>7. Retention</h2>
+  <ul>
+    <li>
+      <strong>Merchant account:</strong> for the life of the account and up to
+      <strong>[RETENTION: e.g. 30 days]</strong> after deletion request, unless
+      longer retention is required for legal claims or statutory bookkeeping
+      (often 6–10 years for invoices under German commercial/tax law).
+    </li>
+    <li>
+      <strong>Lemon connection &amp; recovery records:</strong> while the store
+      is connected and thereafter for <strong>[RETENTION PERIOD]</strong>, or
+      sooner if you disconnect (disconnect currently deletes failed-payment and
+      related activity data for that connection) or instruct deletion under the
+      DPA.
+    </li>
+    <li>
+      <strong>Security / server logs:</strong> typically short-term
+      (<strong>[e.g. 30–90 days]</strong>) unless needed for incident
+      investigation.
+    </li>
+    <li>
+      <strong>Email delivery logs</strong> at our email provider: per that
+      provider’s retention, limited to what is needed for delivery and abuse
+      prevention.
+    </li>
+  </ul>
+
+  <h2>8. Security</h2>
+  <p>
+    We implement appropriate technical and organisational measures (Art. 32
+    GDPR), including encryption in transit (TLS), encryption of Lemon Squeezy
+    API keys at rest, access controls, authentication via a specialised
+    provider, rate limiting, and least-privilege internal access. No method of
+    transmission or storage is 100% secure; please use strong unique passwords
+    and protect your API keys.
+  </p>
+
+  <h2>9. Your rights (GDPR)</h2>
+  <p>If we are controller of your data, you may have the right to:</p>
+  <ul>
+    <li>Access (Art. 15)</li>
+    <li>Rectification (Art. 16)</li>
+    <li>Erasure (Art. 17)</li>
+    <li>Restriction (Art. 18)</li>
+    <li>Data portability (Art. 20)</li>
+    <li>Object to processing based on legitimate interests (Art. 21)</li>
+    <li>Withdraw consent at any time (Art. 7(3)), without affecting prior lawful processing</li>
+    <li>Lodge a complaint with a supervisory authority (Art. 77), e.g. the authority of your habitual residence or our lead authority: <strong>[SUPERVISORY AUTHORITY — e.g. Berliner Beauftragte für Datenschutz]</strong></li>
+  </ul>
+  <p>
+    To exercise rights regarding your merchant account, email
+    <a href={privacyMailto}>{legal.privacyEmail}</a>. For end-customer rights
+    requests about recovery emails, contact the merchant (controller) first; we
+    will assist merchants under the DPA.
+  </p>
+
+  <h2>10. Children</h2>
+  <p>
+    The Service is directed at businesses. It is not intended for individuals
+    under 16. We do not knowingly collect data from children.
+  </p>
+
+  <h2>11. Automated decision-making</h2>
+  <p>
+    We do not make decisions producing legal or similarly significant effects
+    solely by automated processing within the meaning of Art. 22 GDPR. Recovery
+    emails follow rules/sequences you enable; payment success is determined by
+    Lemon Squeezy / the customer’s payment provider.
+  </p>
+
+  <h2>12. Cookies &amp; similar technologies</h2>
+  <p>
+    See our dedicated <a href="/legal/cookies">Cookie Notice</a>. Essential
+    authentication cookies are required to operate signed-in areas. We do not
+    currently operate third-party advertising cookies. If we add analytics, we
+    will update this Policy and obtain consent where required.
+  </p>
+
+  <h2>13. Changes</h2>
+  <p>
+    We may update this Policy. Material changes will be indicated by updating
+    the “Last updated” date and, where appropriate, notifying account holders
+    by email or in-product notice. Continued use after the effective date
+    constitutes acknowledgment of the updated Policy (for contractual
+    processing). Where consent is required, we will re-seek it.
+  </p>
+
+  <h2>14. Contact</h2>
+  <p>
+    Privacy requests: <a href={privacyMailto}>{legal.privacyEmail}</a><br />
+    General support: <a href={supportMailto}>{legal.supportEmail}</a><br />
+    Postal: {legal.legalName}, {legal.streetAddress}, {legal.postalCode}
+    {legal.city}, {legal.country}
+  </p>
+</LegalLayout>

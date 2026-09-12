@@ -1,0 +1,40 @@
+---
+import LegalLayout from "@/layouts/LegalLayout.astro";
+import { legal, legalNav } from "@/lib/legal";
+
+const privacyMailto = `mailto:${legal.privacyEmail}`;
+---
+
+<LegalLayout
+  title="Legal"
+  description={`Legal documents for ${legal.brandName}.`}
+  heading="Legal center"
+  eyebrow="DeclineGuard"
+>
+  <p>
+    These documents govern your use of {legal.brandName} and explain how we
+    handle personal data under the EU General Data Protection Regulation (GDPR /
+    DSGVO) and related laws.
+  </p>
+
+  <ul>
+    {
+      legalNav.map((item) => (
+        <li>
+          <a href={item.href}>{item.label}</a>
+        </li>
+      ))
+    }
+  </ul>
+
+  <h2>Who we are</h2>
+  <p class="meta">
+    {legal.legalName}<br />
+    {legal.streetAddress}<br />
+    {legal.postalCode} {legal.city}<br />
+    {legal.country}
+  </p>
+  <p>
+    Privacy contact: <a href={privacyMailto}>{legal.privacyEmail}</a>
+  </p>
+</LegalLayout>

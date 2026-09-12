@@ -1,0 +1,11 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { AuthenticateWithRedirectCallback } from "@clerk/astro/react";
+---
+
+<Layout title="Signing you in — DeclineGuard">
+  <div class="flex min-h-dvh items-center justify-center bg-[#F7F7F8] px-6">
+    <p class="text-sm text-muted-foreground">Finishing sign-in…</p>
+  </div>
+  <AuthenticateWithRedirectCallback client:load />
+</Layout>

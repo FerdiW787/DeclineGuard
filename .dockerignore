@@ -1,0 +1,14 @@
+# Used by Dockerfile.brand-capture / Fly deploy
+node_modules
+dist
+.git
+.astro
+.env
+.env.*
+*.md
+docs
+public
+src
+.vercel
+.cursor
+agent-transcripts

@@ -1,0 +1,12 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import PublicDashboardPreview from "@/components/dashboard/PublicDashboardPreview";
+---
+
+<Layout
+  theme="light"
+  title="Dashboard — DeclineGuard"
+  description="Preview of the DeclineGuard merchant overview."
+>
+  <PublicDashboardPreview client:only="react" />
+</Layout>

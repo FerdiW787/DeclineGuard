@@ -1,0 +1,12 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Dashboard from "@/components/dashboard/Dashboard";
+---
+
+<Layout
+  theme="light"
+  title="Dashboard — DeclineGuard"
+  description="Track recovered Lemon Squeezy revenue, open failures, and recovery sequences."
+>
+  <Dashboard client:only="react" />
+</Layout>

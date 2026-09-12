@@ -1,0 +1,237 @@
+---
+import LegalLayout from "@/layouts/LegalLayout.astro";
+import { legal, subprocessors } from "@/lib/legal";
+
+const legalMailto = `mailto:${legal.legalEmail}`;
+---
+
+<LegalLayout
+  title="Data Processing Agreement"
+  description={`Art. 28 GDPR Data Processing Agreement (AVV) for ${legal.brandName}.`}
+  heading="Data Processing Agreement"
+  eyebrow="AVV · Art. 28 GDPR"
+>
+  <p>
+    This Data Processing Agreement (“DPA”), including its Annexes, forms part of
+    the <a href="/legal/terms">Terms of Service</a> between the Merchant
+    (“Controller”) and <strong>{legal.legalName}</strong> (“Processor”,
+    “DeclineGuard”) under Article 28 of the GDPR. It applies when DeclineGuard
+    processes personal data of the Controller’s end customers (and similar data
+    subjects) in providing the Service.
+  </p>
+  <p>
+    By creating an account, connecting a Lemon Squeezy store, or otherwise using
+    processing features, Controller agrees to this DPA. If you need a signed PDF
+    copy, email <a href={legalMailto}>{legal.legalEmail}</a>.
+  </p>
+
+  <h2>1. Definitions</h2>
+  <p>
+    Terms used here have the meaning in the GDPR. “Services” means DeclineGuard
+    payment-recovery and related features. “Customer Personal Data” means
+    personal data relating to Controller’s end customers (and other data
+    subjects whose data Controller submits) processed by Processor on
+    Controller’s behalf.
+  </p>
+
+  <h2>2. Subject matter, duration, nature &amp; purpose</h2>
+  <ul>
+    <li><strong>Subject matter:</strong> processing Customer Personal Data to operate recovery detection, storage, dashboarding, and recovery email sequences.</li>
+    <li><strong>Duration:</strong> for the term of the Services agreement and until deletion/return under this DPA.</li>
+    <li><strong>Nature:</strong> collection via webhooks/API, storage, organisation, transmission (email), retrieval, restriction, erasure.</li>
+    <li><strong>Purpose:</strong> solely to provide the Services instructed by Controller; not for Processor’s own marketing to end customers.</li>
+  </ul>
+
+  <h2>3. Types of personal data &amp; data subjects</h2>
+  <h3>3.1 Data subjects</h3>
+  <p>
+    End customers / subscribers of Controller (and any other individuals whose
+    data appears in Lemon Squeezy webhook payloads Controller enables).
+  </p>
+  <h3>3.2 Types of data</h3>
+  <ul>
+    <li>Identity &amp; contact: name, email address</li>
+    <li>Commercial: product/plan name, amount, currency</li>
+    <li>Identifiers: subscription, invoice, event / store identifiers</li>
+    <li>Service metadata: update-payment URL, email send timestamps, recovery status, test-mode flags</li>
+  </ul>
+  <p>
+    Special categories (Art. 9) are not required for the Service; Controller
+    shall not intentionally submit special-category data.
+  </p>
+
+  <h2>4. Instructions</h2>
+  <p>
+    Processor shall process Customer Personal Data only on documented
+    instructions from Controller, including in the Terms, this DPA, and product
+    configuration (connected stores, sequences, brand settings), unless required
+    by EU or Member State law. If Processor believes an instruction infringes
+    GDPR, Processor will inform Controller without undue delay.
+  </p>
+
+  <h2>5. Confidentiality</h2>
+  <p>
+    Persons authorised to process Customer Personal Data are bound by
+    confidentiality (contractual or statutory) and receive access only as
+    needed.
+  </p>
+
+  <h2>6. Security (Art. 32)</h2>
+  <p>
+    Processor implements appropriate technical and organisational measures,
+    including but not limited to:
+  </p>
+  <ul>
+    <li>Encryption in transit (TLS)</li>
+    <li>Encryption of Lemon Squeezy API keys at rest</li>
+    <li>Access control &amp; authentication</li>
+    <li>Least-privilege internal access</li>
+    <li>Logical separation of customer data in the application database</li>
+    <li>Rate limiting and abuse protections</li>
+    <li>Backup / resilience measures as provided by infrastructure vendors</li>
+    <li>Incident response procedures</li>
+  </ul>
+  <p>
+    Details may be updated as measures improve, without reducing the overall
+    security level.
+  </p>
+
+  <h2>7. Subprocessors</h2>
+  <p>
+    Controller authorises Processor to engage subprocessors. Current
+    subprocessors relevant to Customer Personal Data include:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Subprocessor</th>
+        <th>Role</th>
+        <th>Location</th>
+      </tr>
+    </thead>
+    <tbody>
+      {
+        subprocessors.map((s) => (
+          <tr>
+            <td>{s.name}</td>
+            <td>{s.purpose}</td>
+            <td>{s.location}</td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+  <p>
+    Processor will impose data-protection obligations on subprocessors
+    materially no less protective than this DPA. Processor remains responsible
+    for subprocessors’ performance. Processor will notify Controller of intended
+    additions or replacements of subprocessors (e.g. via email, website list, or
+    in-app notice) at least <strong>14 days</strong> in advance where
+    practicable. Controller may object on reasonable data-protection grounds; if
+    unresolved, Controller may terminate the affected Services as its sole
+    remedy.
+  </p>
+
+  <h2>8. International transfers</h2>
+  <p>
+    Where Customer Personal Data is transferred outside the EEA, Processor
+    ensures Chapter V GDPR safeguards (e.g. adequacy or SCCs) via its
+    subprocessors’ mechanisms. Controller authorises such transfers subject to
+    those safeguards.
+  </p>
+
+  <h2>9. Assistance with data-subject rights</h2>
+  <p>
+    Taking into account the nature of processing, Processor shall assist
+    Controller by appropriate technical and organisational measures, insofar as
+    possible, for the fulfilment of Controller’s obligation to respond to
+    requests to exercise data-subject rights. Controller remains responsible for
+    responding to end customers. Processor will not respond directly to end
+    customers as controller, except to redirect them to Controller or as
+    required by law.
+  </p>
+
+  <h2>10. Assistance with security, DPIA &amp; prior consultation</h2>
+  <p>
+    Processor shall assist Controller with Art. 32–36 obligations, considering
+    the nature of processing and information available to Processor, including
+    relevant information for DPIAs regarding the Services.
+  </p>
+
+  <h2>11. Personal data breach</h2>
+  <p>
+    Processor shall notify Controller without undue delay after becoming aware
+    of a personal data breach affecting Customer Personal Data, and provide
+    information reasonably available to help Controller meet Arts. 33–34. Notice
+    to: Controller’s account email and/or
+    <strong>[MERCHANT SECURITY CONTACT — as provided in account]</strong>.
+  </p>
+
+  <h2>12. Return or deletion</h2>
+  <p>
+    Upon termination of Services or upon Controller’s written request, Processor
+    shall, at Controller’s choice, delete or return Customer Personal Data and
+    delete existing copies, unless EU or Member State law requires storage.
+    Disconnecting a store in-product may trigger deletion of associated recovery
+    records as implemented. Certifications of deletion may be provided upon
+    reasonable request.
+  </p>
+
+  <h2>13. Audits</h2>
+  <p>
+    Processor shall make available information necessary to demonstrate
+    compliance with Art. 28 and allow for audits by Controller or an authorised
+    auditor, subject to: reasonable prior notice, confidentiality, no more than
+    once per twelve months (unless a breach or competent authority requires
+    otherwise), and preference for third-party audit reports / questionnaires
+    before on-site inspection. Audits must not unreasonably disrupt operations
+    or compromise other customers’ security.
+  </p>
+
+  <h2>14. Controller responsibilities</h2>
+  <p>Controller warrants that:</p>
+  <ul>
+    <li>it has a valid legal basis to process and to instruct Processor to send recovery emails;</li>
+    <li>its instructions are lawful;</li>
+    <li>notices to data subjects (privacy policy, etc.) cover this processing;</li>
+    <li>it will not configure the Service to process data unlawfully or beyond the Service’s intended scope.</li>
+  </ul>
+
+  <h2>15. Liability</h2>
+  <p>
+    Liability under this DPA follows the liability provisions of the Terms,
+    without prejudice to Arts. 82–84 GDPR and mandatory law.
+  </p>
+
+  <h2>16. Order of precedence</h2>
+  <p>
+    On data-processing subject matter, this DPA prevails over conflicting Terms.
+    The GDPR prevails over both where applicable.
+  </p>
+
+  <h2>17. Governing law</h2>
+  <p>
+    This DPA is governed by {legal.governingLaw}, unless mandatory data-protection
+    rules require otherwise.
+  </p>
+
+  <h2>Annex A — Technical &amp; organisational measures (summary)</h2>
+  <ol>
+    <li>Access control (authentication, authorisation, least privilege)</li>
+    <li>Encryption in transit; credential encryption at rest</li>
+    <li>Secure development and dependency practices</li>
+    <li>Logging &amp; monitoring of security-relevant events</li>
+    <li>Vendor management for subprocessors</li>
+    <li>Incident response &amp; breach notification workflow</li>
+    <li>Availability / backups via infrastructure providers</li>
+    <li>Staff confidentiality commitments</li>
+  </ol>
+
+  <h2>Annex B — Contact</h2>
+  <p class="meta">
+    Processor: {legal.legalName}<br />
+    {legal.streetAddress}, {legal.postalCode} {legal.city}, {legal.country}<br />
+    Privacy: {legal.privacyEmail}<br />
+    Legal: {legal.legalEmail}
+  </p>
+</LegalLayout>

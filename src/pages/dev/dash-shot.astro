@@ -1,0 +1,12 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import PublicDashboardPreview from "@/components/dashboard/PublicDashboardPreview";
+---
+
+<Layout
+  theme="light"
+  title="Dashboard shot — DeclineGuard"
+  description="High-resolution dashboard capture for the homepage bento."
+>
+  <PublicDashboardPreview client:only="react" />
+</Layout>

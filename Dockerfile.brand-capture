@@ -1,0 +1,25 @@
+# Always-on Playwright brand-capture worker (Fly.io / Docker).
+# Build: docker build -f Dockerfile.brand-capture -t brand-capture .
+# Run:   docker run -p 8787:8787 -e BRAND_CAPTURE_WORKER_SECRET=… brand-capture
+# Deploy: npm run brand-capture:deploy
+
+FROM mcr.microsoft.com/playwright:v1.62.1-jammy
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=8787
+ENV REQUIRE_SECRET=1
+# Browsers ship with this image; keep Playwright JS client on the same major/minor.
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+RUN npm init -y \
+  && npm install --no-fund --no-audit playwright@1.62.1 tsx@4.23.5
+
+COPY convex/lib/brandImport ./convex/lib/brandImport
+COPY scripts/brand-capture-worker.ts ./scripts/brand-capture-worker.ts
+COPY scripts/lib ./scripts/lib
+
+EXPOSE 8787
+
+CMD ["npx", "tsx", "scripts/brand-capture-worker.ts"]

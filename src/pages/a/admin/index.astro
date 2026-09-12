@@ -1,0 +1,12 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import AdminConsole from "@/components/admin/AdminConsole";
+---
+
+<Layout
+  theme="light"
+  title="Admin — DeclineGuard"
+  description="Platform admin recovery console for DeclineGuard merchants."
+>
+  <AdminConsole client:only="react" />
+</Layout>

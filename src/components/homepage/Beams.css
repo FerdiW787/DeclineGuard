@@ -1,0 +1,13 @@
+.beams-container {
+  position: absolute !important;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+.beams-container canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}

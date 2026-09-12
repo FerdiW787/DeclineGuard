@@ -1,0 +1,68 @@
+---
+import "@/styles/global.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** Marketing, dashboard, and auth use light Linear. */
+  theme?: "light" | "dark";
+  /** Show the page scrollbar. Homepage only — hidden everywhere else. */
+  showScrollbar?: boolean;
+}
+
+const {
+  title = "DeclineGuard — Recover failed Lemon Squeezy payments",
+  description = "Branded recovery emails on top of Lemon Squeezy. You only pay when we recover money.",
+  theme = "dark",
+  showScrollbar = false,
+} = Astro.props;
+---
+
+<!doctype html>
+<html
+  lang="en"
+  class:list={[
+    theme === "dark" && "dark",
+    showScrollbar && "show-scrollbar",
+    "overflow-x-clip",
+  ]}
+  data-theme={theme}
+>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content={description} />
+    <meta
+      name="color-scheme"
+      content={theme === "dark" ? "dark light" : "light dark"}
+    />
+    <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content={theme === "light" ? "#f7f8f8" : "#0c0a09"} />
+    <title>{title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Syne:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script is:inline>
+      try {
+        const pageTheme = document.documentElement.dataset.theme;
+        // Marketing, dashboard, and auth are light Linear.
+        if (pageTheme === "light") {
+          document.documentElement.classList.remove("dark");
+        } else {
+          document.documentElement.classList.add("dark");
+        }
+      } catch {
+        /* ignore */
+      }
+    </script>
+  </head>
+  <body class="min-h-screen bg-background text-foreground antialiased">
+    <slot />
+  </body>
+</html>

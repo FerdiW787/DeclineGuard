@@ -1,0 +1,61 @@
+.gradient-blinds-container {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.gradient-blinds-container canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Cinematic rise: blinds unveil from the bottom with a soft leading edge */
+@property --dg-blinds-p {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
+.dg-blinds-rise {
+  --dg-blinds-p: 0%;
+  -webkit-mask-image: linear-gradient(
+    to top,
+    #000 0%,
+    #000 max(0%, calc(var(--dg-blinds-p) - 32%)),
+    transparent var(--dg-blinds-p)
+  );
+  mask-image: linear-gradient(
+    to top,
+    #000 0%,
+    #000 max(0%, calc(var(--dg-blinds-p) - 32%)),
+    transparent var(--dg-blinds-p)
+  );
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+.dg-blinds-rise.is-lit {
+  animation: dg-blinds-rise 1.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes dg-blinds-rise {
+  from {
+    --dg-blinds-p: 0%;
+  }
+  to {
+    /* Overshoot so the soft edge clears the top */
+    --dg-blinds-p: 135%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dg-blinds-rise.is-lit {
+    animation: none;
+    --dg-blinds-p: 135%;
+  }
+}
