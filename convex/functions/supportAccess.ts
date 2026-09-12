@@ -417,6 +417,8 @@ function sequenceLabelForFailure(row: {
   day5SentAt?: number;
   day2JobId?: unknown;
   day5JobId?: unknown;
+  recoveryAction?: string | null;
+  attemptIndex?: number | null;
 }): string {
   if (row.day5SentAt != null) return "Email 3 · Day 5 sent";
   if (row.day2SentAt != null) {
@@ -425,7 +427,16 @@ function sequenceLabelForFailure(row: {
   if (row.day0SentAt != null) {
     return row.day2JobId ? "Email 1 · Day 2 pending" : "Email 1 · Day 0 sent";
   }
-  return "Queued · Day 0";
+  // Honest label for wait/null action (attempt 1)
+  if (row.recoveryAction === "wait" || row.recoveryAction == null) {
+    const attempt = row.attemptIndex ?? 1;
+    return `Waiting · Attempt ${attempt}`;
+  }
+  if (row.recoveryAction === "stop") {
+    return "Stopped";
+  }
+  // nudge_update_pm or push_update_pm with no emails sent yet
+  return "Queued · Email pending";
 }
 
 function nextEmailAtForFailure(row: {

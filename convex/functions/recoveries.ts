@@ -666,8 +666,10 @@ export const markPaymentRecovered = internalMutation({
 });
 
 /**
- * Handle subscription lifecycle change → stop recovery sequence.
+ * Handle subscription lifecycle change.
  * Called when subscription_updated shows status change to cancelled/expired/unpaid.
+ * - cancelled/expired → stop sequence (no more emails)
+ * - unpaid → send aggressive push email (direct/urgent, not gentle)
  */
 export const handleSubscriptionLifecycleStop = internalMutation({
   args: {
@@ -695,40 +697,65 @@ export const handleSubscriptionLifecycleStop = internalMutation({
 
     if (!open) return null;
 
-    // Cancel any scheduled follow-up emails
-    if (open.day2JobId) {
-      try {
-        await ctx.scheduler.cancel(open.day2JobId);
-      } catch {
-        /* already finished or cancelled */
-      }
-    }
-    if (open.day5JobId) {
-      try {
-        await ctx.scheduler.cancel(open.day5JobId);
-      } catch {
-        /* already finished or cancelled */
-      }
-    }
-
-    // For unpaid, keep status as "open" but set action to push_update_pm
+    // For unpaid, send aggressive push email (if past attempt-1 wait)
     // For cancelled/expired, set status to "cancelled" and action to "stop"
     if (args.newStatus === "unpaid") {
-      // Unpaid = late in LS retry window → push aggressively
-      await ctx.db.patch(open._id, {
-        recoveryAction: "push_update_pm",
-        lastEventName: args.eventName,
-        day2JobId: undefined,
-        day5JobId: undefined,
-      });
+      // Respect attempt-1 wait policy — don't jump the wait window
+      const attemptIndex = open.attemptIndex ?? 1;
+      if (attemptIndex <= 1) {
+        // Still in wait window — set push_update_pm for future but don't send now
+        // Keep scheduled follow-ups intact (don't cancel jobs)
+        await ctx.db.patch(open._id, {
+          recoveryAction: "push_update_pm",
+          lastEventName: args.eventName,
+        });
+      } else {
+        // Past wait window — cancel pending jobs and send push immediately
+        if (open.day2JobId) {
+          try {
+            await ctx.scheduler.cancel(open.day2JobId);
+          } catch {
+            /* already finished or cancelled */
+          }
+        }
+        if (open.day5JobId) {
+          try {
+            await ctx.scheduler.cancel(open.day5JobId);
+          } catch {
+            /* already finished or cancelled */
+          }
+        }
 
-      // Schedule immediate push email since we cancelled pending follow-ups
-      await ctx.scheduler.runAfter(
-        0,
-        internal.functions.recoveryEmails.sendForFailure,
-        { failureId: open._id },
-      );
+        await ctx.db.patch(open._id, {
+          recoveryAction: "push_update_pm",
+          lastEventName: args.eventName,
+          day2JobId: undefined,
+          day5JobId: undefined,
+        });
+
+        // Send immediate push email (direct/urgent, NOT gentle)
+        await ctx.scheduler.runAfter(
+          0,
+          internal.functions.recoveryEmails.sendPushForUnpaid,
+          { failureId: open._id },
+        );
+      }
     } else {
+      // Cancelled or expired → cancel scheduled jobs and stop sequence
+      if (open.day2JobId) {
+        try {
+          await ctx.scheduler.cancel(open.day2JobId);
+        } catch {
+          /* already finished or cancelled */
+        }
+      }
+      if (open.day5JobId) {
+        try {
+          await ctx.scheduler.cancel(open.day5JobId);
+        } catch {
+          /* already finished or cancelled */
+        }
+      }
       // Cancelled or expired → stop sequence entirely
       await ctx.db.patch(open._id, {
         status: "cancelled",
@@ -1171,6 +1198,8 @@ function sequenceLabelForFailure(row: {
   day5SentAt?: number;
   day2JobId?: unknown;
   day5JobId?: unknown;
+  recoveryAction?: string | null;
+  attemptIndex?: number | null;
 }): string {
   if (row.day5SentAt != null) return "Email 3 · Day 5 sent";
   if (row.day2SentAt != null) {
@@ -1179,7 +1208,16 @@ function sequenceLabelForFailure(row: {
   if (row.day0SentAt != null) {
     return row.day2JobId ? "Email 1 · Day 2 pending" : "Email 1 · Day 0 sent";
   }
-  return "Queued · Day 0";
+  // Honest label for wait/null action (attempt 1)
+  if (row.recoveryAction === "wait" || row.recoveryAction == null) {
+    const attempt = row.attemptIndex ?? 1;
+    return `Waiting · Attempt ${attempt}`;
+  }
+  if (row.recoveryAction === "stop") {
+    return "Stopped";
+  }
+  // nudge_update_pm or push_update_pm with no emails sent yet
+  return "Queued · Email pending";
 }
 
 /** ETA for the next scheduled recovery email (prod timing: +2d / +5d from Day 0). */

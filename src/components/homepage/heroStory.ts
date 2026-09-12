@@ -14,7 +14,7 @@ export const HERO_STORY_CAPTIONS: Record<
 > = {
   1: {
     kicker: "Live recovery",
-    title: "A failed charge.",
+    title: "A failed payment.",
     sub: `${HERO_STORY.customer} · ${HERO_STORY.product} · €49`,
   },
   2: {

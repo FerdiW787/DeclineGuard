@@ -177,12 +177,12 @@ export function formatMoneyMajor(amount: number, currency: string) {
   }
 }
 
-/** Short status line for an open failure (not “failed the whole sequence”). */
+/** Short status line for an open failure (not "failed the whole sequence"). */
 export function openFailureStatusLine(row: {
   sequenceLabel: string;
   emailsSentCount: number;
 }): string {
-  if (row.emailsSentCount <= 0) return "Queued · Day 0 pending";
+  // sequenceLabel now contains honest wait/attempt info from backend
   return row.sequenceLabel;
 }
 

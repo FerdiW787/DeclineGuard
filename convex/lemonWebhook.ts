@@ -83,12 +83,22 @@ export const handleLemonSqueezyWebhook = httpAction(
     }
 
     const storeId = storeIdEarly;
-    const subscriptionId = stringifyId(attrs.subscription_id);
+    // For subscription_updated, data IS the subscription (use data.id)
+    // For payment events, data is an invoice (use attrs.subscription_id)
+    const subscriptionId =
+      isSubscriptionLifecycleEvent
+        ? stringifyId(data.id)
+        : stringifyId(attrs.subscription_id);
     if (!storeId || !subscriptionId) {
       return new Response("Missing store or subscription id", { status: 400 });
     }
 
-    const eventKey = `${eventName}:${data.type ?? "resource"}:${data.id}`;
+    // Event key must allow subsequent lifecycle events (cancelled then expired)
+    // For subscription_updated: include status + updated_at to differentiate
+    // For payment events: resource id is unique per invoice
+    const eventKey = isSubscriptionLifecycleEvent
+      ? `${eventName}:${data.id}:${attrs.status ?? "unknown"}:${attrs.updated_at ?? Date.now()}`
+      : `${eventName}:${data.type ?? "resource"}:${data.id}`;
     const already = await ctx.runQuery(
       internal.functions.recoveries.hasProcessedEvent,
       { eventKey },

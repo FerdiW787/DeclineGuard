@@ -168,7 +168,7 @@ export function FailedCard() {
                   <span className="tabular-nums text-black/45">{amt}</span>
                   {active === email ? (
                     <span className="text-[11px] font-semibold text-purple-700">
-                      Retry
+                      Recovering
                     </span>
                   ) : null}
                 </span>
