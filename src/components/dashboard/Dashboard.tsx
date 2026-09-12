@@ -929,10 +929,10 @@ function Dashboard() {
             </button>
             <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 border-t border-black/6 pt-4 text-[11px] text-[#8a8f98]">
               <a
-                href="/legal/terms"
+                href="/legal/impressum"
                 className="transition-colors hover:text-[#08090a]"
               >
-                Terms
+                Impressum
               </a>
               <a
                 href="/legal/privacy"
@@ -941,16 +941,16 @@ function Dashboard() {
                 Privacy
               </a>
               <a
+                href="/legal/terms"
+                className="transition-colors hover:text-[#08090a]"
+              >
+                Terms
+              </a>
+              <a
                 href="/legal/dpa"
                 className="transition-colors hover:text-[#08090a]"
               >
                 DPA
-              </a>
-              <a
-                href="/legal/impressum"
-                className="transition-colors hover:text-[#08090a]"
-              >
-                Impressum
               </a>
             </div>
           </div>
