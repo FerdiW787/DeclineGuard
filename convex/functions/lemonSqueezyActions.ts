@@ -49,6 +49,7 @@ const storeOptionValidator = v.object({
 const REQUIRED_WEBHOOK_EVENTS = [
   "subscription_payment_failed",
   "subscription_payment_recovered",
+  "subscription_updated",
 ] as const;
 
 async function lsFetch(

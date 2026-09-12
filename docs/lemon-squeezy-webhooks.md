@@ -34,6 +34,7 @@ Use that same secret in Lemon Squeezy (or copy it from Dashboard → Settings).
 4. Subscribe at least to:
    - `subscription_payment_failed`
    - `subscription_payment_recovered`
+   - `subscription_updated`
 5. Save
 
 ## Store binding
@@ -48,6 +49,7 @@ If events arrive for a store that isn’t linked, we ack `200` and ignore (so LS
 | --- | --- |
 | `subscription_payment_failed` | Upserts an **open** `failedPayments` row + activity item |
 | `subscription_payment_recovered` | Marks that subscription’s open failure as **recovered** + activity item |
+| `subscription_updated` | Stops recovery sequences when subscription is cancelled/expired/unpaid |
 
 ## Dashboard queries
 
