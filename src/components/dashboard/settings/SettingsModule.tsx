@@ -64,7 +64,7 @@ export default function SettingsModule({
   const [tab, setTab] = useState<SettingsTabId>(initialTab);
   const [mounted, setMounted] = useState(open);
   const rootRef = useRef<HTMLDivElement>(null);
-  const backdropRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const openRef = useRef(open);
   openRef.current = open;
