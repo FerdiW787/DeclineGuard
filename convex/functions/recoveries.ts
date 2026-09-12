@@ -710,7 +710,8 @@ export const markPaymentRecovered = internalMutation({
     });
 
     // Free-tier 10% fee ledger — skip test-mode recoveries; invoice manually.
-    if (!open.testMode) {
+    // Policy: no fee if recovered before Day 0 email was sent (LS recovered on its own).
+    if (!open.testMode && open.day0SentAt != null) {
       const existingFee = await ctx.db
         .query("recoveryFees")
         .withIndex("by_failure", (q) => q.eq("failureId", open._id))
