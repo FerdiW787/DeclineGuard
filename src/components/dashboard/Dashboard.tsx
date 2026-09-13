@@ -927,6 +927,32 @@ function Dashboard() {
               <Settings className="size-4 shrink-0" />
               <span>Settings</span>
             </button>
+            <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 border-t border-black/6 pt-4 text-[11px] text-[#8a8f98]">
+              <a
+                href="/legal/impressum"
+                className="transition-colors hover:text-[#08090a]"
+              >
+                Impressum
+              </a>
+              <a
+                href="/legal/privacy"
+                className="transition-colors hover:text-[#08090a]"
+              >
+                Privacy
+              </a>
+              <a
+                href="/legal/terms"
+                className="transition-colors hover:text-[#08090a]"
+              >
+                Terms
+              </a>
+              <a
+                href="/legal/dpa"
+                className="transition-colors hover:text-[#08090a]"
+              >
+                DPA
+              </a>
+            </div>
           </div>
         </div>
       </aside>

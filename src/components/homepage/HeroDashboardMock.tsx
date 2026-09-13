@@ -43,6 +43,7 @@ const DISABLED_TABS = new Set<MarketingProductTab>(["sequences", "settings"]);
 type PreviewInnerProps = {
   tab: MarketingProductTab;
   onNavigate?: (tab: MarketingProductTab) => void;
+  desktopPreview?: boolean;
 };
 
 type NavIndicator = {

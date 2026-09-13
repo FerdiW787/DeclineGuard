@@ -7,6 +7,7 @@
     "dev:astro": "astro dev",
     "start": "astro dev",
     "build": "astro build",
+    "typecheck": "tsc --noEmit",
     "preview": "astro preview",
     "astro": "astro",
     "test:brand-import": "tsx scripts/brand-import-fixtures.ts",

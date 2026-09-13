@@ -14,6 +14,7 @@ import {
   requireActiveUser,
   requireActiveUserForWrite,
 } from "../lib/accountGuard";
+import { consumeRateLimit } from "../lib/rateLimit";
 
 /** Gap between preview emails (mirrors fast recovery drip, but 30s). */
 export const PREVIEW_GAP_MS = 30_000;
@@ -143,8 +144,7 @@ export const start = mutation({
     if (identity.emailVerified !== true) {
       throw new Error("Verify your account email before sending a preview.");
     }
-    // Hardcoded recipient for testing — restore identity.email before production.
-    const toEmail = normalizeAccountEmail("ferdi0909@protonmail.ch");
+    const toEmail = normalizeAccountEmail(identity.email);
 
     const connection = await ctx.db
       .query("lemonConnections")
@@ -154,10 +154,9 @@ export const start = mutation({
       throw new Error("Connect a Lemon Squeezy store before sending a preview.");
     }
 
-    // Rate limits disabled for testing — restore before production:
-    // await consumeRateLimit(ctx, `preview_seq:${user._id}`, 3, 60 * 60 * 1000);
-    // await consumeRateLimit(ctx, `preview_seq:day:${user._id}`, 5, 24 * 60 * 60 * 1000);
-    // await consumeRateLimit(ctx, "preview_seq:global", 40, 60 * 60 * 1000);
+    await consumeRateLimit(ctx, `preview_seq:${user._id}`, 3, 60 * 60 * 1000);
+    await consumeRateLimit(ctx, `preview_seq:day:${user._id}`, 5, 24 * 60 * 60 * 1000);
+    await consumeRateLimit(ctx, "preview_seq:global", 40, 60 * 60 * 1000);
 
     const running = await ctx.db
       .query("previewSequences")

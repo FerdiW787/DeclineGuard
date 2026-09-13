@@ -717,7 +717,7 @@ export const markPaymentRecovered = internalMutation({
 
     // Plan-aware recovery fee ledger:
     // - Skip test-mode recoveries
-    // - Skip if no recovery email was ever sent (day0SentAt null)
+    // - Skip if no recovery email was ever sent (day0SentAt null = LS recovered on its own)
     // - Fee rate: Free = 10%, Pro = 4%
     // - Idempotent via by_failure index
     // NOTE: RECOVERY_SEQUENCE_FAST env var is an ops change on Convex prod, not code.
