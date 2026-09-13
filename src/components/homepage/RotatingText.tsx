@@ -31,7 +31,7 @@ export type RotatingTextHandle = {
   reset: () => void;
 };
 
-type RotatingTextProps = {
+type RotatingTextOwnProps = {
   texts: string[];
   transition?: Transition;
   initial?: boolean | TargetAndTransition | VariantLabels;
@@ -49,7 +49,18 @@ type RotatingTextProps = {
   mainClassName?: string;
   splitLevelClassName?: string;
   elementLevelClassName?: string;
-} & Omit<HTMLAttributes<HTMLSpanElement>, "children">;
+};
+
+type RotatingTextProps = RotatingTextOwnProps &
+  Omit<
+    HTMLAttributes<HTMLSpanElement>,
+    | "children"
+    | "onAnimationStart"
+    | "onAnimationEnd"
+    | "onDragStart"
+    | "onDragEnd"
+    | "onDrag"
+  >;
 
 type WordObj = {
   characters: string[];
