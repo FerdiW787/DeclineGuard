@@ -8,6 +8,7 @@ import {
   Wallet,
   Workflow,
 } from "lucide-react";
+import { PLANS } from "@/lib/pricing";
 import { useMemo, type ReactNode } from "react";
 import {
   formatNextEmailAt,
@@ -362,7 +363,7 @@ export default function OverviewHub({
               }
               hint={
                 recoveredThisMonthCents > 0
-                  ? `Our 10% · ${feesOwedLabel}`
+                  ? `Fees owed · ${feesOwedLabel}`
                   : "Free until we recover"
               }
             />
