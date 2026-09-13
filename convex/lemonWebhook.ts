@@ -24,15 +24,23 @@ type LsWebhookBody = {
  */
 export const handleLemonSqueezyWebhook = httpAction(
   async (ctx: ActionCtx, request: Request) => {
-    const secret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET;
-    if (!secret) {
+    // Dual-secret rotation: accept signatures from current or previous secret.
+    // This allows rotating webhook secrets without downtime during the overlap window.
+    const currentSecret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET?.trim();
+    const previousSecret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET_PREVIOUS?.trim();
+
+    const secrets = [currentSecret, previousSecret].filter(
+      (s): s is string => typeof s === "string" && s.length > 0,
+    );
+
+    if (secrets.length === 0) {
       console.error("LEMONSQUEEZY_WEBHOOK_SECRET is not set");
       return new Response("Webhook secret not configured", { status: 500 });
     }
 
     const rawBody = await request.text();
     const signature = request.headers.get("X-Signature");
-    const valid = await verifyLemonSignature(rawBody, signature, secret);
+    const valid = await verifyLemonSignature(rawBody, signature, secrets);
     if (!valid) {
       return new Response("Invalid signature", { status: 400 });
     }
@@ -99,11 +107,14 @@ export const handleLemonSqueezyWebhook = httpAction(
     const eventKey = isSubscriptionLifecycleEvent
       ? `${eventName}:${data.id}:${attrs.status ?? "unknown"}:${attrs.updated_at ?? Date.now()}`
       : `${eventName}:${data.type ?? "resource"}:${data.id}`;
-    const already = await ctx.runQuery(
-      internal.functions.recoveries.hasProcessedEvent,
-      { eventKey },
+
+    // Atomic claim: only the winner proceeds to business logic.
+    // Prevents race conditions under LS retry bursts.
+    const { claimed } = await ctx.runMutation(
+      internal.functions.recoveries.claimWebhookEvent,
+      { eventKey, eventName, storeId },
     );
-    if (already) {
+    if (!claimed) {
       return new Response("Already processed", { status: 200 });
     }
 
@@ -113,12 +124,8 @@ export const handleLemonSqueezyWebhook = httpAction(
     );
     if (!binding) {
       // Store not linked to any DeclineGuard account — ack so LS stops retrying
+      // Event was already recorded by claimWebhookEvent above
       console.warn(`No binding for Lemon Squeezy store ${storeId}`);
-      await ctx.runMutation(internal.functions.recoveries.recordWebhookEvent, {
-        eventKey,
-        eventName,
-        storeId,
-      });
       return new Response("No matching store", { status: 200 });
     }
 
@@ -219,23 +226,19 @@ export const handleLemonSqueezyWebhook = httpAction(
       }
     }
 
-    await ctx.runMutation(internal.functions.recoveries.recordWebhookEvent, {
-      eventKey,
-      eventName,
-      storeId,
-    });
-
+    // Event was already recorded by claimWebhookEvent above — no separate record call needed
     return new Response("OK", { status: 200 });
   },
 );
 
-async function verifyLemonSignature(
+/**
+ * Timing-safe HMAC-SHA256 signature verification for a single secret.
+ */
+async function verifySignatureWithSecret(
   rawBody: string,
-  signatureHeader: string | null,
+  signatureHeader: string,
   secret: string,
 ): Promise<boolean> {
-  if (!signatureHeader) return false;
-
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
@@ -250,12 +253,37 @@ async function verifyLemonSignature(
     .join("");
 
   // LS compares hex digest strings (utf-8 bytes of the hex characters)
+  // Timing-safe compare: constant-time XOR accumulation
   if (digestHex.length !== signatureHeader.length) return false;
   let mismatch = 0;
   for (let i = 0; i < digestHex.length; i += 1) {
     mismatch |= digestHex.charCodeAt(i) ^ signatureHeader.charCodeAt(i);
   }
   return mismatch === 0;
+}
+
+/**
+ * Verify Lemon Squeezy webhook signature against one or more secrets.
+ * Supports dual-secret rotation: if current secret fails, tries previous.
+ * Both secrets are always checked (timing-safe) to prevent side-channel leaks.
+ */
+async function verifyLemonSignature(
+  rawBody: string,
+  signatureHeader: string | null,
+  secrets: string[],
+): Promise<boolean> {
+  if (!signatureHeader) return false;
+  if (secrets.length === 0) return false;
+
+  // Verify against all secrets (timing-safe: always check all, then combine)
+  const results = await Promise.all(
+    secrets.map((secret) =>
+      verifySignatureWithSecret(rawBody, signatureHeader, secret),
+    ),
+  );
+
+  // Accept if any secret verifies (supports rotation window)
+  return results.some((valid) => valid);
 }
 
 function stringifyId(value: unknown): string | null {

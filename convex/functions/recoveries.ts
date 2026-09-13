@@ -177,6 +177,49 @@ export const hasProcessedEvent = internalQuery({
   },
 });
 
+/**
+ * Atomic claim for webhook event idempotency.
+ *
+ * Replaces the classic check-then-act race:
+ *   query hasProcessedEvent → business logic → mutation recordWebhookEvent
+ *
+ * With a single atomic claim mutation:
+ *   mutation claimWebhookEvent → if won, business logic proceeds
+ *
+ * Under Lemon Squeezy retries, multiple deliveries can race. This ensures
+ * exactly one caller wins the claim; all others receive claimed=false and
+ * should return 200 "Already processed" without running business logic.
+ */
+export const claimWebhookEvent = internalMutation({
+  args: {
+    eventKey: v.string(),
+    eventName: v.string(),
+    storeId: v.string(),
+  },
+  returns: v.object({ claimed: v.boolean() }),
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("lemonWebhookEvents")
+      .withIndex("by_eventKey", (q) => q.eq("eventKey", args.eventKey))
+      .unique();
+
+    if (existing) {
+      // Another delivery already claimed this event — loser
+      return { claimed: false };
+    }
+
+    // Winner: insert the claim record
+    await ctx.db.insert("lemonWebhookEvents", {
+      eventKey: args.eventKey,
+      eventName: args.eventName,
+      storeId: args.storeId,
+      receivedAt: Date.now(),
+    });
+
+    return { claimed: true };
+  },
+});
+
 export const recordWebhookEvent = internalMutation({
   args: {
     eventKey: v.string(),
