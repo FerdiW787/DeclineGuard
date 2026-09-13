@@ -119,6 +119,7 @@ const activityTypeValidator = v.union(
   v.literal("email_sent"),
   v.literal("email_bounced"),
   v.literal("email_delivered"),
+  v.literal("sequence_stopped"),
 );
 
 const activityValidator = v.object({
@@ -573,6 +574,17 @@ export const stopSequenceOnLifecycleEnd = internalMutation({
       day5JobId: undefined,
     });
 
+    await ctx.db.insert("activityEvents", {
+      userId: failure.userId,
+      storeId: failure.storeId,
+      type: "sequence_stopped",
+      title: `${failure.customerEmail} / Sequence stopped`,
+      detail: `Subscription ${args.status} — no further recovery emails`,
+      customerEmail: failure.customerEmail,
+      relatedFailureId: failure._id,
+      occurredAt: Date.now(),
+    });
+
     return null;
   },
 });
@@ -696,12 +708,17 @@ export const markPaymentRecovered = internalMutation({
       day5JobId: undefined,
     });
 
+    const amountLabel = formatMoney(args.amountCents, args.currency);
+    const recoveryDetail = open.day0SentAt != null
+      ? `${amountLabel} · Recovered after our sequence started`
+      : `${amountLabel} · Lemon Squeezy recovered before our sequence`;
+
     await ctx.db.insert("activityEvents", {
       userId: args.userId,
       storeId: args.storeId,
       type: "recovered",
       title: `${args.customerEmail} / recovered`,
-      detail: formatMoney(args.amountCents, args.currency),
+      detail: recoveryDetail,
       customerEmail: args.customerEmail,
       amountCents: args.amountCents,
       currency: args.currency,
@@ -842,9 +859,9 @@ export const handleSubscriptionLifecycleStop = internalMutation({
       await ctx.db.insert("activityEvents", {
         userId: open.userId,
         storeId: args.storeId,
-        type: "payment_failed",
-        title: `${open.customerEmail} / subscription ${args.newStatus}`,
-        detail: "Recovery sequence stopped — subscription ended",
+        type: "sequence_stopped",
+        title: `${open.customerEmail} / Sequence stopped`,
+        detail: `Subscription ${args.newStatus} — no further recovery emails`,
         customerEmail: open.customerEmail,
         relatedFailureId: open._id,
         occurredAt: args.occurredAt,
