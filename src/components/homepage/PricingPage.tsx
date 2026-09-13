@@ -150,14 +150,14 @@ export default function PricingPage() {
             </ul>
             <div className="mt-8">
               <SignedOut>
-                <LinearCta href="/a/sign-up" variant="ghost" className="w-full justify-center">
-                  {pro.cta}
-                </LinearCta>
+                <span className="inline-flex w-full cursor-default items-center justify-center rounded-lg border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm font-medium text-[#8a8a8e]">
+                  Coming soon
+                </span>
               </SignedOut>
               <SignedIn>
-                <LinearCta href="/a/dashboard" variant="ghost" className="w-full justify-center">
-                  Upgrade in dashboard
-                </LinearCta>
+                <span className="inline-flex w-full cursor-default items-center justify-center rounded-lg border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm font-medium text-[#8a8a8e]">
+                  Coming soon
+                </span>
               </SignedIn>
             </div>
           </article>

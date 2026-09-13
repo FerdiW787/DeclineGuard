@@ -362,7 +362,7 @@ export default function OverviewHub({
               }
               hint={
                 recoveredThisMonthCents > 0
-                  ? `Our 10% · ${feesOwedLabel}`
+                  ? `Fees owed · ${feesOwedLabel}`
                   : "Free until we recover"
               }
             />

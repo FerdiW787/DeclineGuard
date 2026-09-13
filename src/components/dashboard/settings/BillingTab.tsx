@@ -5,6 +5,7 @@ import {
   SettingsSection,
 } from "./SettingsFields";
 import type { SettingsFeesSummary } from "./settingsTypes";
+import { PLANS } from "@/lib/pricing";
 
 export function BillingTab({
   feesSummary,
@@ -14,7 +15,7 @@ export function BillingTab({
   return (
     <SettingsSection
       title="Billing"
-      description="Free plan: 10% of recovered revenue. Founding stores are invoiced manually — nothing is charged automatically yet."
+      description={`Free plan: ${PLANS.free.recoveryFeePercent}% of recovered revenue. Founding stores are invoiced manually — nothing is charged automatically yet.`}
     >
       <SettingsCard>
         {feesSummary === undefined ? (
@@ -28,7 +29,7 @@ export function BillingTab({
               description={
                 feesSummary.currencyMixed
                   ? "Mixed currencies across recoveries."
-                  : "10% of recovered revenue this calendar month."
+                  : `${PLANS.free.recoveryFeePercent}% of recovered revenue this calendar month.`
               }
             >
               <p className="text-[15px] font-semibold tabular-nums text-[#08090a]">
