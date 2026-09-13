@@ -244,6 +244,33 @@ export const claimWebhookEvent = internalMutation({
   },
 });
 
+/**
+ * Release a previously claimed webhook event.
+ *
+ * Called when business logic fails after a successful claim. Deletes the
+ * claim row so LS retries will not see "Already processed" — they'll get
+ * a fresh chance to claim and process.
+ *
+ * Without this, a mutation throw would leave a stuck claim that makes all
+ * retries return 200 with zero effect, permanently dropping the webhook.
+ */
+export const releaseWebhookEvent = internalMutation({
+  args: { eventKey: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("lemonWebhookEvents")
+      .withIndex("by_eventKey", (q) => q.eq("eventKey", args.eventKey))
+      .collect();
+
+    for (const row of rows) {
+      await ctx.db.delete(row._id);
+    }
+
+    return null;
+  },
+});
+
 export const recordWebhookEvent = internalMutation({
   args: {
     eventKey: v.string(),

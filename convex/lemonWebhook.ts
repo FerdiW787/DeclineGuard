@@ -101,11 +101,19 @@ export const handleLemonSqueezyWebhook = httpAction(
       return new Response("Missing store or subscription id", { status: 400 });
     }
 
+    // Validate customer email BEFORE claim — 400s should not consume a claim
+    const customerEmail =
+      typeof attrs.user_email === "string" ? attrs.user_email : "";
+    if (!customerEmail) {
+      return new Response("Missing customer email", { status: 400 });
+    }
+
     // Event key must allow subsequent lifecycle events (cancelled then expired)
     // For subscription_updated: include status + updated_at to differentiate
     // For payment events: resource id is unique per invoice
+    // NOTE: updated_at fallback is "unknown" (not Date.now()) for stable keys across retries
     const eventKey = isSubscriptionLifecycleEvent
-      ? `${eventName}:${data.id}:${attrs.status ?? "unknown"}:${attrs.updated_at ?? Date.now()}`
+      ? `${eventName}:${data.id}:${attrs.status ?? "unknown"}:${attrs.updated_at ?? "unknown"}`
       : `${eventName}:${data.type ?? "resource"}:${data.id}`;
 
     // Atomic claim: only the winner proceeds to business logic.
@@ -118,23 +126,20 @@ export const handleLemonSqueezyWebhook = httpAction(
       return new Response("Already processed", { status: 200 });
     }
 
+    // --- CLAIM WON: all paths below must either succeed or release the claim ---
+
     const binding = await ctx.runQuery(
       internal.functions.lemonSqueezy.getBindingByStoreId,
       { storeId },
     );
     if (!binding) {
       // Store not linked to any DeclineGuard account — ack so LS stops retrying
-      // Event was already recorded by claimWebhookEvent above
+      // Keep claim (intentional: we don't want retries for unlinked stores)
       console.warn(`No binding for Lemon Squeezy store ${storeId}`);
       return new Response("No matching store", { status: 200 });
     }
 
-    const customerEmail =
-      typeof attrs.user_email === "string" ? attrs.user_email : "";
-    if (!customerEmail) {
-      return new Response("Missing customer email", { status: 400 });
-    }
-
+    // Extract remaining fields (non-throwing)
     const customerName =
       typeof attrs.user_name === "string" ? attrs.user_name : undefined;
     const currency =
@@ -160,73 +165,94 @@ export const handleLemonSqueezyWebhook = httpAction(
         ? (allowHttpsUrl(urls.update_payment_method) ?? undefined)
         : undefined;
 
-    if (eventName === "subscription_payment_failed") {
-      const result = await ctx.runMutation(
-        internal.functions.recoveries.upsertFailedPayment,
-        {
-          userId: binding.userId,
-          connectionId: binding.connectionId,
-          storeId,
-          subscriptionId,
-          subscriptionInvoiceId: String(data.id),
-          customerEmail,
-          customerName,
-          productName,
-          declineReason,
-          amountCents,
-          currency,
-          updatePaymentUrl,
-          failedAt: occurredAt,
-          eventName,
-          testMode,
-        },
-      );
-
-      // Only send recovery emails when policy says to (attempt >= 2)
-      // Attempt 1 = wait (don't stack on LS's own failure email)
-      if (
-        result.recoveryAction === "nudge_update_pm" ||
-        result.recoveryAction === "push_update_pm"
-      ) {
-        await ctx.scheduler.runAfter(
-          0,
-          internal.functions.recoveryEmails.sendForFailure,
-          { failureId: result.failureId },
-        );
-      }
-    } else if (eventName === "subscription_payment_recovered") {
-      await ctx.runMutation(internal.functions.recoveries.markPaymentRecovered, {
-        userId: binding.userId,
-        storeId,
-        subscriptionId,
-        subscriptionInvoiceId: String(data.id),
-        customerEmail,
-        amountCents,
-        currency,
-        recoveredAt: occurredAt,
-        eventName,
-      });
-    } else if (eventName === "subscription_updated") {
-      // Handle lifecycle stop: cancelled, expired, or unpaid → stop sequence
-      const status =
-        typeof attrs.status === "string" ? attrs.status : "";
-      const lifecycleStopStatuses = ["cancelled", "expired", "unpaid"];
-
-      if (lifecycleStopStatuses.includes(status)) {
-        await ctx.runMutation(
-          internal.functions.recoveries.handleSubscriptionLifecycleStop,
+    // Business logic: wrap in try/catch — on failure, release claim and return 500
+    // so LS retries get a fresh chance (not stuck "Already processed" forever)
+    try {
+      if (eventName === "subscription_payment_failed") {
+        const result = await ctx.runMutation(
+          internal.functions.recoveries.upsertFailedPayment,
           {
+            userId: binding.userId,
+            connectionId: binding.connectionId,
             storeId,
             subscriptionId,
-            newStatus: status as "cancelled" | "expired" | "unpaid",
+            subscriptionInvoiceId: String(data.id),
+            customerEmail,
+            customerName,
+            productName,
+            declineReason,
+            amountCents,
+            currency,
+            updatePaymentUrl,
+            failedAt: occurredAt,
             eventName,
-            occurredAt,
+            testMode,
           },
         );
+
+        // Only send recovery emails when policy says to (attempt >= 2)
+        // Attempt 1 = wait (don't stack on LS's own failure email)
+        if (
+          result.recoveryAction === "nudge_update_pm" ||
+          result.recoveryAction === "push_update_pm"
+        ) {
+          await ctx.scheduler.runAfter(
+            0,
+            internal.functions.recoveryEmails.sendForFailure,
+            { failureId: result.failureId },
+          );
+        }
+      } else if (eventName === "subscription_payment_recovered") {
+        await ctx.runMutation(
+          internal.functions.recoveries.markPaymentRecovered,
+          {
+            userId: binding.userId,
+            storeId,
+            subscriptionId,
+            subscriptionInvoiceId: String(data.id),
+            customerEmail,
+            amountCents,
+            currency,
+            recoveredAt: occurredAt,
+            eventName,
+          },
+        );
+      } else if (eventName === "subscription_updated") {
+        // Handle lifecycle stop: cancelled, expired, or unpaid → stop sequence
+        const status =
+          typeof attrs.status === "string" ? attrs.status : "";
+        const lifecycleStopStatuses = ["cancelled", "expired", "unpaid"];
+
+        if (lifecycleStopStatuses.includes(status)) {
+          await ctx.runMutation(
+            internal.functions.recoveries.handleSubscriptionLifecycleStop,
+            {
+              storeId,
+              subscriptionId,
+              newStatus: status as "cancelled" | "expired" | "unpaid",
+              eventName,
+              occurredAt,
+            },
+          );
+        }
       }
+    } catch (err) {
+      // Business logic failed — release claim so LS retries can re-process
+      console.error(
+        `Webhook business logic failed for ${eventKey}, releasing claim:`,
+        err,
+      );
+      try {
+        await ctx.runMutation(internal.functions.recoveries.releaseWebhookEvent, {
+          eventKey,
+        });
+      } catch (releaseErr) {
+        console.error(`Failed to release claim for ${eventKey}:`, releaseErr);
+      }
+      return new Response("Internal error", { status: 500 });
     }
 
-    // Event was already recorded by claimWebhookEvent above — no separate record call needed
+    // Success — claim stays, event is processed
     return new Response("OK", { status: 200 });
   },
 );
