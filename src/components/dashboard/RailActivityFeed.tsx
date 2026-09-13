@@ -60,7 +60,7 @@ function matchesKind(type: ActivityEventType, kind: ActivityKind): boolean {
     case "recovered":
       return type === "recovered";
     case "failed":
-      return type === "payment_failed";
+      return type === "payment_failed" || type === "sequence_stopped";
     case "email":
       return isEmailKind(type);
     default: {
@@ -82,6 +82,8 @@ function statusLabel(type: ActivityEventType): string {
       return "Bounced";
     case "email_delivered":
       return "Delivered";
+    case "sequence_stopped":
+      return "Sequence stopped";
     default: {
       const _exhaustive: never = type;
       return _exhaustive;

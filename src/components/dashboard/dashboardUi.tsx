@@ -1,6 +1,7 @@
 import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 import {
   CheckCircle2,
+  CircleSlash,
   Mail,
   MailCheck,
   MailWarning,
@@ -207,7 +208,8 @@ export type ActivityEventType =
   | "recovered"
   | "email_sent"
   | "email_bounced"
-  | "email_delivered";
+  | "email_delivered"
+  | "sequence_stopped";
 
 export type EmailDeliveryStatus =
   | "queued"
@@ -218,7 +220,7 @@ export type EmailDeliveryStatus =
 
 export function activityUiType(
   type: ActivityEventType,
-): "failed" | "recovered" | "email" | "bounce" | "delivered" {
+): "failed" | "recovered" | "email" | "bounce" | "delivered" | "stopped" {
   switch (type) {
     case "payment_failed":
       return "failed";
@@ -230,6 +232,8 @@ export function activityUiType(
       return "bounce";
     case "email_delivered":
       return "delivered";
+    case "sequence_stopped":
+      return "stopped";
     default: {
       const _exhaustive: never = type;
       return _exhaustive;
@@ -252,7 +256,7 @@ export function formatActivityTitle(
 export function ActivityIcon({
   type,
 }: {
-  type: "failed" | "recovered" | "email" | "bounce" | "delivered";
+  type: "failed" | "recovered" | "email" | "bounce" | "delivered" | "stopped";
 }) {
   const wrap =
     type === "failed"
@@ -263,7 +267,9 @@ export function ActivityIcon({
           ? "bg-rose-50 text-rose-800"
           : type === "delivered"
             ? "bg-sky-50 text-sky-800"
-            : "bg-violet-50 text-violet-800";
+            : type === "stopped"
+              ? "bg-slate-100 text-slate-600"
+              : "bg-violet-50 text-violet-800";
   const Icon =
     type === "failed"
       ? TriangleAlert
@@ -273,7 +279,9 @@ export function ActivityIcon({
           ? MailWarning
           : type === "delivered"
             ? MailCheck
-            : Mail;
+            : type === "stopped"
+              ? CircleSlash
+              : Mail;
   return (
     <span
       className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full ${wrap}`}
