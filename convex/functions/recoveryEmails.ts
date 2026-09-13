@@ -277,6 +277,24 @@ async function runSequenceStep(
   if (!res.ok) {
     const errText = await res.text();
     console.error("Resend error", res.status, errText);
+
+    const parsed = parseResendError(errText);
+    const isQuotaError =
+      res.status === 429 ||
+      parsed.code === "daily_quota_exceeded" ||
+      parsed.code === "rate_limit_exceeded" ||
+      /quota|rate.?limit/i.test(parsed.message ?? "") ||
+      /quota|rate.?limit/i.test(parsed.code ?? "");
+
+    await ctx.runMutation(internal.functions.recoveries.recordResendQuotaError, {
+      failureId,
+      step,
+      status: res.status,
+      code: parsed.code,
+      message: parsed.message,
+      isQuotaError,
+    });
+
     return;
   }
 
@@ -310,5 +328,31 @@ function formatMoney(cents: number, currency: string): string {
     }).format(cents / 100);
   } catch {
     return `${(cents / 100).toFixed(2)} ${currency.toUpperCase()}`;
+  }
+}
+
+/**
+ * Parse Resend error response body to extract structured error info.
+ * Resend errors typically look like: { "statusCode": 429, "message": "...", "name": "rate_limit_exceeded" }
+ */
+function parseResendError(body: string): {
+  code: string | undefined;
+  message: string | undefined;
+} {
+  try {
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    const code =
+      typeof parsed.name === "string"
+        ? parsed.name
+        : typeof parsed.code === "string"
+          ? parsed.code
+          : typeof parsed.error === "string"
+            ? parsed.error
+            : undefined;
+    const message =
+      typeof parsed.message === "string" ? parsed.message : undefined;
+    return { code, message };
+  } catch {
+    return { code: undefined, message: body.slice(0, 200) };
   }
 }

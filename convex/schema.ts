@@ -182,6 +182,23 @@ export default defineSchema({
         v.literal("failed"),
       ),
     ),
+    /**
+     * Structured error from the last failed email send attempt.
+     * Set when Resend returns non-OK (e.g. 429 rate limit, daily_quota_exceeded).
+     * Cleared on next successful send. Ops can query failedPayments with this field set.
+     */
+    lastEmailError: v.optional(
+      v.object({
+        /** HTTP status code from Resend (e.g. 429) */
+        status: v.number(),
+        /** Error code parsed from response body (e.g. "daily_quota_exceeded", "rate_limit_exceeded") */
+        code: v.optional(v.string()),
+        /** Human-readable error message from Resend */
+        message: v.optional(v.string()),
+        /** When the error occurred */
+        at: v.number(),
+      }),
+    ),
     deletedAt: v.optional(v.number()),
     deletedBy: v.optional(deletedByValidator),
   })
