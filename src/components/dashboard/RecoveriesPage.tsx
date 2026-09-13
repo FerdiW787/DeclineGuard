@@ -702,7 +702,7 @@ export default function RecoveriesPage({
                 </p>
               </div>
               {recentWins === undefined ? (
-                <p className="mt-5 text-sm text-black/40">Loading wins…</p>
+                <WinsLoadingSkeleton />
               ) : recentWins.length === 0 ? (
                 <p className="mt-4 text-sm leading-relaxed text-black/40">
                   Recovered customers show up here as soon as Lemon Squeezy
@@ -881,7 +881,7 @@ export default function RecoveriesPage({
               )}
             >
             {openFailures === undefined ? (
-              <p className="mt-8 text-sm text-black/40">Loading failures…</p>
+              <FailuresLoadingSkeleton />
             ) : openFailures.length === 0 ? (
               <div className="mt-8 flex flex-col items-center rounded-md bg-teal-50/60 px-4 py-10 text-center">
                 <CheckCircle2 className="size-8 text-teal-600" />
@@ -1211,6 +1211,57 @@ function Badge({
   );
 }
 
+function WinsLoadingSkeleton() {
+  return (
+    <div role="status" aria-busy="true" className="mt-3">
+      <span className="sr-only">Loading wins…</span>
+      <ul className="space-y-0.5" aria-hidden="true">
+        {[...Array(4)].map((_, i) => (
+          <li
+            key={i}
+            className="flex h-[52px] items-center justify-between gap-3 rounded-xl px-2 py-2"
+          >
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="h-3.5 w-28 rounded-full bg-black/8 motion-safe:animate-pulse" />
+              <div className="h-2.5 w-20 rounded-full bg-black/5 motion-safe:animate-pulse" />
+            </div>
+            <div className="h-4 w-14 shrink-0 rounded-full bg-black/8 motion-safe:animate-pulse" />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function FailuresLoadingSkeleton() {
+  return (
+    <div role="status" aria-busy="true" className="mt-4">
+      <span className="sr-only">Loading failures…</span>
+      <div className="space-y-1" aria-hidden="true">
+        {[...Array(5)].map((_, i) => (
+          <div
+            key={i}
+            className="flex h-[72px] items-start justify-between gap-2.5 rounded-md px-2.5 py-2.5"
+          >
+            <div className="min-w-0 flex-1 space-y-2 pt-0.5">
+              <div className="flex items-center gap-1.5">
+                <div className="h-3.5 w-32 rounded-full bg-black/8 motion-safe:animate-pulse" />
+                <div className="h-4 w-14 rounded-full bg-black/5 motion-safe:animate-pulse" />
+              </div>
+              <div className="h-2.5 w-44 rounded-full bg-black/5 motion-safe:animate-pulse" />
+              <div className="h-2.5 w-28 rounded-full bg-black/[0.03] motion-safe:animate-pulse" />
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+              <div className="h-4 w-12 rounded-full bg-black/8 motion-safe:animate-pulse" />
+              <div className="size-4 rounded bg-black/5 motion-safe:animate-pulse" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CasePanel({
   row,
   nowMs,
@@ -1393,7 +1444,9 @@ function CasePanel({
                 Timeline
               </p>
           {caseLoading ? (
-            <span className="text-[11px] text-black/35">Loading…</span>
+            <span className="text-[11px] text-black/35 motion-safe:animate-pulse">
+              Loading…
+            </span>
           ) : null}
         </div>
         {activity.length === 0 ? (
