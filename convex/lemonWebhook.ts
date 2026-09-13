@@ -101,10 +101,12 @@ export const handleLemonSqueezyWebhook = httpAction(
       return new Response("Missing store or subscription id", { status: 400 });
     }
 
-    // Validate customer email BEFORE claim — 400s should not consume a claim
+    // Validate customer email BEFORE claim for payment events only.
+    // Payment events require email for recovery notifications.
+    // Lifecycle events (subscription_updated) often omit user_email and don't need it.
     const customerEmail =
       typeof attrs.user_email === "string" ? attrs.user_email : "";
-    if (!customerEmail) {
+    if (isPaymentEvent && !customerEmail) {
       return new Response("Missing customer email", { status: 400 });
     }
 
