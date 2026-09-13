@@ -2,13 +2,24 @@ import { v } from "convex/values";
 import {
   internalMutation,
   internalQuery,
+  mutation,
   query,
   type MutationCtx,
   type QueryCtx,
 } from "../_generated/server";
 import { internal } from "../_generated/api";
+import {
+  requireStaff,
+  writeAuditLog,
+  requireActionReason,
+  assertCanActOnTarget,
+} from "../lib/admin";
 import type { Doc, Id } from "../_generated/dataModel";
-import { resolveProductUserOrNull } from "../lib/accountGuard";
+import {
+  resolveProductUserOrNull,
+  resolvePlan,
+  recoveryFeeRate,
+} from "../lib/accountGuard";
 import { recoveryActionValidator } from "../schema";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -164,6 +175,100 @@ export const hasProcessedEvent = internalQuery({
       .withIndex("by_eventKey", (q) => q.eq("eventKey", args.eventKey))
       .unique();
     return existing != null;
+  },
+});
+
+/**
+ * Atomic claim for webhook event idempotency (insert-then-reconcile pattern).
+ *
+ * Replaces the classic check-then-act race:
+ *   query hasProcessedEvent → business logic → mutation recordWebhookEvent
+ *
+ * With a single atomic claim mutation:
+ *   mutation claimWebhookEvent → if won, business logic proceeds
+ *
+ * Under Lemon Squeezy retries, multiple deliveries can race. Convex indexes
+ * are NOT unique constraints — two concurrent mutations can both see empty
+ * and both insert. To serialize claims correctly:
+ *
+ * 1. Insert optimistically (always)
+ * 2. Re-query all rows with this eventKey
+ * 3. If duplicates exist, the oldest (_creationTime) wins
+ * 4. Delete loser row(s)
+ * 5. Return claimed:true only if this mutation's insert is the winner
+ *
+ * This ensures exactly one caller wins; all others receive claimed=false
+ * and should return 200 "Already processed" without running business logic.
+ */
+export const claimWebhookEvent = internalMutation({
+  args: {
+    eventKey: v.string(),
+    eventName: v.string(),
+    storeId: v.string(),
+  },
+  returns: v.object({ claimed: v.boolean() }),
+  handler: async (ctx, args) => {
+    // Step 1: Insert optimistically — don't check first (avoids TOCTOU)
+    const insertedId = await ctx.db.insert("lemonWebhookEvents", {
+      eventKey: args.eventKey,
+      eventName: args.eventName,
+      storeId: args.storeId,
+      receivedAt: Date.now(),
+    });
+
+    // Step 2: Re-query all rows with this eventKey to detect concurrent inserts
+    const allWithKey = await ctx.db
+      .query("lemonWebhookEvents")
+      .withIndex("by_eventKey", (q) => q.eq("eventKey", args.eventKey))
+      .collect();
+
+    // Step 3: If only our row exists, we won uncontested
+    if (allWithKey.length === 1) {
+      return { claimed: true };
+    }
+
+    // Step 4: Multiple rows — oldest _creationTime wins (Convex-assigned, monotonic)
+    // Sort by _creationTime ascending; first element is the winner
+    allWithKey.sort((a, b) => a._creationTime - b._creationTime);
+    const winner = allWithKey[0]!;
+
+    // Step 5: Delete all loser rows (everyone except winner)
+    for (const row of allWithKey) {
+      if (row._id !== winner._id) {
+        await ctx.db.delete(row._id);
+      }
+    }
+
+    // Step 6: Did we win? Only if our inserted ID is the winner
+    const weWon = winner._id === insertedId;
+    return { claimed: weWon };
+  },
+});
+
+/**
+ * Release a previously claimed webhook event.
+ *
+ * Called when business logic fails after a successful claim. Deletes the
+ * claim row so LS retries will not see "Already processed" — they'll get
+ * a fresh chance to claim and process.
+ *
+ * Without this, a mutation throw would leave a stuck claim that makes all
+ * retries return 200 with zero effect, permanently dropping the webhook.
+ */
+export const releaseWebhookEvent = internalMutation({
+  args: { eventKey: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("lemonWebhookEvents")
+      .withIndex("by_eventKey", (q) => q.eq("eventKey", args.eventKey))
+      .collect();
+
+    for (const row of rows) {
+      await ctx.db.delete(row._id);
+    }
+
+    return null;
   },
 });
 
@@ -726,16 +831,23 @@ export const markPaymentRecovered = internalMutation({
       occurredAt: args.recoveredAt,
     });
 
-    // Free-tier 10% fee ledger — skip test-mode recoveries; invoice manually.
-    // Policy: no fee if recovered before Day 0 email was sent (LS recovered on its own).
+    // Plan-aware recovery fee ledger:
+    // - Skip test-mode recoveries
+    // - Skip if no recovery email was ever sent (day0SentAt null = LS recovered on its own)
+    // - Fee rate: Free = 10%, Pro = 4%
+    // - Idempotent via by_failure index
+    // NOTE: RECOVERY_SEQUENCE_FAST env var is an ops change on Convex prod, not code.
     if (!open.testMode && open.day0SentAt != null) {
       const existingFee = await ctx.db
         .query("recoveryFees")
         .withIndex("by_failure", (q) => q.eq("failureId", open._id))
         .first();
       if (!existingFee) {
+        const user = await ctx.db.get(args.userId);
+        const plan = user ? resolvePlan(user) : "free";
+        const feeRate = recoveryFeeRate(plan);
         const amountCents = args.amountCents;
-        const feeCents = Math.round(amountCents * 0.1);
+        const feeCents = Math.round(amountCents * feeRate);
         if (feeCents > 0) {
           await ctx.db.insert("recoveryFees", {
             userId: args.userId,
@@ -1681,3 +1793,135 @@ function formatMoney(cents: number, currency: string): string {
     return `${(cents / 100).toFixed(2)} ${currency.toUpperCase()}`;
   }
 }
+
+const feeStatusValidator = v.union(
+  v.literal("owed"),
+  v.literal("invoiced"),
+  v.literal("waived"),
+);
+
+/**
+ * Internal mutation to mark a recovery fee as invoiced.
+ * Used by billing automation or admin tooling.
+ */
+export const markFeeInvoiced = internalMutation({
+  args: { feeId: v.id("recoveryFees") },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const fee = await ctx.db.get(args.feeId);
+    if (!fee) return false;
+    if (fee.status !== "owed") return false;
+
+    await ctx.db.patch(args.feeId, { status: "invoiced" });
+    return true;
+  },
+});
+
+/**
+ * Internal mutation to mark a recovery fee as waived.
+ * Used by billing automation or admin tooling.
+ */
+export const markFeeWaived = internalMutation({
+  args: { feeId: v.id("recoveryFees") },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const fee = await ctx.db.get(args.feeId);
+    if (!fee) return false;
+    if (fee.status !== "owed") return false;
+
+    await ctx.db.patch(args.feeId, { status: "waived" });
+    return true;
+  },
+});
+
+/**
+ * Admin mutation to update recovery fee status (invoiced or waived).
+ * Requires Staff/Admin role; creates audit trail.
+ */
+export const adminUpdateFeeStatus = mutation({
+  args: {
+    feeId: v.id("recoveryFees"),
+    status: v.union(v.literal("invoiced"), v.literal("waived")),
+    reason: v.string(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const actor = await requireStaff(ctx);
+    const reason = requireActionReason(args.reason);
+
+    const fee = await ctx.db.get(args.feeId);
+    if (!fee) throw new Error("Recovery fee not found");
+
+    if (fee.status !== "owed") {
+      throw new Error(
+        `Cannot update fee status: fee is already "${fee.status}". Only "owed" fees can be marked invoiced or waived.`,
+      );
+    }
+
+    const feeOwner = await ctx.db.get(fee.userId);
+    if (!feeOwner) throw new Error("Fee owner not found");
+    assertCanActOnTarget(actor, feeOwner);
+
+    await ctx.db.patch(args.feeId, { status: args.status });
+
+    await writeAuditLog(ctx, {
+      actorUserId: actor._id,
+      targetUserId: fee.userId,
+      action: `fee_status:${args.status}`,
+      reason,
+      metadata: {
+        feeId: args.feeId,
+        failureId: fee.failureId,
+        feeCents: fee.feeCents,
+        priorStatus: "owed",
+      },
+    });
+
+    return true;
+  },
+});
+
+/**
+ * Admin query to list recovery fees for a merchant (Staff/Admin only).
+ */
+export const adminListFeesForUser = query({
+  args: {
+    userId: v.id("users"),
+    limit: v.optional(v.number()),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("recoveryFees"),
+      failureId: v.id("failedPayments"),
+      storeId: v.string(),
+      recoveredAt: v.number(),
+      amountCents: v.number(),
+      feeCents: v.number(),
+      currency: v.string(),
+      status: feeStatusValidator,
+      testMode: v.boolean(),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    await requireStaff(ctx);
+
+    const limit = Math.min(Math.max(args.limit ?? 100, 1), 500);
+    const rows = await ctx.db
+      .query("recoveryFees")
+      .withIndex("by_user_recoveredAt", (q) => q.eq("userId", args.userId))
+      .order("desc")
+      .take(limit);
+
+    return rows.map((row) => ({
+      _id: row._id,
+      failureId: row.failureId,
+      storeId: row.storeId,
+      recoveredAt: row.recoveredAt,
+      amountCents: row.amountCents,
+      feeCents: row.feeCents,
+      currency: row.currency,
+      status: row.status,
+      testMode: row.testMode,
+    }));
+  },
+});

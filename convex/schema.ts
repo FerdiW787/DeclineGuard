@@ -28,6 +28,9 @@ export const accountStatusValidator = v.union(
   v.literal("disabled"),
 );
 
+/** Billing plan: free (10% recovery fee) or pro (4% recovery fee). */
+export const planValidator = v.union(v.literal("free"), v.literal("pro"));
+
 /** user = merchant; staff = help desk; admin = full control. `standard` is legacy user. */
 export const roleValidator = v.union(
   v.literal("user"),
@@ -46,6 +49,8 @@ export default defineSchema({
     accountStatus: v.optional(accountStatusValidator),
     frozenAt: v.optional(v.number()),
     frozenReason: v.optional(v.string()),
+    /** Billing plan: free (10% fee) or pro (4% fee). Defaults to free if unset. */
+    plan: v.optional(planValidator),
   }).index("by_userId", ["userId"]),
 
   /** One Lemon Squeezy account connection per DeclineGuard user (pick active store) */
