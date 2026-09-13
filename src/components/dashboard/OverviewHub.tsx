@@ -8,7 +8,6 @@ import {
   Wallet,
   Workflow,
 } from "lucide-react";
-import { PLANS } from "@/lib/pricing";
 import { useMemo, type ReactNode } from "react";
 import {
   formatNextEmailAt,
