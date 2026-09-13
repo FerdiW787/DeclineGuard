@@ -177,6 +177,100 @@ export const hasProcessedEvent = internalQuery({
   },
 });
 
+/**
+ * Atomic claim for webhook event idempotency (insert-then-reconcile pattern).
+ *
+ * Replaces the classic check-then-act race:
+ *   query hasProcessedEvent → business logic → mutation recordWebhookEvent
+ *
+ * With a single atomic claim mutation:
+ *   mutation claimWebhookEvent → if won, business logic proceeds
+ *
+ * Under Lemon Squeezy retries, multiple deliveries can race. Convex indexes
+ * are NOT unique constraints — two concurrent mutations can both see empty
+ * and both insert. To serialize claims correctly:
+ *
+ * 1. Insert optimistically (always)
+ * 2. Re-query all rows with this eventKey
+ * 3. If duplicates exist, the oldest (_creationTime) wins
+ * 4. Delete loser row(s)
+ * 5. Return claimed:true only if this mutation's insert is the winner
+ *
+ * This ensures exactly one caller wins; all others receive claimed=false
+ * and should return 200 "Already processed" without running business logic.
+ */
+export const claimWebhookEvent = internalMutation({
+  args: {
+    eventKey: v.string(),
+    eventName: v.string(),
+    storeId: v.string(),
+  },
+  returns: v.object({ claimed: v.boolean() }),
+  handler: async (ctx, args) => {
+    // Step 1: Insert optimistically — don't check first (avoids TOCTOU)
+    const insertedId = await ctx.db.insert("lemonWebhookEvents", {
+      eventKey: args.eventKey,
+      eventName: args.eventName,
+      storeId: args.storeId,
+      receivedAt: Date.now(),
+    });
+
+    // Step 2: Re-query all rows with this eventKey to detect concurrent inserts
+    const allWithKey = await ctx.db
+      .query("lemonWebhookEvents")
+      .withIndex("by_eventKey", (q) => q.eq("eventKey", args.eventKey))
+      .collect();
+
+    // Step 3: If only our row exists, we won uncontested
+    if (allWithKey.length === 1) {
+      return { claimed: true };
+    }
+
+    // Step 4: Multiple rows — oldest _creationTime wins (Convex-assigned, monotonic)
+    // Sort by _creationTime ascending; first element is the winner
+    allWithKey.sort((a, b) => a._creationTime - b._creationTime);
+    const winner = allWithKey[0]!;
+
+    // Step 5: Delete all loser rows (everyone except winner)
+    for (const row of allWithKey) {
+      if (row._id !== winner._id) {
+        await ctx.db.delete(row._id);
+      }
+    }
+
+    // Step 6: Did we win? Only if our inserted ID is the winner
+    const weWon = winner._id === insertedId;
+    return { claimed: weWon };
+  },
+});
+
+/**
+ * Release a previously claimed webhook event.
+ *
+ * Called when business logic fails after a successful claim. Deletes the
+ * claim row so LS retries will not see "Already processed" — they'll get
+ * a fresh chance to claim and process.
+ *
+ * Without this, a mutation throw would leave a stuck claim that makes all
+ * retries return 200 with zero effect, permanently dropping the webhook.
+ */
+export const releaseWebhookEvent = internalMutation({
+  args: { eventKey: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("lemonWebhookEvents")
+      .withIndex("by_eventKey", (q) => q.eq("eventKey", args.eventKey))
+      .collect();
+
+    for (const row of rows) {
+      await ctx.db.delete(row._id);
+    }
+
+    return null;
+  },
+});
+
 export const recordWebhookEvent = internalMutation({
   args: {
     eventKey: v.string(),
