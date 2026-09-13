@@ -8,7 +8,12 @@ import {
   type QueryCtx,
 } from "../_generated/server";
 import { internal } from "../_generated/api";
-import { requireStaff, requireAdmin, writeAuditLog } from "../lib/admin";
+import {
+  requireStaff,
+  writeAuditLog,
+  requireActionReason,
+  assertCanActOnTarget,
+} from "../lib/admin";
 import type { Doc, Id } from "../_generated/dataModel";
 import {
   resolveProductUserOrNull,
@@ -1731,14 +1736,20 @@ export const adminUpdateFeeStatus = mutation({
   returns: v.boolean(),
   handler: async (ctx, args) => {
     const actor = await requireStaff(ctx);
+    const reason = requireActionReason(args.reason);
 
     const fee = await ctx.db.get(args.feeId);
     if (!fee) throw new Error("Recovery fee not found");
 
-    const priorStatus = fee.status;
-    if (priorStatus === args.status) {
-      return true;
+    if (fee.status !== "owed") {
+      throw new Error(
+        `Cannot update fee status: fee is already "${fee.status}". Only "owed" fees can be marked invoiced or waived.`,
+      );
     }
+
+    const feeOwner = await ctx.db.get(fee.userId);
+    if (!feeOwner) throw new Error("Fee owner not found");
+    assertCanActOnTarget(actor, feeOwner);
 
     await ctx.db.patch(args.feeId, { status: args.status });
 
@@ -1746,12 +1757,12 @@ export const adminUpdateFeeStatus = mutation({
       actorUserId: actor._id,
       targetUserId: fee.userId,
       action: `fee_status:${args.status}`,
-      reason: args.reason.trim() || `Changed from ${priorStatus} to ${args.status}`,
+      reason,
       metadata: {
         feeId: args.feeId,
         failureId: fee.failureId,
         feeCents: fee.feeCents,
-        priorStatus,
+        priorStatus: "owed",
       },
     });
 
