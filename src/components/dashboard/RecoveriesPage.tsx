@@ -78,7 +78,8 @@ type FailureCase = {
       | "recovered"
       | "email_sent"
       | "email_bounced"
-      | "email_delivered";
+      | "email_delivered"
+      | "retry_requested";
     title: string;
     detail: string | null;
     customerEmail: string | null;
@@ -1279,7 +1280,8 @@ function CasePanel({
       | "recovered"
       | "email_sent"
       | "email_bounced"
-      | "email_delivered";
+      | "email_delivered"
+      | "retry_requested";
     title: string;
     detail: string | null;
     customerEmail: string | null;

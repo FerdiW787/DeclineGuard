@@ -16,7 +16,8 @@ type ActivityType =
   | "recovered"
   | "email_sent"
   | "email_bounced"
-  | "email_delivered";
+  | "email_delivered"
+  | "retry_requested";
 type TypeFilter = "all" | ActivityType;
 
 type ActivityItem = {
