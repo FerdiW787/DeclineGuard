@@ -653,7 +653,13 @@ export const stopSequenceOnLifecycleEnd = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const failure = await ctx.db.get(args.failureId);
-    if (!failure) return null;
+    if (
+      !failure ||
+      failure.status !== "open" ||
+      failure.recoveryAction === "stop"
+    ) {
+      return null;
+    }
 
     // Cancel any scheduled jobs
     if (failure.day2JobId) {
