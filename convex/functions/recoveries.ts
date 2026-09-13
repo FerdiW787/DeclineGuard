@@ -21,7 +21,6 @@ import {
   recoveryFeeRate,
 } from "../lib/accountGuard";
 import { recoveryActionValidator } from "../schema";
-import { writeAuditLog } from "../lib/admin";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -504,10 +503,12 @@ export const recordEmailSent = internalMutation({
         | "bounced"
         | "complained"
         | "failed";
+      lastEmailError?: undefined;
     } = {
       lastEmailSentAt: now,
       lastEmailInvoiceId: args.invoiceId,
       emailsSentCount: (failure.emailsSentCount ?? 0) + 1,
+      lastEmailError: undefined,
     };
 
     switch (args.step) {
