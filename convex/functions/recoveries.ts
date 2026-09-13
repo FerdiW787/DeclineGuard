@@ -503,10 +503,12 @@ export const recordEmailSent = internalMutation({
         | "bounced"
         | "complained"
         | "failed";
+      lastEmailError?: undefined;
     } = {
       lastEmailSentAt: now,
       lastEmailInvoiceId: args.invoiceId,
       emailsSentCount: (failure.emailsSentCount ?? 0) + 1,
+      lastEmailError: undefined,
     };
 
     switch (args.step) {
@@ -590,6 +592,58 @@ export const recordEmailSent = internalMutation({
       console.log(
         `Scheduled Email 3 for ${args.failureId} in 60000ms after Email 2 (fast)`,
       );
+    }
+
+    return null;
+  },
+});
+
+/**
+ * Record a Resend API error on a recovery email send attempt.
+ * Creates an ops-visible audit log and patches the failure with error details.
+ * Called when Resend returns non-OK (e.g. 429 rate limit, daily_quota_exceeded).
+ * Does NOT auto-retry — the step remains unsent, but ops can query for blocked sends.
+ */
+export const recordResendQuotaError = internalMutation({
+  args: {
+    failureId: v.id("failedPayments"),
+    step: v.union(v.literal("day0"), v.literal("day2"), v.literal("day5")),
+    status: v.number(),
+    code: v.optional(v.string()),
+    message: v.optional(v.string()),
+    isQuotaError: v.boolean(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const failure = await ctx.db.get(args.failureId);
+    if (!failure) return null;
+
+    const now = Date.now();
+
+    await ctx.db.patch(args.failureId, {
+      lastEmailError: {
+        status: args.status,
+        code: args.code,
+        message: args.message,
+        at: now,
+      },
+    });
+
+    if (args.isQuotaError) {
+      await writeAuditLog(ctx, {
+        actorUserId: null,
+        targetUserId: failure.userId,
+        action: "resend_quota_blocked",
+        metadata: {
+          failureId: args.failureId,
+          step: args.step,
+          status: args.status,
+          code: args.code,
+          message: args.message,
+          customerEmail: failure.customerEmail,
+          storeId: failure.storeId,
+        },
+      });
     }
 
     return null;
