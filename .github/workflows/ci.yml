@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+  secret-prefix-scan:
+    name: Secret Prefix Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for PUBLIC_/VITE_ vars with SECRET/API_KEY in name
+        run: |
+          # Scan for dangerous patterns: PUBLIC_ or VITE_ prefixed env var names
+          # that also contain SECRET or API_KEY (case-insensitive)
+          #
+          # These patterns indicate potential secret exposure via client-side env vars.
+
+          echo "Scanning for dangerous env var naming patterns..."
+
+          # Search for patterns in all text files, excluding common non-source dirs
+          MATCHES=$(grep -riE \
+            '(PUBLIC_[A-Z0-9_]*(SECRET|API_KEY)|VITE_[A-Z0-9_]*(SECRET|API_KEY))' \
+            --include='*.ts' \
+            --include='*.tsx' \
+            --include='*.js' \
+            --include='*.jsx' \
+            --include='*.mjs' \
+            --include='*.cjs' \
+            --include='*.astro' \
+            --include='*.env*' \
+            --include='*.json' \
+            --exclude-dir=node_modules \
+            --exclude-dir=.git \
+            --exclude-dir=dist \
+            --exclude-dir=.astro \
+            --exclude-dir=.github \
+            . 2>/dev/null || true)
+
+          if [ -n "$MATCHES" ]; then
+            echo "::error::Found PUBLIC_/VITE_ env vars with SECRET/API_KEY in name:"
+            echo "$MATCHES"
+            echo ""
+            echo "Public env vars (PUBLIC_*, VITE_*) are exposed to the client."
+            echo "Never include SECRET or API_KEY in public variable names."
+            exit 1
+          fi
+
+          echo "No dangerous patterns found."
