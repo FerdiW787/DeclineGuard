@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { action, internalAction, type ActionCtx } from "../_generated/server";
 import { api, internal } from "../_generated/api";
 import { apiKeyLast4, decryptApiKey, encryptApiKey } from "../lib/lsCrypto";
+import { allowHttpsUrl } from "../lib/safeUrl";
 
 async function assertCallerActive(ctx: ActionCtx): Promise<void> {
   // Model B: Admin with active takeover resolves to merchant product user.
@@ -542,6 +543,264 @@ export const sendWebhookTestPing = action({
     });
 
     return { ok: true as const };
+  },
+});
+
+/**
+ * Merchant-triggered retry for a failed payment.
+ * Lemon Squeezy does not expose a manual retry API, so this action:
+ * 1. Fetches fresh subscription data (with new update_payment_method URL)
+ * 2. Updates the failedPayment record with the fresh URL (sanitized)
+ * 3. Records a retry_requested activity breadcrumb (no fake recovered event)
+ *
+ * v1: URL refresh + activity only. Does NOT advance the recovery email sequence.
+ * sendEmail is accepted but currently no-ops (reserved for future use).
+ *
+ * Requirements:
+ * - Caller must be authenticated (Model B takeover supported)
+ * - Failure must be "open" and owned by the caller's product account
+ * - Rate-limited per failure and per user
+ */
+export const retryFailedPayment = action({
+  args: {
+    failureId: v.id("failedPayments"),
+    sendEmail: v.optional(v.boolean()),
+  },
+  returns: v.object({
+    status: v.union(
+      v.literal("ok"),
+      v.literal("not_found"),
+      v.literal("not_open"),
+      v.literal("no_connection"),
+      v.literal("ls_error"),
+    ),
+    message: v.string(),
+    updatePaymentUrl: v.optional(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    await assertCallerActive(ctx);
+    const clerkUserId = await productClerkUserId(ctx);
+
+    await ctx.runMutation(internal.functions.rateLimit.consume, {
+      key: `ls:retry:user:${clerkUserId}`,
+      limit: 10,
+      windowMs: 60_000,
+    });
+
+    await ctx.runMutation(internal.functions.rateLimit.consume, {
+      key: `ls:retry:failure:${args.failureId}`,
+      limit: 3,
+      windowMs: 60_000,
+    });
+
+    const product = await ctx.runQuery(
+      api.functions.adminTakeover.getProductContext,
+      {},
+    );
+
+    const failure = await ctx.runQuery(
+      internal.functions.recoveries.getFailureForRetry,
+      { failureId: args.failureId, userId: product.convexUserId },
+    );
+
+    if (!failure) {
+      return {
+        status: "not_found" as const,
+        message: "Failed payment not found or you do not have access to it.",
+      };
+    }
+
+    if (failure.status !== "open") {
+      return {
+        status: "not_open" as const,
+        message: "This payment is no longer open for retry.",
+      };
+    }
+
+    const secret = await ctx.runQuery(
+      internal.functions.lemonSqueezy.getConnectionSecretById,
+      { connectionId: failure.connectionId },
+    );
+    if (!secret) {
+      return {
+        status: "no_connection" as const,
+        message:
+          "No Lemon Squeezy connection found. Please reconnect your store.",
+      };
+    }
+
+    let apiKey: string;
+    try {
+      apiKey = await decryptApiKey(secret.apiKeyCipher);
+    } catch {
+      return {
+        status: "no_connection" as const,
+        message:
+          "Could not decrypt your Lemon Squeezy API key. Disconnect and reconnect your store.",
+      };
+    }
+
+    let rawUpdatePaymentUrl: string | undefined;
+    try {
+      const json = await lsFetch(
+        apiKey,
+        `/subscriptions/${failure.subscriptionId}`,
+      );
+      const data = json.data as Record<string, unknown> | null | undefined;
+      const attrs =
+        data && typeof data === "object" && "attributes" in data
+          ? (data.attributes as Record<string, unknown>)
+          : null;
+
+      if (attrs) {
+        const urls =
+          attrs.urls && typeof attrs.urls === "object"
+            ? (attrs.urls as Record<string, unknown>)
+            : null;
+
+        rawUpdatePaymentUrl =
+          typeof urls?.update_payment_method === "string"
+            ? urls.update_payment_method
+            : typeof urls?.customer_portal === "string"
+              ? urls.customer_portal
+              : undefined;
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Lemon Squeezy API error";
+      return {
+        status: "ls_error" as const,
+        message: `Failed to fetch subscription data: ${message}`,
+      };
+    }
+
+    const sanitizedUrl = allowHttpsUrl(rawUpdatePaymentUrl) ?? undefined;
+
+    await ctx.runMutation(internal.functions.recoveries.updateFailureForRetry, {
+      failureId: args.failureId,
+      updatePaymentUrl: sanitizedUrl,
+      requestedBy: "merchant",
+    });
+
+    return {
+      status: "ok" as const,
+      message: "Retry requested. Fresh payment link fetched.",
+      updatePaymentUrl: sanitizedUrl,
+    };
+  },
+});
+
+/**
+ * Internal action for staff/ops to trigger retry without auth checks.
+ * Ownership guard still applies — staff must specify a valid failure.
+ *
+ * v1: URL refresh + activity only. Does NOT advance the recovery email sequence.
+ * sendEmail is accepted but currently no-ops (reserved for future use).
+ */
+export const retryFailedPaymentInternal = internalAction({
+  args: {
+    failureId: v.id("failedPayments"),
+    sendEmail: v.optional(v.boolean()),
+  },
+  returns: v.object({
+    status: v.union(
+      v.literal("ok"),
+      v.literal("not_found"),
+      v.literal("not_open"),
+      v.literal("no_connection"),
+      v.literal("ls_error"),
+    ),
+    message: v.string(),
+    updatePaymentUrl: v.optional(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    const failure = await ctx.runQuery(
+      internal.functions.recoveries.getFailureEmailPayload,
+      { failureId: args.failureId },
+    );
+
+    if (!failure) {
+      return {
+        status: "not_found" as const,
+        message: "Failed payment not found.",
+      };
+    }
+
+    if (failure.status !== "open") {
+      return {
+        status: "not_open" as const,
+        message: "This payment is no longer open for retry.",
+      };
+    }
+
+    const secret = await ctx.runQuery(
+      internal.functions.lemonSqueezy.getConnectionSecretById,
+      { connectionId: failure.connectionId },
+    );
+    if (!secret) {
+      return {
+        status: "no_connection" as const,
+        message: "No Lemon Squeezy connection found for this failure.",
+      };
+    }
+
+    let apiKey: string;
+    try {
+      apiKey = await decryptApiKey(secret.apiKeyCipher);
+    } catch {
+      return {
+        status: "no_connection" as const,
+        message: "Could not decrypt Lemon Squeezy API key.",
+      };
+    }
+
+    let rawUpdatePaymentUrl: string | undefined;
+    try {
+      const json = await lsFetch(
+        apiKey,
+        `/subscriptions/${failure.subscriptionId}`,
+      );
+      const data = json.data as Record<string, unknown> | null | undefined;
+      const attrs =
+        data && typeof data === "object" && "attributes" in data
+          ? (data.attributes as Record<string, unknown>)
+          : null;
+
+      if (attrs) {
+        const urls =
+          attrs.urls && typeof attrs.urls === "object"
+            ? (attrs.urls as Record<string, unknown>)
+            : null;
+
+        rawUpdatePaymentUrl =
+          typeof urls?.update_payment_method === "string"
+            ? urls.update_payment_method
+            : typeof urls?.customer_portal === "string"
+              ? urls.customer_portal
+              : undefined;
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Lemon Squeezy API error";
+      return {
+        status: "ls_error" as const,
+        message: `Failed to fetch subscription data: ${message}`,
+      };
+    }
+
+    const sanitizedUrl = allowHttpsUrl(rawUpdatePaymentUrl) ?? undefined;
+
+    await ctx.runMutation(internal.functions.recoveries.updateFailureForRetry, {
+      failureId: args.failureId,
+      updatePaymentUrl: sanitizedUrl,
+      requestedBy: "staff",
+    });
+
+    return {
+      status: "ok" as const,
+      message: "Retry requested. Fresh payment link fetched.",
+      updatePaymentUrl: sanitizedUrl,
+    };
   },
 });
 

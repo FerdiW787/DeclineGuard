@@ -283,6 +283,8 @@ export default function StaffDashboardSim({
           break;
         case "email_delivered":
           break;
+        case "retry_requested":
+          break;
         case "sequence_stopped":
           break;
         default: {

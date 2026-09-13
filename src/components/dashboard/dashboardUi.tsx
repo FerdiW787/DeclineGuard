@@ -5,6 +5,7 @@ import {
   Mail,
   MailCheck,
   MailWarning,
+  RefreshCw,
   TriangleAlert,
 } from "lucide-react";
 
@@ -209,6 +210,7 @@ export type ActivityEventType =
   | "email_sent"
   | "email_bounced"
   | "email_delivered"
+  | "retry_requested"
   | "sequence_stopped";
 
 export type EmailDeliveryStatus =
@@ -220,7 +222,7 @@ export type EmailDeliveryStatus =
 
 export function activityUiType(
   type: ActivityEventType,
-): "failed" | "recovered" | "email" | "bounce" | "delivered" | "stopped" {
+): "failed" | "recovered" | "email" | "bounce" | "delivered" | "retry" | "stopped" {
   switch (type) {
     case "payment_failed":
       return "failed";
@@ -232,6 +234,8 @@ export function activityUiType(
       return "bounce";
     case "email_delivered":
       return "delivered";
+    case "retry_requested":
+      return "retry";
     case "sequence_stopped":
       return "stopped";
     default: {
@@ -256,7 +260,7 @@ export function formatActivityTitle(
 export function ActivityIcon({
   type,
 }: {
-  type: "failed" | "recovered" | "email" | "bounce" | "delivered" | "stopped";
+  type: "failed" | "recovered" | "email" | "bounce" | "delivered" | "retry" | "stopped";
 }) {
   const wrap =
     type === "failed"
@@ -267,9 +271,11 @@ export function ActivityIcon({
           ? "bg-rose-50 text-rose-800"
           : type === "delivered"
             ? "bg-sky-50 text-sky-800"
-            : type === "stopped"
-              ? "bg-slate-100 text-slate-600"
-              : "bg-violet-50 text-violet-800";
+            : type === "retry"
+              ? "bg-blue-50 text-blue-800"
+              : type === "stopped"
+                ? "bg-slate-100 text-slate-600"
+                : "bg-violet-50 text-violet-800";
   const Icon =
     type === "failed"
       ? TriangleAlert
@@ -279,9 +285,11 @@ export function ActivityIcon({
           ? MailWarning
           : type === "delivered"
             ? MailCheck
-            : type === "stopped"
-              ? CircleSlash
-              : Mail;
+            : type === "retry"
+              ? RefreshCw
+              : type === "stopped"
+                ? CircleSlash
+                : Mail;
   return (
     <span
       className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full ${wrap}`}

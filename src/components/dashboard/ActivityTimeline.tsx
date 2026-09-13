@@ -17,6 +17,7 @@ type ActivityType =
   | "email_sent"
   | "email_bounced"
   | "email_delivered"
+  | "retry_requested"
   | "sequence_stopped";
 type TypeFilter = "all" | ActivityType;
 

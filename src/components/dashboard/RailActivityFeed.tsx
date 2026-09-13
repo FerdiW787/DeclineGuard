@@ -51,7 +51,8 @@ function isEmailKind(type: ActivityEventType): boolean {
   return (
     type === "email_sent" ||
     type === "email_bounced" ||
-    type === "email_delivered"
+    type === "email_delivered" ||
+    type === "retry_requested"
   );
 }
 
@@ -82,6 +83,8 @@ function statusLabel(type: ActivityEventType): string {
       return "Bounced";
     case "email_delivered":
       return "Delivered";
+    case "retry_requested":
+      return "Retry requested";
     case "sequence_stopped":
       return "Sequence stopped";
     default: {

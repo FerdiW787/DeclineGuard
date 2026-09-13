@@ -130,6 +130,7 @@ const activityTypeValidator = v.union(
   v.literal("email_sent"),
   v.literal("email_bounced"),
   v.literal("email_delivered"),
+  v.literal("retry_requested"),
   v.literal("sequence_stopped"),
 );
 
@@ -1853,6 +1854,106 @@ function formatMoney(cents: number, currency: string): string {
     return `${(cents / 100).toFixed(2)} ${currency.toUpperCase()}`;
   }
 }
+
+/**
+ * Get failure details for retry, with ownership validation.
+ * Returns null if failure not found, not open, or not owned by user.
+ */
+export const getFailureForRetry = internalQuery({
+  args: {
+    failureId: v.id("failedPayments"),
+    userId: v.id("users"),
+  },
+  returns: v.union(
+    v.object({
+      _id: v.id("failedPayments"),
+      userId: v.id("users"),
+      connectionId: v.id("lemonConnections"),
+      storeId: v.string(),
+      subscriptionId: v.string(),
+      subscriptionInvoiceId: v.string(),
+      customerEmail: v.string(),
+      status: v.union(
+        v.literal("open"),
+        v.literal("recovered"),
+        v.literal("cancelled"),
+      ),
+      updatePaymentUrl: v.union(v.string(), v.null()),
+      recoveryAction: v.union(recoveryActionValidator, v.null()),
+      day0SentAt: v.union(v.number(), v.null()),
+      day2SentAt: v.union(v.number(), v.null()),
+      day5SentAt: v.union(v.number(), v.null()),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const failure = await ctx.db.get(args.failureId);
+    if (!failure || failure.deletedAt != null) return null;
+    if (failure.userId !== args.userId) return null;
+    if (failure.status !== "open") return null;
+
+    return {
+      _id: failure._id,
+      userId: failure.userId,
+      connectionId: failure.connectionId,
+      storeId: failure.storeId,
+      subscriptionId: failure.subscriptionId,
+      subscriptionInvoiceId: failure.subscriptionInvoiceId,
+      customerEmail: failure.customerEmail,
+      status: failure.status,
+      updatePaymentUrl: failure.updatePaymentUrl ?? null,
+      recoveryAction: failure.recoveryAction ?? null,
+      day0SentAt: failure.day0SentAt ?? null,
+      day2SentAt: failure.day2SentAt ?? null,
+      day5SentAt: failure.day5SentAt ?? null,
+    };
+  },
+});
+
+/**
+ * Update failure with fresh payment URL and record retry activity.
+ * Called after fetching fresh subscription data from Lemon Squeezy.
+ */
+export const updateFailureForRetry = internalMutation({
+  args: {
+    failureId: v.id("failedPayments"),
+    updatePaymentUrl: v.optional(v.string()),
+    requestedBy: v.union(v.literal("merchant"), v.literal("staff")),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const failure = await ctx.db.get(args.failureId);
+    if (!failure || failure.deletedAt != null || failure.status !== "open") {
+      return null;
+    }
+
+    const now = Date.now();
+    const patch: { updatePaymentUrl?: string } = {};
+    if (args.updatePaymentUrl) {
+      patch.updatePaymentUrl = args.updatePaymentUrl;
+    }
+
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(args.failureId, patch);
+    }
+
+    await ctx.db.insert("activityEvents", {
+      userId: failure.userId,
+      storeId: failure.storeId,
+      type: "retry_requested",
+      title: `${failure.customerEmail} / retry requested`,
+      detail:
+        args.requestedBy === "merchant"
+          ? "Merchant requested payment retry"
+          : "Staff requested payment retry",
+      customerEmail: failure.customerEmail,
+      relatedFailureId: failure._id,
+      occurredAt: now,
+    });
+
+    return null;
+  },
+});
 
 const feeStatusValidator = v.union(
   v.literal("owed"),
