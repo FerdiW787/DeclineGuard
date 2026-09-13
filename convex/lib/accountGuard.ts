@@ -220,3 +220,27 @@ export async function requireSupportParticipant(
 export function isSoftDeleted(row: { deletedAt?: number }): boolean {
   return row.deletedAt != null;
 }
+
+export type Plan = "free" | "pro";
+
+/**
+ * Resolve billing plan for a user. Defaults to "free" if unset.
+ * Used by fee calculation to determine recovery fee rate.
+ */
+export function resolvePlan(user: Doc<"users">): Plan {
+  return user.plan ?? "free";
+}
+
+/** Recovery fee rate by plan: Free = 10%, Pro = 4%. */
+export function recoveryFeeRate(plan: Plan): number {
+  switch (plan) {
+    case "free":
+      return 0.1;
+    case "pro":
+      return 0.04;
+    default: {
+      const _exhaustive: never = plan;
+      return 0.1;
+    }
+  }
+}

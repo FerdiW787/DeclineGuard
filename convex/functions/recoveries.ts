@@ -2,13 +2,19 @@ import { v } from "convex/values";
 import {
   internalMutation,
   internalQuery,
+  mutation,
   query,
   type MutationCtx,
   type QueryCtx,
 } from "../_generated/server";
 import { internal } from "../_generated/api";
+import { requireStaff, requireAdmin, writeAuditLog } from "../lib/admin";
 import type { Doc, Id } from "../_generated/dataModel";
-import { resolveProductUserOrNull } from "../lib/accountGuard";
+import {
+  resolveProductUserOrNull,
+  resolvePlan,
+  recoveryFeeRate,
+} from "../lib/accountGuard";
 import { recoveryActionValidator } from "../schema";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -709,15 +715,23 @@ export const markPaymentRecovered = internalMutation({
       occurredAt: args.recoveredAt,
     });
 
-    // Free-tier 10% fee ledger — skip test-mode recoveries; invoice manually.
-    if (!open.testMode) {
+    // Plan-aware recovery fee ledger:
+    // - Skip test-mode recoveries
+    // - Skip if no recovery email was ever sent (day0SentAt null)
+    // - Fee rate: Free = 10%, Pro = 4%
+    // - Idempotent via by_failure index
+    // NOTE: RECOVERY_SEQUENCE_FAST env var is an ops change on Convex prod, not code.
+    if (!open.testMode && open.day0SentAt != null) {
       const existingFee = await ctx.db
         .query("recoveryFees")
         .withIndex("by_failure", (q) => q.eq("failureId", open._id))
         .first();
       if (!existingFee) {
+        const user = await ctx.db.get(args.userId);
+        const plan = user ? resolvePlan(user) : "free";
+        const feeRate = recoveryFeeRate(plan);
         const amountCents = args.amountCents;
-        const feeCents = Math.round(amountCents * 0.1);
+        const feeCents = Math.round(amountCents * feeRate);
         if (feeCents > 0) {
           await ctx.db.insert("recoveryFees", {
             userId: args.userId,
@@ -1663,3 +1677,129 @@ function formatMoney(cents: number, currency: string): string {
     return `${(cents / 100).toFixed(2)} ${currency.toUpperCase()}`;
   }
 }
+
+const feeStatusValidator = v.union(
+  v.literal("owed"),
+  v.literal("invoiced"),
+  v.literal("waived"),
+);
+
+/**
+ * Internal mutation to mark a recovery fee as invoiced.
+ * Used by billing automation or admin tooling.
+ */
+export const markFeeInvoiced = internalMutation({
+  args: { feeId: v.id("recoveryFees") },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const fee = await ctx.db.get(args.feeId);
+    if (!fee) return false;
+    if (fee.status !== "owed") return false;
+
+    await ctx.db.patch(args.feeId, { status: "invoiced" });
+    return true;
+  },
+});
+
+/**
+ * Internal mutation to mark a recovery fee as waived.
+ * Used by billing automation or admin tooling.
+ */
+export const markFeeWaived = internalMutation({
+  args: { feeId: v.id("recoveryFees") },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const fee = await ctx.db.get(args.feeId);
+    if (!fee) return false;
+    if (fee.status !== "owed") return false;
+
+    await ctx.db.patch(args.feeId, { status: "waived" });
+    return true;
+  },
+});
+
+/**
+ * Admin mutation to update recovery fee status (invoiced or waived).
+ * Requires Staff/Admin role; creates audit trail.
+ */
+export const adminUpdateFeeStatus = mutation({
+  args: {
+    feeId: v.id("recoveryFees"),
+    status: v.union(v.literal("invoiced"), v.literal("waived")),
+    reason: v.string(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const actor = await requireStaff(ctx);
+
+    const fee = await ctx.db.get(args.feeId);
+    if (!fee) throw new Error("Recovery fee not found");
+
+    const priorStatus = fee.status;
+    if (priorStatus === args.status) {
+      return true;
+    }
+
+    await ctx.db.patch(args.feeId, { status: args.status });
+
+    await writeAuditLog(ctx, {
+      actorUserId: actor._id,
+      targetUserId: fee.userId,
+      action: `fee_status:${args.status}`,
+      reason: args.reason.trim() || `Changed from ${priorStatus} to ${args.status}`,
+      metadata: {
+        feeId: args.feeId,
+        failureId: fee.failureId,
+        feeCents: fee.feeCents,
+        priorStatus,
+      },
+    });
+
+    return true;
+  },
+});
+
+/**
+ * Admin query to list recovery fees for a merchant (Staff/Admin only).
+ */
+export const adminListFeesForUser = query({
+  args: {
+    userId: v.id("users"),
+    limit: v.optional(v.number()),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("recoveryFees"),
+      failureId: v.id("failedPayments"),
+      storeId: v.string(),
+      recoveredAt: v.number(),
+      amountCents: v.number(),
+      feeCents: v.number(),
+      currency: v.string(),
+      status: feeStatusValidator,
+      testMode: v.boolean(),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    await requireStaff(ctx);
+
+    const limit = Math.min(Math.max(args.limit ?? 100, 1), 500);
+    const rows = await ctx.db
+      .query("recoveryFees")
+      .withIndex("by_user_recoveredAt", (q) => q.eq("userId", args.userId))
+      .order("desc")
+      .take(limit);
+
+    return rows.map((row) => ({
+      _id: row._id,
+      failureId: row.failureId,
+      storeId: row.storeId,
+      recoveredAt: row.recoveredAt,
+      amountCents: row.amountCents,
+      feeCents: row.feeCents,
+      currency: row.currency,
+      status: row.status,
+      testMode: row.testMode,
+    }));
+  },
+});

@@ -922,3 +922,41 @@ export const getUserClerkId = query({
     return user?.userId ?? null;
   },
 });
+
+const planValidator = v.union(v.literal("free"), v.literal("pro"));
+
+/**
+ * Admin mutation to update a user's billing plan.
+ * Creates audit trail for plan changes.
+ */
+export const setUserPlan = mutation({
+  args: {
+    userId: v.id("users"),
+    plan: planValidator,
+    reason: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const actor = await requireAdmin(ctx);
+    const user = await ctx.db.get(args.userId);
+    if (!user) throw new Error("User not found");
+
+    const reason = requireActionReason(args.reason);
+    const priorPlan = user.plan ?? "free";
+
+    if (priorPlan === args.plan) {
+      return null;
+    }
+
+    await ctx.db.patch(args.userId, { plan: args.plan });
+
+    await writeAuditLog(ctx, {
+      actorUserId: actor._id,
+      targetUserId: args.userId,
+      action: `plan_change:${args.plan}`,
+      reason,
+      metadata: { priorPlan },
+    });
+    return null;
+  },
+});
