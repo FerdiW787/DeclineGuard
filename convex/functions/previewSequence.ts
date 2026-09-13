@@ -8,6 +8,7 @@ import {
 } from "../_generated/server";
 import { internal } from "../_generated/api";
 import type { Doc } from "../_generated/dataModel";
+import { writeAuditLog } from "../lib/admin";
 import {
   accountStatusOf,
   isSoftDeleted,
@@ -381,6 +382,44 @@ export const markFailed = internalMutation({
       completedAt: Date.now(),
       lastError: args.error.slice(0, 500),
     });
+    return null;
+  },
+});
+
+/**
+ * Record a Resend quota/rate-limit error for preview sequences.
+ * Writes an ops-visible audit log (lighter weight than recovery emails).
+ * Does NOT auto-retry — sequence is marked failed, ops can query for blocked sends.
+ */
+export const recordPreviewQuotaError = internalMutation({
+  args: {
+    previewId: v.id("previewSequences"),
+    step: previewStepValidator,
+    status: v.number(),
+    code: v.optional(v.string()),
+    message: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.previewId);
+    if (!row) return null;
+
+    await writeAuditLog(ctx, {
+      actorUserId: null,
+      targetUserId: row.userId,
+      action: "resend_quota_blocked",
+      reason: "Preview sequence email blocked by Resend quota/rate limit",
+      metadata: {
+        previewId: args.previewId,
+        step: args.step,
+        status: args.status,
+        code: args.code,
+        message: args.message,
+        toEmail: row.toEmail,
+        isPreview: true,
+      },
+    });
+
     return null;
   },
 });

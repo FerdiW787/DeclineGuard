@@ -415,6 +415,8 @@ function Dashboard() {
           break;
         case "retry_requested":
           break;
+        case "sequence_stopped":
+          break;
         default: {
           const _exhaustive: never = ev.type;
           void _exhaustive;

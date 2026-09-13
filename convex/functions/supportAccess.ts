@@ -383,6 +383,7 @@ const activitySimValidator = v.object({
     v.literal("email_bounced"),
     v.literal("email_delivered"),
     v.literal("retry_requested"),
+    v.literal("sequence_stopped"),
   ),
   title: v.string(),
   detail: v.union(v.string(), v.null()),

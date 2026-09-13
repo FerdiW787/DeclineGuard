@@ -1,6 +1,7 @@
 import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 import {
   CheckCircle2,
+  CircleSlash,
   Mail,
   MailCheck,
   MailWarning,
@@ -209,7 +210,8 @@ export type ActivityEventType =
   | "email_sent"
   | "email_bounced"
   | "email_delivered"
-  | "retry_requested";
+  | "retry_requested"
+  | "sequence_stopped";
 
 export type EmailDeliveryStatus =
   | "queued"
@@ -220,7 +222,7 @@ export type EmailDeliveryStatus =
 
 export function activityUiType(
   type: ActivityEventType,
-): "failed" | "recovered" | "email" | "bounce" | "delivered" | "retry" {
+): "failed" | "recovered" | "email" | "bounce" | "delivered" | "retry" | "stopped" {
   switch (type) {
     case "payment_failed":
       return "failed";
@@ -234,6 +236,8 @@ export function activityUiType(
       return "delivered";
     case "retry_requested":
       return "retry";
+    case "sequence_stopped":
+      return "stopped";
     default: {
       const _exhaustive: never = type;
       return _exhaustive;
@@ -256,7 +260,7 @@ export function formatActivityTitle(
 export function ActivityIcon({
   type,
 }: {
-  type: "failed" | "recovered" | "email" | "bounce" | "delivered" | "retry";
+  type: "failed" | "recovered" | "email" | "bounce" | "delivered" | "retry" | "stopped";
 }) {
   const wrap =
     type === "failed"
@@ -269,7 +273,9 @@ export function ActivityIcon({
             ? "bg-sky-50 text-sky-800"
             : type === "retry"
               ? "bg-blue-50 text-blue-800"
-              : "bg-violet-50 text-violet-800";
+              : type === "stopped"
+                ? "bg-slate-100 text-slate-600"
+                : "bg-violet-50 text-violet-800";
   const Icon =
     type === "failed"
       ? TriangleAlert
@@ -281,7 +287,9 @@ export function ActivityIcon({
             ? MailCheck
             : type === "retry"
               ? RefreshCw
-              : Mail;
+              : type === "stopped"
+                ? CircleSlash
+                : Mail;
   return (
     <span
       className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full ${wrap}`}

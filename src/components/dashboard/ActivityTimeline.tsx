@@ -17,7 +17,8 @@ type ActivityType =
   | "email_sent"
   | "email_bounced"
   | "email_delivered"
-  | "retry_requested";
+  | "retry_requested"
+  | "sequence_stopped";
 type TypeFilter = "all" | ActivityType;
 
 type ActivityItem = {
@@ -52,6 +53,7 @@ const TYPE_FILTERS: Array<{ id: TypeFilter; label: string }> = [
   { id: "email_sent", label: "Emails" },
   { id: "email_bounced", label: "Bounces" },
   { id: "email_delivered", label: "Delivered" },
+  { id: "sequence_stopped", label: "Sequence stopped" },
 ];
 
 const HISTORY_PAGE_SIZE = 10;

@@ -24,15 +24,23 @@ type LsWebhookBody = {
  */
 export const handleLemonSqueezyWebhook = httpAction(
   async (ctx: ActionCtx, request: Request) => {
-    const secret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET;
-    if (!secret) {
+    // Dual-secret rotation: accept signatures from current or previous secret.
+    // This allows rotating webhook secrets without downtime during the overlap window.
+    const currentSecret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET?.trim();
+    const previousSecret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET_PREVIOUS?.trim();
+
+    const secrets = [currentSecret, previousSecret].filter(
+      (s): s is string => typeof s === "string" && s.length > 0,
+    );
+
+    if (secrets.length === 0) {
       console.error("LEMONSQUEEZY_WEBHOOK_SECRET is not set");
       return new Response("Webhook secret not configured", { status: 500 });
     }
 
     const rawBody = await request.text();
     const signature = request.headers.get("X-Signature");
-    const valid = await verifyLemonSignature(rawBody, signature, secret);
+    const valid = await verifyLemonSignature(rawBody, signature, secrets);
     if (!valid) {
       return new Response("Invalid signature", { status: 400 });
     }
@@ -93,19 +101,34 @@ export const handleLemonSqueezyWebhook = httpAction(
       return new Response("Missing store or subscription id", { status: 400 });
     }
 
+    // Validate customer email BEFORE claim for payment events only.
+    // Payment events require email for recovery notifications.
+    // Lifecycle events (subscription_updated) often omit user_email and don't need it.
+    const customerEmail =
+      typeof attrs.user_email === "string" ? attrs.user_email : "";
+    if (isPaymentEvent && !customerEmail) {
+      return new Response("Missing customer email", { status: 400 });
+    }
+
     // Event key must allow subsequent lifecycle events (cancelled then expired)
     // For subscription_updated: include status + updated_at to differentiate
     // For payment events: resource id is unique per invoice
+    // NOTE: updated_at fallback is "unknown" (not Date.now()) for stable keys across retries
     const eventKey = isSubscriptionLifecycleEvent
-      ? `${eventName}:${data.id}:${attrs.status ?? "unknown"}:${attrs.updated_at ?? Date.now()}`
+      ? `${eventName}:${data.id}:${attrs.status ?? "unknown"}:${attrs.updated_at ?? "unknown"}`
       : `${eventName}:${data.type ?? "resource"}:${data.id}`;
-    const already = await ctx.runQuery(
-      internal.functions.recoveries.hasProcessedEvent,
-      { eventKey },
+
+    // Atomic claim: only the winner proceeds to business logic.
+    // Prevents race conditions under LS retry bursts.
+    const { claimed } = await ctx.runMutation(
+      internal.functions.recoveries.claimWebhookEvent,
+      { eventKey, eventName, storeId },
     );
-    if (already) {
+    if (!claimed) {
       return new Response("Already processed", { status: 200 });
     }
+
+    // --- CLAIM WON: all paths below must either succeed or release the claim ---
 
     const binding = await ctx.runQuery(
       internal.functions.lemonSqueezy.getBindingByStoreId,
@@ -113,21 +136,12 @@ export const handleLemonSqueezyWebhook = httpAction(
     );
     if (!binding) {
       // Store not linked to any DeclineGuard account — ack so LS stops retrying
+      // Keep claim (intentional: we don't want retries for unlinked stores)
       console.warn(`No binding for Lemon Squeezy store ${storeId}`);
-      await ctx.runMutation(internal.functions.recoveries.recordWebhookEvent, {
-        eventKey,
-        eventName,
-        storeId,
-      });
       return new Response("No matching store", { status: 200 });
     }
 
-    const customerEmail =
-      typeof attrs.user_email === "string" ? attrs.user_email : "";
-    if (!customerEmail) {
-      return new Response("Missing customer email", { status: 400 });
-    }
-
+    // Extract remaining fields (non-throwing)
     const customerName =
       typeof attrs.user_name === "string" ? attrs.user_name : undefined;
     const currency =
@@ -153,89 +167,106 @@ export const handleLemonSqueezyWebhook = httpAction(
         ? (allowHttpsUrl(urls.update_payment_method) ?? undefined)
         : undefined;
 
-    if (eventName === "subscription_payment_failed") {
-      const result = await ctx.runMutation(
-        internal.functions.recoveries.upsertFailedPayment,
-        {
-          userId: binding.userId,
-          connectionId: binding.connectionId,
-          storeId,
-          subscriptionId,
-          subscriptionInvoiceId: String(data.id),
-          customerEmail,
-          customerName,
-          productName,
-          declineReason,
-          amountCents,
-          currency,
-          updatePaymentUrl,
-          failedAt: occurredAt,
-          eventName,
-          testMode,
-        },
-      );
-
-      // Only send recovery emails when policy says to (attempt >= 2)
-      // Attempt 1 = wait (don't stack on LS's own failure email)
-      if (
-        result.recoveryAction === "nudge_update_pm" ||
-        result.recoveryAction === "push_update_pm"
-      ) {
-        await ctx.scheduler.runAfter(
-          0,
-          internal.functions.recoveryEmails.sendForFailure,
-          { failureId: result.failureId },
-        );
-      }
-    } else if (eventName === "subscription_payment_recovered") {
-      await ctx.runMutation(internal.functions.recoveries.markPaymentRecovered, {
-        userId: binding.userId,
-        storeId,
-        subscriptionId,
-        subscriptionInvoiceId: String(data.id),
-        customerEmail,
-        amountCents,
-        currency,
-        recoveredAt: occurredAt,
-        eventName,
-      });
-    } else if (eventName === "subscription_updated") {
-      // Handle lifecycle stop: cancelled, expired, or unpaid → stop sequence
-      const status =
-        typeof attrs.status === "string" ? attrs.status : "";
-      const lifecycleStopStatuses = ["cancelled", "expired", "unpaid"];
-
-      if (lifecycleStopStatuses.includes(status)) {
-        await ctx.runMutation(
-          internal.functions.recoveries.handleSubscriptionLifecycleStop,
+    // Business logic: wrap in try/catch — on failure, release claim and return 500
+    // so LS retries get a fresh chance (not stuck "Already processed" forever)
+    try {
+      if (eventName === "subscription_payment_failed") {
+        const result = await ctx.runMutation(
+          internal.functions.recoveries.upsertFailedPayment,
           {
+            userId: binding.userId,
+            connectionId: binding.connectionId,
             storeId,
             subscriptionId,
-            newStatus: status as "cancelled" | "expired" | "unpaid",
+            subscriptionInvoiceId: String(data.id),
+            customerEmail,
+            customerName,
+            productName,
+            declineReason,
+            amountCents,
+            currency,
+            updatePaymentUrl,
+            failedAt: occurredAt,
             eventName,
-            occurredAt,
+            testMode,
           },
         );
+
+        // Only send recovery emails when policy says to (attempt >= 2)
+        // Attempt 1 = wait (don't stack on LS's own failure email)
+        if (
+          result.recoveryAction === "nudge_update_pm" ||
+          result.recoveryAction === "push_update_pm"
+        ) {
+          await ctx.scheduler.runAfter(
+            0,
+            internal.functions.recoveryEmails.sendForFailure,
+            { failureId: result.failureId },
+          );
+        }
+      } else if (eventName === "subscription_payment_recovered") {
+        await ctx.runMutation(
+          internal.functions.recoveries.markPaymentRecovered,
+          {
+            userId: binding.userId,
+            storeId,
+            subscriptionId,
+            subscriptionInvoiceId: String(data.id),
+            customerEmail,
+            amountCents,
+            currency,
+            recoveredAt: occurredAt,
+            eventName,
+          },
+        );
+      } else if (eventName === "subscription_updated") {
+        // Handle lifecycle stop: cancelled, expired, or unpaid → stop sequence
+        const status =
+          typeof attrs.status === "string" ? attrs.status : "";
+        const lifecycleStopStatuses = ["cancelled", "expired", "unpaid"];
+
+        if (lifecycleStopStatuses.includes(status)) {
+          await ctx.runMutation(
+            internal.functions.recoveries.handleSubscriptionLifecycleStop,
+            {
+              storeId,
+              subscriptionId,
+              newStatus: status as "cancelled" | "expired" | "unpaid",
+              eventName,
+              occurredAt,
+            },
+          );
+        }
       }
+    } catch (err) {
+      // Business logic failed — release claim so LS retries can re-process
+      console.error(
+        `Webhook business logic failed for ${eventKey}, releasing claim:`,
+        err,
+      );
+      try {
+        await ctx.runMutation(internal.functions.recoveries.releaseWebhookEvent, {
+          eventKey,
+        });
+      } catch (releaseErr) {
+        console.error(`Failed to release claim for ${eventKey}:`, releaseErr);
+      }
+      return new Response("Internal error", { status: 500 });
     }
 
-    await ctx.runMutation(internal.functions.recoveries.recordWebhookEvent, {
-      eventKey,
-      eventName,
-      storeId,
-    });
-
+    // Success — claim stays, event is processed
     return new Response("OK", { status: 200 });
   },
 );
 
-async function verifyLemonSignature(
+/**
+ * Timing-safe HMAC-SHA256 signature verification for a single secret.
+ */
+async function verifySignatureWithSecret(
   rawBody: string,
-  signatureHeader: string | null,
+  signatureHeader: string,
   secret: string,
 ): Promise<boolean> {
-  if (!signatureHeader) return false;
-
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
@@ -250,12 +281,37 @@ async function verifyLemonSignature(
     .join("");
 
   // LS compares hex digest strings (utf-8 bytes of the hex characters)
+  // Timing-safe compare: constant-time XOR accumulation
   if (digestHex.length !== signatureHeader.length) return false;
   let mismatch = 0;
   for (let i = 0; i < digestHex.length; i += 1) {
     mismatch |= digestHex.charCodeAt(i) ^ signatureHeader.charCodeAt(i);
   }
   return mismatch === 0;
+}
+
+/**
+ * Verify Lemon Squeezy webhook signature against one or more secrets.
+ * Supports dual-secret rotation: if current secret fails, tries previous.
+ * Both secrets are always checked (timing-safe) to prevent side-channel leaks.
+ */
+async function verifyLemonSignature(
+  rawBody: string,
+  signatureHeader: string | null,
+  secrets: string[],
+): Promise<boolean> {
+  if (!signatureHeader) return false;
+  if (secrets.length === 0) return false;
+
+  // Verify against all secrets (timing-safe: always check all, then combine)
+  const results = await Promise.all(
+    secrets.map((secret) =>
+      verifySignatureWithSecret(rawBody, signatureHeader, secret),
+    ),
+  );
+
+  // Accept if any secret verifies (supports rotation window)
+  return results.some((valid) => valid);
 }
 
 function stringifyId(value: unknown): string | null {

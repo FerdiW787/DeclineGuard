@@ -28,6 +28,9 @@ export const accountStatusValidator = v.union(
   v.literal("disabled"),
 );
 
+/** Billing plan: free (10% recovery fee) or pro (4% recovery fee). */
+export const planValidator = v.union(v.literal("free"), v.literal("pro"));
+
 /** user = merchant; staff = help desk; admin = full control. `standard` is legacy user. */
 export const roleValidator = v.union(
   v.literal("user"),
@@ -46,6 +49,8 @@ export default defineSchema({
     accountStatus: v.optional(accountStatusValidator),
     frozenAt: v.optional(v.number()),
     frozenReason: v.optional(v.string()),
+    /** Billing plan: free (10% fee) or pro (4% fee). Defaults to free if unset. */
+    plan: v.optional(planValidator),
   }).index("by_userId", ["userId"]),
 
   /** One Lemon Squeezy account connection per DeclineGuard user (pick active store) */
@@ -176,6 +181,23 @@ export default defineSchema({
         v.literal("complained"),
         v.literal("failed"),
       ),
+    ),
+    /**
+     * Structured error from the last failed email send attempt.
+     * Set when Resend returns non-OK (e.g. 429 rate limit, daily_quota_exceeded).
+     * Cleared on next successful send. Ops can query failedPayments with this field set.
+     */
+    lastEmailError: v.optional(
+      v.object({
+        /** HTTP status code from Resend (e.g. 429) */
+        status: v.number(),
+        /** Error code parsed from response body (e.g. "daily_quota_exceeded", "rate_limit_exceeded") */
+        code: v.optional(v.string()),
+        /** Human-readable error message from Resend */
+        message: v.optional(v.string()),
+        /** When the error occurred */
+        at: v.number(),
+      }),
     ),
     deletedAt: v.optional(v.number()),
     deletedBy: v.optional(deletedByValidator),
@@ -349,6 +371,7 @@ export default defineSchema({
       v.literal("email_bounced"),
       v.literal("email_delivered"),
       v.literal("retry_requested"),
+      v.literal("sequence_stopped"),
     ),
     title: v.string(),
     detail: v.optional(v.string()),
