@@ -119,6 +119,7 @@ const activityTypeValidator = v.union(
   v.literal("email_sent"),
   v.literal("email_bounced"),
   v.literal("email_delivered"),
+  v.literal("sequence_stopped"),
 );
 
 const activityValidator = v.object({
@@ -839,12 +840,16 @@ export const handleSubscriptionLifecycleStop = internalMutation({
         day5JobId: undefined,
       });
 
+      const reasonCopy =
+        args.newStatus === "cancelled"
+          ? "Subscription cancelled"
+          : "Subscription expired";
       await ctx.db.insert("activityEvents", {
         userId: open.userId,
         storeId: args.storeId,
-        type: "payment_failed",
-        title: `${open.customerEmail} / subscription ${args.newStatus}`,
-        detail: "Recovery sequence stopped — subscription ended",
+        type: "sequence_stopped",
+        title: `${open.customerEmail} / sequence stopped`,
+        detail: reasonCopy,
         customerEmail: open.customerEmail,
         relatedFailureId: open._id,
         occurredAt: args.occurredAt,

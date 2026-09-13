@@ -283,6 +283,8 @@ export default function StaffDashboardSim({
           break;
         case "email_delivered":
           break;
+        case "sequence_stopped":
+          break;
         default: {
           const _exhaustive: never = ev.type;
           void _exhaustive;

@@ -16,7 +16,8 @@ type ActivityType =
   | "recovered"
   | "email_sent"
   | "email_bounced"
-  | "email_delivered";
+  | "email_delivered"
+  | "sequence_stopped";
 type TypeFilter = "all" | ActivityType;
 
 type ActivityItem = {
@@ -48,6 +49,7 @@ const TYPE_FILTERS: Array<{ id: TypeFilter; label: string }> = [
   { id: "all", label: "All" },
   { id: "payment_failed", label: "Recovery failed" },
   { id: "recovered", label: "Recovered" },
+  { id: "sequence_stopped", label: "Stopped" },
   { id: "email_sent", label: "Emails" },
   { id: "email_bounced", label: "Bounces" },
   { id: "email_delivered", label: "Delivered" },

@@ -4,6 +4,7 @@ import {
   Mail,
   MailCheck,
   MailWarning,
+  StopCircle,
   TriangleAlert,
 } from "lucide-react";
 
@@ -207,7 +208,8 @@ export type ActivityEventType =
   | "recovered"
   | "email_sent"
   | "email_bounced"
-  | "email_delivered";
+  | "email_delivered"
+  | "sequence_stopped";
 
 export type EmailDeliveryStatus =
   | "queued"
@@ -218,7 +220,7 @@ export type EmailDeliveryStatus =
 
 export function activityUiType(
   type: ActivityEventType,
-): "failed" | "recovered" | "email" | "bounce" | "delivered" {
+): "failed" | "recovered" | "email" | "bounce" | "delivered" | "stopped" {
   switch (type) {
     case "payment_failed":
       return "failed";
@@ -230,6 +232,8 @@ export function activityUiType(
       return "bounce";
     case "email_delivered":
       return "delivered";
+    case "sequence_stopped":
+      return "stopped";
     default: {
       const _exhaustive: never = type;
       return _exhaustive;
@@ -246,13 +250,16 @@ export function formatActivityTitle(
   if (type === "payment_failed") {
     next = next.replace(/payment failed/gi, "Recovery failed");
   }
+  if (type === "sequence_stopped") {
+    next = next.replace(/sequence stopped/gi, "Sequence stopped");
+  }
   return next;
 }
 
 export function ActivityIcon({
   type,
 }: {
-  type: "failed" | "recovered" | "email" | "bounce" | "delivered";
+  type: "failed" | "recovered" | "email" | "bounce" | "delivered" | "stopped";
 }) {
   const wrap =
     type === "failed"
@@ -263,7 +270,9 @@ export function ActivityIcon({
           ? "bg-rose-50 text-rose-800"
           : type === "delivered"
             ? "bg-sky-50 text-sky-800"
-            : "bg-violet-50 text-violet-800";
+            : type === "stopped"
+              ? "bg-zinc-100 text-zinc-600"
+              : "bg-violet-50 text-violet-800";
   const Icon =
     type === "failed"
       ? TriangleAlert
@@ -273,7 +282,9 @@ export function ActivityIcon({
           ? MailWarning
           : type === "delivered"
             ? MailCheck
-            : Mail;
+            : type === "stopped"
+              ? StopCircle
+              : Mail;
   return (
     <span
       className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full ${wrap}`}
