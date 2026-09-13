@@ -207,6 +207,7 @@ const ChartTooltipInner = memo(function ChartTooltipInner({
       color: line.stroke,
       label: line.dataKey,
       value: (tooltipData.point[line.dataKey] as number) ?? 0,
+      dataKey: line.dataKey,
     }));
   }, [tooltipData, lines, rowsRenderer]);
 
