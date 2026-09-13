@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { action, internalAction, type ActionCtx } from "../_generated/server";
 import { api, internal } from "../_generated/api";
 import { apiKeyLast4, decryptApiKey, encryptApiKey } from "../lib/lsCrypto";
+import { allowHttpsUrl } from "../lib/safeUrl";
 
 async function assertCallerActive(ctx: ActionCtx): Promise<void> {
   // Model B: Admin with active takeover resolves to merchant product user.
@@ -549,9 +550,11 @@ export const sendWebhookTestPing = action({
  * Merchant-triggered retry for a failed payment.
  * Lemon Squeezy does not expose a manual retry API, so this action:
  * 1. Fetches fresh subscription data (with new update_payment_method URL)
- * 2. Updates the failedPayment record with the fresh URL
- * 3. Optionally triggers a recovery email re-send
- * 4. Records an activity breadcrumb (no fake recovered event)
+ * 2. Updates the failedPayment record with the fresh URL (sanitized)
+ * 3. Records a retry_requested activity breadcrumb (no fake recovered event)
+ *
+ * v1: URL refresh + activity only. Does NOT advance the recovery email sequence.
+ * sendEmail is accepted but currently no-ops (reserved for future use).
  *
  * Requirements:
  * - Caller must be authenticated (Model B takeover supported)
@@ -637,7 +640,7 @@ export const retryFailedPayment = action({
       };
     }
 
-    let updatePaymentUrl: string | undefined;
+    let rawUpdatePaymentUrl: string | undefined;
     try {
       const json = await lsFetch(
         apiKey,
@@ -655,7 +658,7 @@ export const retryFailedPayment = action({
             ? (attrs.urls as Record<string, unknown>)
             : null;
 
-        updatePaymentUrl =
+        rawUpdatePaymentUrl =
           typeof urls?.update_payment_method === "string"
             ? urls.update_payment_method
             : typeof urls?.customer_portal === "string"
@@ -671,37 +674,18 @@ export const retryFailedPayment = action({
       };
     }
 
+    const sanitizedUrl = allowHttpsUrl(rawUpdatePaymentUrl) ?? undefined;
+
     await ctx.runMutation(internal.functions.recoveries.updateFailureForRetry, {
       failureId: args.failureId,
-      updatePaymentUrl,
+      updatePaymentUrl: sanitizedUrl,
       requestedBy: "merchant",
     });
 
-    if (args.sendEmail !== false) {
-      const step =
-        failure.day5SentAt != null
-          ? null
-          : failure.day2SentAt != null
-            ? "day5"
-            : failure.day0SentAt != null
-              ? "day2"
-              : "day0";
-
-      if (step) {
-        await ctx.scheduler.runAfter(
-          0,
-          internal.functions.recoveryEmails.sendSequenceStep,
-          { failureId: args.failureId, step },
-        );
-      }
-    }
-
     return {
       status: "ok" as const,
-      message:
-        "Retry requested. Fresh payment link fetched" +
-        (args.sendEmail !== false ? " and recovery email queued." : "."),
-      updatePaymentUrl,
+      message: "Retry requested. Fresh payment link fetched.",
+      updatePaymentUrl: sanitizedUrl,
     };
   },
 });
@@ -709,6 +693,9 @@ export const retryFailedPayment = action({
 /**
  * Internal action for staff/ops to trigger retry without auth checks.
  * Ownership guard still applies — staff must specify a valid failure.
+ *
+ * v1: URL refresh + activity only. Does NOT advance the recovery email sequence.
+ * sendEmail is accepted but currently no-ops (reserved for future use).
  */
 export const retryFailedPaymentInternal = internalAction({
   args: {
@@ -767,7 +754,7 @@ export const retryFailedPaymentInternal = internalAction({
       };
     }
 
-    let updatePaymentUrl: string | undefined;
+    let rawUpdatePaymentUrl: string | undefined;
     try {
       const json = await lsFetch(
         apiKey,
@@ -785,7 +772,7 @@ export const retryFailedPaymentInternal = internalAction({
             ? (attrs.urls as Record<string, unknown>)
             : null;
 
-        updatePaymentUrl =
+        rawUpdatePaymentUrl =
           typeof urls?.update_payment_method === "string"
             ? urls.update_payment_method
             : typeof urls?.customer_portal === "string"
@@ -801,37 +788,18 @@ export const retryFailedPaymentInternal = internalAction({
       };
     }
 
+    const sanitizedUrl = allowHttpsUrl(rawUpdatePaymentUrl) ?? undefined;
+
     await ctx.runMutation(internal.functions.recoveries.updateFailureForRetry, {
       failureId: args.failureId,
-      updatePaymentUrl,
+      updatePaymentUrl: sanitizedUrl,
       requestedBy: "staff",
     });
 
-    if (args.sendEmail !== false) {
-      const step =
-        failure.day5SentAt != null
-          ? null
-          : failure.day2SentAt != null
-            ? "day5"
-            : failure.day0SentAt != null
-              ? "day2"
-              : "day0";
-
-      if (step) {
-        await ctx.scheduler.runAfter(
-          0,
-          internal.functions.recoveryEmails.sendSequenceStep,
-          { failureId: args.failureId, step },
-        );
-      }
-    }
-
     return {
       status: "ok" as const,
-      message:
-        "Retry requested. Fresh payment link fetched" +
-        (args.sendEmail !== false ? " and recovery email queued." : "."),
-      updatePaymentUrl,
+      message: "Retry requested. Fresh payment link fetched.",
+      updatePaymentUrl: sanitizedUrl,
     };
   },
 });
