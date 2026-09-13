@@ -1,0 +1,18 @@
+{
+  "name": "DeclineGuard",
+  "install": "bash scripts/cloud-agent-install.sh",
+  "terminals": [
+    {
+      "name": "convex",
+      "command": "bash scripts/cloud-agent-convex.sh"
+    },
+    {
+      "name": "astro",
+      "command": "npm run dev:astro"
+    }
+  ],
+  "ports": [
+    { "name": "astro", "port": 4321 },
+    { "name": "convex", "port": 3210 }
+  ]
+}

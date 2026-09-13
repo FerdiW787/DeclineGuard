@@ -5,5 +5,9 @@ dist
 .env.local
 .DS_Store
 
-.cursor
+.cursor/*
+!.cursor/environment.json
 .agents
+
+# Local (anonymous) Convex deployment data created by `convex dev`
+.convex
