@@ -2,13 +2,14 @@ import {
   startTransition,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
-import { useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import gsap from "gsap";
 import { curveMonotoneX } from "@visx/curve";
 import {
@@ -18,6 +19,8 @@ import {
   ChevronRight,
   Download,
   Link2,
+  Loader2,
+  RefreshCw,
   Search,
 } from "lucide-react";
 import {
@@ -154,6 +157,10 @@ function urgencyScore(row: OpenFailureRow, nowMs: number) {
   if (row.emailsSentCount <= 0) score += 200;
   score += Math.min(row.amountCents / 100, 300);
   return score;
+}
+
+function httpsPaymentUrl(url: string | null | undefined): string | null {
+  return url?.startsWith("https://") ? url : null;
 }
 
 function sequenceSteps(row: OpenFailureRow) {
@@ -553,6 +560,7 @@ export default function RecoveriesPage({
               caseQueryId != null &&
               liveCase === undefined
             }
+            retryEnabled={!activitySimulation}
             onGoToCustomizations={onGoToCustomizations}
           />
         </div>
@@ -1103,6 +1111,7 @@ export default function RecoveriesPage({
                       caseQueryId != null &&
                       liveCase === undefined
                     }
+                    retryEnabled={!activitySimulation}
                     onGoToCustomizations={onGoToCustomizations}
                   />
                 </div>
@@ -1269,10 +1278,12 @@ function CasePanel({
   nowMs,
   activity,
   caseLoading,
+  retryEnabled,
   onGoToCustomizations,
 }: {
   row: OpenFailureRow;
   nowMs: number;
+  retryEnabled: boolean;
   onGoToCustomizations?: () => void;
   activity: Array<{
     _id: string;
@@ -1293,6 +1304,12 @@ function CasePanel({
   }>;
   caseLoading: boolean;
 }) {
+  const [refreshedUrl, setRefreshedUrl] = useState<string | null>(null);
+  useEffect(() => {
+    setRefreshedUrl(null);
+  }, [row._id]);
+  const paymentUrl =
+    httpsPaymentUrl(refreshedUrl) ?? httpsPaymentUrl(row.updatePaymentUrl);
   const displayName = row.customerName?.trim() || row.customerEmail;
   const overdue = isOverdue(row, nowMs);
   const nextLabel = formatNextEmailAt(row.nextEmailAt);
@@ -1362,21 +1379,28 @@ function CasePanel({
         ) : null}
       </dl>
 
-      {row.updatePaymentUrl?.startsWith("https://") ? (
-        <a
-          href={row.updatePaymentUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#111] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-black"
-        >
-          <Link2 className="size-4" />
-          Open card-fix link
-        </a>
-      ) : (
-        <p className="rounded-xl bg-black/[0.03] px-3 py-2.5 text-[12px] text-black/45">
-          No card-fix link on this failure yet — sequence is still running.
-        </p>
-      )}
+      <div className="space-y-2">
+        {paymentUrl ? (
+          <a
+            href={paymentUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-full bg-[#111] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-black motion-reduce:transition-none"
+          >
+            <Link2 className="size-4" />
+            Open card-fix link
+          </a>
+        ) : (
+          <p className="flex min-h-[2.75rem] items-center rounded-xl bg-black/[0.03] px-3 py-2.5 text-[12px] text-black/45">
+            No card-fix link on this failure yet — sequence is still running.
+          </p>
+        )}
+        <RetryPaymentControl
+          enabled={retryEnabled}
+          failureId={row._id}
+          onRefreshedUrl={setRefreshedUrl}
+        />
+      </div>
 
       <div>
         <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-black/45">
@@ -1490,6 +1514,202 @@ function CasePanel({
           way or fixing the address.
         </p>
       ) : null}
+    </div>
+  );
+}
+
+type RetryUiState = "idle" | "retrying" | "success" | "error";
+
+const RETRY_LABEL: Record<RetryUiState, string> = {
+  idle: "Retry payment",
+  retrying: "Retrying…",
+  success: "Requested",
+  error: "Retry failed",
+};
+
+const RETRY_BTN_CLASS = cn(
+  "dg-btn dg-btn-secondary min-h-[2.75rem] w-full cursor-pointer !px-4 !py-2.5 text-sm",
+  "disabled:cursor-not-allowed disabled:opacity-45 disabled:!transform-none disabled:!shadow-none",
+  "motion-reduce:transition-none motion-reduce:hover:!transform-none motion-reduce:hover:!shadow-none",
+  "motion-reduce:active:!transform-none motion-reduce:active:!shadow-none",
+);
+
+function RetryButtonLabel({ state }: { state: RetryUiState }) {
+  return (
+    <span className="relative inline-grid justify-items-center">
+      <span
+        className="invisible col-start-1 row-start-1 whitespace-nowrap"
+        aria-hidden
+      >
+        Retry payment
+      </span>
+      <span
+        className="invisible col-start-1 row-start-1 whitespace-nowrap"
+        aria-hidden
+      >
+        Retrying…
+      </span>
+      <span className="col-start-1 row-start-1 whitespace-nowrap">
+        {RETRY_LABEL[state]}
+      </span>
+    </span>
+  );
+}
+
+function RetryPaymentButton({
+  state,
+  disabled,
+  title,
+  describedBy,
+  onClick,
+}: {
+  state: RetryUiState;
+  disabled?: boolean;
+  title?: string;
+  describedBy?: string;
+  onClick?: () => void;
+}) {
+  const busy = state === "retrying";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || busy}
+      aria-busy={busy || undefined}
+      aria-describedby={describedBy}
+      title={title}
+      className={RETRY_BTN_CLASS}
+    >
+      {busy ? (
+        <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden />
+      ) : (
+        <RefreshCw className="size-4" aria-hidden />
+      )}
+      <RetryButtonLabel state={state} />
+    </button>
+  );
+}
+
+function RetryStatus({
+  id,
+  state,
+  message,
+}: {
+  id: string;
+  state: RetryUiState;
+  message: string | null;
+}) {
+  const show = state === "success" || state === "error";
+  return (
+    <p
+      id={id}
+      role={state === "error" ? "alert" : "status"}
+      aria-live={state === "error" ? "assertive" : "polite"}
+      className={cn(
+        "mt-2 min-h-[2.5rem] text-[12px] leading-5",
+        state === "error"
+          ? "text-rose-700"
+          : state === "success"
+            ? "text-teal-800"
+            : "text-black/45",
+      )}
+    >
+      {show ? message : null}
+    </p>
+  );
+}
+
+function RetryPaymentControl({
+  enabled,
+  failureId,
+  onRefreshedUrl,
+}: {
+  enabled: boolean;
+  failureId: string;
+  onRefreshedUrl: (url: string) => void;
+}) {
+  const uid = useId();
+  const statusId = `retry-status-${uid}`;
+  if (!enabled) {
+    return (
+      <div>
+        <RetryPaymentButton
+          state="idle"
+          disabled
+          title="Retry is available in your live dashboard"
+        />
+        <RetryStatus id={statusId} state="idle" message={null} />
+      </div>
+    );
+  }
+  return (
+    <RetryPaymentButtonLive
+      failureId={failureId}
+      onRefreshedUrl={onRefreshedUrl}
+    />
+  );
+}
+
+function RetryPaymentButtonLive({
+  failureId,
+  onRefreshedUrl,
+}: {
+  failureId: string;
+  onRefreshedUrl: (url: string) => void;
+}) {
+  const retryFailedPayment = useAction(
+    api.functions.lemonSqueezyActions.retryFailedPayment,
+  );
+  const [state, setState] = useState<RetryUiState>("idle");
+  const [message, setMessage] = useState<string | null>(null);
+  const inFlight = useRef(false);
+  const uid = useId();
+  const statusId = `retry-status-${uid}`;
+
+  useEffect(() => {
+    inFlight.current = false;
+    setState("idle");
+    setMessage(null);
+  }, [failureId]);
+
+  const onRetry = useCallback(async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setState("retrying");
+    setMessage(null);
+    try {
+      const result = await retryFailedPayment({
+        failureId: failureId as Id<"failedPayments">,
+      });
+      if (result.status === "ok") {
+        setState("success");
+        setMessage(result.message);
+        const url = httpsPaymentUrl(result.updatePaymentUrl);
+        if (url) onRefreshedUrl(url);
+      } else {
+        setState("error");
+        setMessage(result.message);
+      }
+    } catch (err) {
+      setState("error");
+      setMessage(
+        err instanceof Error && err.message.trim()
+          ? err.message
+          : "Retry failed. Try again.",
+      );
+    } finally {
+      inFlight.current = false;
+    }
+  }, [failureId, onRefreshedUrl, retryFailedPayment]);
+
+  return (
+    <div>
+      <RetryPaymentButton
+        state={state}
+        describedBy={statusId}
+        onClick={() => void onRetry()}
+      />
+      <RetryStatus id={statusId} state={state} message={message} />
     </div>
   );
 }
