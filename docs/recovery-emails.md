@@ -69,6 +69,8 @@ DeclineGuard stores each Resend message id and updates delivery status when Rese
 npx convex env set RESEND_WEBHOOK_SECRET "whsec_xxxxxxxx"
 ```
 
+Optional previous secret for zero-downtime rotation (`RESEND_WEBHOOK_SECRET_PREVIOUS`): set the new secret as current, keep the old as previous, update Resend, then remove previous after retries settle. See `.env.example`.
+
 Dashboard → Settings shows the callback URL under **Recovery email → Deliverability webhook**. Open failures show Delivered / Bounced chips once events arrive.
 
 ## Convex env
@@ -82,6 +84,8 @@ npx convex env set RESEND_FROM_EMAIL "DeclineGuard <noreply@yourdomain.com>"
 
 # Deliverability webhooks (see above)
 npx convex env set RESEND_WEBHOOK_SECRET "whsec_xxxxxxxx"
+# Optional rotation window — see .env.example
+# npx convex env set RESEND_WEBHOOK_SECRET_PREVIOUS "whsec_xxxxxxxx"
 
 # Dev only — Email 1 immediate, Email 2 +1 min, Email 3 +1 min after Email 2
 npx convex env set RECOVERY_SEQUENCE_FAST 1

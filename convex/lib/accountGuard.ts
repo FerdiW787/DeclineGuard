@@ -244,3 +244,17 @@ export function recoveryFeeRate(plan: Plan): number {
     }
   }
 }
+
+/** Integer percent shown to merchants: Free = 10, Pro = 4. */
+export function recoveryFeePercent(plan: Plan): 10 | 4 {
+  switch (plan) {
+    case "free":
+      return 10;
+    case "pro":
+      return 4;
+    default: {
+      const _exhaustive: never = plan;
+      return 10;
+    }
+  }
+}

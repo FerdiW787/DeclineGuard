@@ -1,6 +1,11 @@
 import { query, mutation, internalMutation } from "../_generated/server";
 import { v } from "convex/values";
 import { normalizeRole, roleValidator } from "../lib/admin";
+import {
+  recoveryFeePercent,
+  resolvePlan,
+} from "../lib/accountGuard";
+import { planValidator } from "../schema";
 import { archiveMerchantData } from "./lemonSqueezy";
 
 export const ensureCurrentUser = mutation({
@@ -90,6 +95,9 @@ export const getCurrentUser = query({
         v.literal("disabled"),
       ),
       frozenReason: v.union(v.string(), v.null()),
+      /** Read-only billing plan. Merchants cannot self-set this. */
+      plan: planValidator,
+      recoveryFeePercent: v.union(v.literal(10), v.literal(4)),
     }),
     v.null(),
   ),
@@ -103,6 +111,7 @@ export const getCurrentUser = query({
       .unique();
     if (!user) return null;
 
+    const plan = resolvePlan(user);
     return {
       _id: user._id,
       _creationTime: user._creationTime,
@@ -112,6 +121,8 @@ export const getCurrentUser = query({
       role: normalizeRole(user.role),
       accountStatus: user.accountStatus ?? "active",
       frozenReason: user.frozenReason ?? null,
+      plan,
+      recoveryFeePercent: recoveryFeePercent(plan),
     };
   },
 });

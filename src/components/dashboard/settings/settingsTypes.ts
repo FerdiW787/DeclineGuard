@@ -44,6 +44,7 @@ export type SettingsModuleProps = {
   apiKeyLast4: string;
   testMode: boolean;
   planTier?: string;
+  recoveryFeePercent?: number;
   webhookSetup: SettingsWebhookSetup | undefined;
   webhookStatus?: SettingsWebhookStatus | undefined;
   feesSummary?: SettingsFeesSummary | undefined;

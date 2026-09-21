@@ -437,6 +437,8 @@ export type RecoveredWinRow = {
   failedAt: number;
   recoveredAt: number;
   testMode: boolean;
+  /** Owed recovery fee for this win; omitted/null when none. */
+  feeCents?: number | null;
 };
 
 export type ActivityRow = {

@@ -116,6 +116,8 @@ const recoveredWinValidator = v.object({
   failedAt: v.number(),
   recoveredAt: v.number(),
   testMode: v.boolean(),
+  /** Owed recovery fee for this win; null when no ledger row (test / no sequence). */
+  feeCents: v.union(v.number(), v.null()),
 });
 
 const emailSendStepValidator = v.union(
@@ -1363,19 +1365,28 @@ export const listRecentRecovered = query({
       .order("desc")
       .take(limit);
 
-    return rows
-      .filter((row) => row.deletedAt == null && row.recoveredAt != null)
-      .map((row) => ({
-        _id: row._id,
-        customerEmail: row.customerEmail,
-        customerName: row.customerName ?? null,
-        productName: row.productName ?? null,
-        amountCents: row.amountCents,
-        currency: row.currency,
-        failedAt: row.failedAt,
-        recoveredAt: row.recoveredAt!,
-        testMode: row.testMode,
-      }));
+    return await Promise.all(
+      rows
+        .filter((row) => row.deletedAt == null && row.recoveredAt != null)
+        .map(async (row) => {
+          const fee = await ctx.db
+            .query("recoveryFees")
+            .withIndex("by_failure", (q) => q.eq("failureId", row._id))
+            .first();
+          return {
+            _id: row._id,
+            customerEmail: row.customerEmail,
+            customerName: row.customerName ?? null,
+            productName: row.productName ?? null,
+            amountCents: row.amountCents,
+            currency: row.currency,
+            failedAt: row.failedAt,
+            recoveredAt: row.recoveredAt!,
+            testMode: row.testMode,
+            feeCents: fee?.feeCents ?? null,
+          };
+        }),
+    );
   },
 });
 
