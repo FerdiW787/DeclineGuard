@@ -10,10 +10,13 @@ import {
 import type { Doc, Id } from "../_generated/dataModel";
 import {
   accountStatusOf,
+  recoveryFeePercent,
   requireActiveUser,
   requireSupportParticipant,
+  resolvePlan,
   TAKEOVER_FREEZE_REASON,
 } from "../lib/accountGuard";
+import { planValidator } from "../schema";
 import {
   normalizeRole,
   requireAdmin,
@@ -153,14 +156,19 @@ export const getProductContext = query({
     clerkUserId: v.string(),
     convexUserId: v.id("users"),
     actingViaTakeover: v.boolean(),
+    plan: planValidator,
+    recoveryFeePercent: v.union(v.literal(10), v.literal(4)),
   }),
   handler: async (ctx) => {
     const viewer = await requireSupportParticipant(ctx);
     const product = await requireActiveUser(ctx);
+    const plan = resolvePlan(product);
     return {
       clerkUserId: product.userId,
       convexUserId: product._id,
       actingViaTakeover: viewer._id !== product._id,
+      plan,
+      recoveryFeePercent: recoveryFeePercent(plan),
     };
   },
 });

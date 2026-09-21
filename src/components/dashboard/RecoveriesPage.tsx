@@ -738,9 +738,16 @@ export default function RecoveriesPage({
                               .join(" · ")}
                           </p>
                         </div>
-                        <span className="shrink-0 text-sm font-semibold tabular-nums text-teal-700">
-                          +{formatMoneyAmount(win.amountCents, win.currency)}
-                        </span>
+                        <div className="shrink-0 text-right">
+                          <span className="text-sm font-semibold tabular-nums text-teal-700">
+                            +{formatMoneyAmount(win.amountCents, win.currency)}
+                          </span>
+                          {win.feeCents != null && win.feeCents > 0 ? (
+                            <p className="text-[11px] tabular-nums text-black/40">
+                              Fee {formatMoneyAmount(win.feeCents, win.currency)}
+                            </p>
+                          ) : null}
+                        </div>
                       </li>
                     );
                   })}

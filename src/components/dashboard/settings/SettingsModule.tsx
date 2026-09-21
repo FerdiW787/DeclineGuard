@@ -45,6 +45,7 @@ export default function SettingsModule({
   apiKeyLast4,
   testMode,
   planTier = "Free",
+  recoveryFeePercent = 10,
   webhookSetup,
   webhookStatus,
   feesSummary,
@@ -278,7 +279,11 @@ export default function SettingsModule({
               />
             ) : null}
             {tab === "billing" ? (
-              <BillingTab feesSummary={feesSummary} />
+              <BillingTab
+                feesSummary={feesSummary}
+                planName={planTier}
+                recoveryFeePercent={recoveryFeePercent}
+              />
             ) : null}
             {tab === "account" && showAccount ? (
               <AccountTab email={accountEmail} readOnly={readOnly} />

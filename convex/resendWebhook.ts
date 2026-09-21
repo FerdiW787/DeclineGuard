@@ -1,7 +1,10 @@
 import { httpAction } from "./_generated/server";
 import type { ActionCtx } from "./_generated/server";
-import { Webhook } from "svix";
 import { internal } from "./_generated/api";
+import {
+  collectWebhookSecrets,
+  verifySvixPayload,
+} from "./lib/svixVerify";
 
 type ResendWebhookEvent = {
   type?: string;
@@ -24,11 +27,15 @@ type ResendWebhookEvent = {
  * - email.failed (if available)
  *
  * Env: RESEND_WEBHOOK_SECRET (Svix signing secret from Resend webhook details)
+ * Optional: RESEND_WEBHOOK_SECRET_PREVIOUS for zero-downtime rotation
  */
 export const handleResendWebhook = httpAction(
   async (ctx: ActionCtx, request: Request) => {
-    const secret = process.env.RESEND_WEBHOOK_SECRET;
-    if (!secret) {
+    const secrets = collectWebhookSecrets(
+      process.env.RESEND_WEBHOOK_SECRET,
+      process.env.RESEND_WEBHOOK_SECRET_PREVIOUS,
+    );
+    if (secrets.length === 0) {
       console.error("RESEND_WEBHOOK_SECRET is not set");
       return new Response("Webhook secret not configured", { status: 500 });
     }
@@ -42,14 +49,17 @@ export const handleResendWebhook = httpAction(
       return new Response("Missing Svix headers", { status: 400 });
     }
 
-    const wh = new Webhook(secret);
     let event: ResendWebhookEvent;
     try {
-      event = wh.verify(payload, {
-        "svix-id": svixId,
-        "svix-timestamp": svixTimestamp,
-        "svix-signature": svixSignature,
-      }) as ResendWebhookEvent;
+      event = verifySvixPayload(
+        payload,
+        {
+          "svix-id": svixId,
+          "svix-timestamp": svixTimestamp,
+          "svix-signature": svixSignature,
+        },
+        secrets,
+      ) as ResendWebhookEvent;
     } catch {
       return new Response("Invalid signature", { status: 400 });
     }

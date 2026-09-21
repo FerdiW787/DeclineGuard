@@ -1,8 +1,11 @@
 import { httpAction } from "./_generated/server";
 import type { ActionCtx } from "./_generated/server";
-import { Webhook } from "svix";
 import { internal } from "./_generated/api";
 import type { StoredRole } from "./lib/admin";
+import {
+  collectWebhookSecrets,
+  verifySvixPayload,
+} from "./lib/svixVerify";
 
 type ClerkWebhookMessage = {
   type: string;
@@ -29,9 +32,13 @@ function roleFromClerkMetadata(
 
 export const handleClerkWebhook = httpAction(
   async (ctx: ActionCtx, request: Request) => {
-    const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
+    // Dual-secret rotation: accept signatures from current or previous secret.
+    const secrets = collectWebhookSecrets(
+      process.env.CLERK_WEBHOOK_SECRET,
+      process.env.CLERK_WEBHOOK_SECRET_PREVIOUS,
+    );
 
-    if (!WEBHOOK_SECRET) {
+    if (secrets.length === 0) {
       return new Response("CLERK_WEBHOOK_SECRET is not set", { status: 500 });
     }
 
@@ -44,15 +51,18 @@ export const handleClerkWebhook = httpAction(
       return new Response("Missing Svix headers", { status: 400 });
     }
 
-    const wh = new Webhook(WEBHOOK_SECRET);
     let msg: ClerkWebhookMessage;
 
     try {
-      msg = wh.verify(payload, {
-        "svix-id": svixId,
-        "svix-timestamp": svixTimestamp,
-        "svix-signature": svixSignature,
-      }) as ClerkWebhookMessage;
+      msg = verifySvixPayload(
+        payload,
+        {
+          "svix-id": svixId,
+          "svix-timestamp": svixTimestamp,
+          "svix-signature": svixSignature,
+        },
+        secrets,
+      ) as ClerkWebhookMessage;
     } catch {
       return new Response("Error verifying webhook", { status: 400 });
     }

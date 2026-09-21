@@ -49,6 +49,7 @@ import MerchantSupport, {
 } from "@/components/support/MerchantSupport";
 import SettingsModule from "./settings/SettingsModule";
 import type { SettingsTabId } from "./settings/settingsTypes";
+import { PLANS } from "@/lib/pricing";
 
 type DayRow = {
   date: string;
@@ -145,7 +146,6 @@ function Dashboard() {
     [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim() ||
     user?.primaryEmailAddress?.emailAddress ||
     "Account";
-  const planTier = "Free";
   const [nav, setNav] = useState<NavId>("overview");
   const customizationsRef = useRef<EmailCustomizeHandle>(null);
   const pageEnterRef = useRef<PageEnterHandle>(null);
@@ -219,6 +219,10 @@ function Dashboard() {
   );
   const ensureCurrentUser = useMutation(api.functions.user.ensureCurrentUser);
   const currentUser = useQuery(api.functions.user.getCurrentUser);
+  const plan = currentUser?.plan ?? "free";
+  const recoveryFeePercent =
+    currentUser?.recoveryFeePercent ?? PLANS[plan].recoveryFeePercent;
+  const planTier = PLANS[plan].name;
   const unreadHelpCount = useQuery(
     api.functions.support.countUnreadThreads,
     isSignedIn ? {} : "skip",
@@ -1255,7 +1259,7 @@ function Dashboard() {
                       storeLogoUrl={connection.storeAvatarUrl ?? null}
                       suggestedDomain={suggestedBrandDomain}
                       context="sequences"
-                      showDeclineGuardBadge={planTier === "Free"}
+                      showDeclineGuardBadge={plan === "free"}
                     />
                   ) : (
                   <SequencesPage
@@ -1294,7 +1298,7 @@ function Dashboard() {
                         recoverySettings?.socialInstagram ?? null
                       }
                       emailCopy={recoverySettings?.emailCopy ?? null}
-                      showDeclineGuardBadge={planTier === "Free"}
+                      showDeclineGuardBadge={plan === "free"}
                       onGoToRecoveries={(filter) =>
                         goRecoveries(filter ?? "all")
                       }
@@ -1354,7 +1358,7 @@ function Dashboard() {
                       storeLogoUrl={connection.storeAvatarUrl ?? null}
                       suggestedDomain={suggestedBrandDomain}
                       context="customizations"
-                      showDeclineGuardBadge={planTier === "Free"}
+                      showDeclineGuardBadge={plan === "free"}
                     />
                   ) : (
                   <CustomizationsPage
@@ -1392,7 +1396,7 @@ function Dashboard() {
                     socialYoutube={recoverySettings?.socialYoutube ?? null}
                     socialInstagram={recoverySettings?.socialInstagram ?? null}
                     emailCopy={recoverySettings?.emailCopy ?? null}
-                    showDeclineGuardBadge={planTier === "Free"}
+                    showDeclineGuardBadge={plan === "free"}
                     openFailures={openFailures}
                     fromAddressHint={emailSetup?.fromAddress ?? null}
                     brandDomain={recoverySettings?.brandDomain ?? null}
@@ -1465,6 +1469,7 @@ function Dashboard() {
           apiKeyLast4={connection.apiKeyLast4}
           testMode={connection.testMode}
           planTier={planTier}
+          recoveryFeePercent={recoveryFeePercent}
           webhookSetup={webhookSetup}
           webhookStatus={webhookStatus}
           feesSummary={feesSummary}

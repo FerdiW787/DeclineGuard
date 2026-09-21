@@ -47,6 +47,7 @@ import type * as lib_recoveryEmailFrom from "../lib/recoveryEmailFrom.js";
 import type * as lib_recoveryEmailTemplate from "../lib/recoveryEmailTemplate.js";
 import type * as lib_safeUrl from "../lib/safeUrl.js";
 import type * as lib_storageOwnership from "../lib/storageOwnership.js";
+import type * as lib_svixVerify from "../lib/svixVerify.js";
 import type * as resendWebhook from "../resendWebhook.js";
 
 import type {
@@ -95,6 +96,7 @@ declare const fullApi: ApiFromModules<{
   "lib/recoveryEmailTemplate": typeof lib_recoveryEmailTemplate;
   "lib/safeUrl": typeof lib_safeUrl;
   "lib/storageOwnership": typeof lib_storageOwnership;
+  "lib/svixVerify": typeof lib_svixVerify;
   resendWebhook: typeof resendWebhook;
 }>;
 
