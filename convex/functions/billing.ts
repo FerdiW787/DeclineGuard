@@ -6,6 +6,7 @@ import {
   resolvePlan,
   type Plan,
 } from "../lib/accountGuard";
+import { writeAuditLog } from "../lib/admin";
 import {
   getPlatformBillingConfig,
   matchesProCatalog,
@@ -142,11 +143,28 @@ export const applyPlatformSubscription = internalMutation({
     }
 
     const knownSub = user.lsSubscriptionId === args.lsSubscriptionId;
+    const resolvedViaCustomData = Boolean(
+      args.convexUserId &&
+        ctx.db.normalizeId("users", args.convexUserId) === user._id,
+    );
 
-    // Promote only for the configured Pro variant/product.
-    // Demote if catalog matches OR this is the sub we already stored.
-    if (nextPlan === "pro" && !catalogOk) {
-      return { applied: false, reason: "variant_mismatch" };
+    // Promote only for the configured Pro variant/product, or when our
+    // checkout custom_data resolved the user and catalog ids were omitted
+    // (payment_success invoices sometimes drop variant/product).
+    if (nextPlan === "pro") {
+      if (args.variantId && args.variantId !== config.variantId) {
+        return { applied: false, reason: "variant_mismatch" };
+      }
+      if (
+        config.productId &&
+        args.productId &&
+        args.productId !== config.productId
+      ) {
+        return { applied: false, reason: "product_mismatch" };
+      }
+      if (!catalogOk && !resolvedViaCustomData) {
+        return { applied: false, reason: "variant_mismatch" };
+      }
     }
     if (nextPlan === "free" && !catalogOk && !knownSub) {
       return { applied: false, reason: "unverified_subscription" };
@@ -158,6 +176,21 @@ export const applyPlatformSubscription = internalMutation({
       lsSubscriptionId: args.lsSubscriptionId,
       lsSubscriptionStatus: args.status,
     });
+
+    if (priorPlan !== nextPlan) {
+      await writeAuditLog(ctx, {
+        actorUserId: null,
+        targetUserId: user._id,
+        action: `plan_webhook:${nextPlan}`,
+        reason: "Lemon Squeezy platform subscription webhook",
+        metadata: {
+          priorPlan,
+          status: args.status,
+          lsSubscriptionId: args.lsSubscriptionId,
+          variantId: args.variantId ?? null,
+        },
+      });
+    }
 
     return {
       applied: priorPlan !== nextPlan || !knownSub,

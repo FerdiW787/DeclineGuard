@@ -77,6 +77,13 @@ Checkout creation does **not** set plan. Merchants cannot self-set plan.
 Staff `setUserPlan` remains gated with an audit log; the next matching
 webhook still overwrites plan.
 
+`createProCheckout` return/receipt URLs must pass `allowAppHttpsUrl`: https
+plus an allowlisted DeclineGuard origin (`PUBLIC_APP_URL` / `PUBLIC_APP_URLS`
+or `declineguard.com` / `www` / `app`). Arbitrary https hosts are rejected.
+
+Platform-store `order_created` is handled separately for monthly recovery-fee
+invoices (claim/release + mark paid). That path is unchanged.
+
 ## Dashboard queries
 
 - `api.functions.recoveries.listOpenFailures`

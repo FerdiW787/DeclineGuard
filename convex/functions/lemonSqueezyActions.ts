@@ -5,7 +5,7 @@ import { action, internalAction, type ActionCtx } from "../_generated/server";
 import { api, internal } from "../_generated/api";
 import { getPlatformBillingConfig } from "../lib/billingPlan";
 import { apiKeyLast4, decryptApiKey, encryptApiKey } from "../lib/lsCrypto";
-import { allowHttpsUrl } from "../lib/safeUrl";
+import { allowAppHttpsUrl, allowHttpsUrl } from "../lib/safeUrl";
 
 async function assertCallerActive(ctx: ActionCtx): Promise<void> {
   // Model B: Admin with active takeover resolves to merchant product user.
@@ -917,6 +917,11 @@ export const createProCheckout = action({
     if (viewer.accountStatus === "disabled") {
       throw new Error("This account is disabled. Contact DeclineGuard support.");
     }
+    if (viewer.accountStatus === "frozen") {
+      throw new Error(
+        "This account is frozen. Contact DeclineGuard support to restore access before upgrading.",
+      );
+    }
     if (
       viewer.plan === "pro" &&
       (viewer.lsSubscriptionStatus ?? "").toLowerCase() === "active"
@@ -938,7 +943,7 @@ export const createProCheckout = action({
       );
     }
 
-    const returnUrl = allowHttpsUrl(args.returnUrl);
+    const returnUrl = allowAppHttpsUrl(args.returnUrl);
     const variantNumeric = Number(config.variantId);
     if (!Number.isFinite(variantNumeric)) {
       throw new Error("LEMONSQUEEZY_PRO_VARIANT_ID must be a numeric variant id.");
