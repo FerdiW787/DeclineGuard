@@ -5,6 +5,7 @@ import {
   internalMutation,
   internalQuery,
   mutation,
+  query,
   type MutationCtx,
   type QueryCtx,
 } from "../_generated/server";
@@ -17,9 +18,43 @@ import {
 import {
   existingClaimBlocksNewCharge,
   feeInvoiceClaimKey,
+  orderCoversClaimedCents,
 } from "../lib/feeBilling";
+import { allowHttpsUrl } from "../lib/safeUrl";
+import { resolveProductUserOrNull } from "../lib/accountGuard";
 
+/**
+ * Caps per-merchant owed-fee load when claiming a period.
+ * Merchants with more than this many still-owed rows are under-invoiced
+ * until older rows are paid/waived or staff releases and force-runs.
+ */
 const FEE_INVOICE_SCAN_LIMIT = 2000;
+
+const billingInvoiceStatusValidator = v.union(
+  v.literal("claiming"),
+  v.literal("created"),
+  v.literal("paid"),
+  v.literal("failed"),
+);
+
+const feeInvoiceListItemValidator = v.object({
+  _id: v.id("billingInvoices"),
+  userId: v.id("users"),
+  claimKey: v.string(),
+  periodKey: v.string(),
+  currency: v.string(),
+  totalCents: v.number(),
+  feeCount: v.number(),
+  status: billingInvoiceStatusValidator,
+  lsCheckoutId: v.union(v.string(), v.null()),
+  lsCheckoutUrl: v.union(v.string(), v.null()),
+  lsOrderId: v.union(v.string(), v.null()),
+  expiresAt: v.union(v.number(), v.null()),
+  checkoutEmailSentAt: v.union(v.number(), v.null()),
+  createdAt: v.number(),
+  paidAt: v.union(v.number(), v.null()),
+  lastError: v.union(v.string(), v.null()),
+});
 
 const owedFeeSummaryValidator = v.object({
   _id: v.id("recoveryFees"),
@@ -208,12 +243,33 @@ export const claimBillingPeriod = internalMutation({
       byCurrency.set(code, list);
     }
     if (byCurrency.size > 1) {
+      await writeAuditLog(ctx, {
+        actorUserId: null,
+        targetUserId: args.userId,
+        action: "fee_invoice:skipped_currency",
+        metadata: {
+          reason: "currency_mixed",
+          currencies: [...byCurrency.keys()],
+          periodKey: args.periodKey,
+        },
+      });
       return { ...none, currencyMixed: true, reason: "currency_mixed" };
     }
 
     const currency = [...byCurrency.keys()][0] ?? "USD";
     const storeCurrency = args.storeCurrency.trim().toUpperCase() || "USD";
     if (currency !== storeCurrency) {
+      await writeAuditLog(ctx, {
+        actorUserId: null,
+        targetUserId: args.userId,
+        action: "fee_invoice:skipped_currency",
+        metadata: {
+          reason: "currency_mismatch",
+          feeCurrency: currency,
+          storeCurrency,
+          periodKey: args.periodKey,
+        },
+      });
       return {
         ...none,
         currencyMismatch: true,
@@ -337,6 +393,7 @@ export const attachLsCheckout = internalMutation({
     invoiceId: v.id("billingInvoices"),
     lsCheckoutId: v.string(),
     lsCheckoutUrl: v.optional(v.string()),
+    expiresAt: v.optional(v.number()),
     nowMs: v.number(),
   },
   returns: v.boolean(),
@@ -351,14 +408,59 @@ export const attachLsCheckout = internalMutation({
       return false;
     }
 
+    const safeUrl = allowHttpsUrl(args.lsCheckoutUrl);
     await ctx.db.patch(args.invoiceId, {
       status: "created",
       lsCheckoutId: args.lsCheckoutId,
-      lsCheckoutUrl: args.lsCheckoutUrl,
+      lsCheckoutUrl: safeUrl ?? undefined,
+      expiresAt: args.expiresAt,
       createdLsAt: args.nowMs,
-      lastError: undefined,
+      lastError: safeUrl ? undefined : "missing_checkout_url",
     });
     return true;
+  },
+});
+
+export const recordCheckoutEmailSent = internalMutation({
+  args: {
+    invoiceId: v.id("billingInvoices"),
+    nowMs: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.invoiceId);
+    if (!invoice) return null;
+    await ctx.db.patch(args.invoiceId, { checkoutEmailSentAt: args.nowMs });
+    return null;
+  },
+});
+
+export const getInvoiceCheckoutFields = internalQuery({
+  args: { invoiceId: v.id("billingInvoices") },
+  returns: v.union(
+    v.object({
+      _id: v.id("billingInvoices"),
+      status: billingInvoiceStatusValidator,
+      totalCents: v.number(),
+      feeCount: v.number(),
+      lsCheckoutId: v.union(v.string(), v.null()),
+      lsCheckoutUrl: v.union(v.string(), v.null()),
+      expiresAt: v.union(v.number(), v.null()),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.invoiceId);
+    if (!row) return null;
+    return {
+      _id: row._id,
+      status: row.status,
+      totalCents: row.totalCents,
+      feeCount: row.feeIds.length,
+      lsCheckoutId: row.lsCheckoutId ?? null,
+      lsCheckoutUrl: allowHttpsUrl(row.lsCheckoutUrl),
+      expiresAt: row.expiresAt ?? null,
+    };
   },
 });
 
@@ -418,6 +520,7 @@ export const recordFeeInvoiceCreated = internalMutation({
         totalCents: invoice.totalCents,
         feeCount: invoice.feeIds.length,
         lsCheckoutId: invoice.lsCheckoutId,
+        lsCheckoutUrl: invoice.lsCheckoutUrl,
       },
     });
     return null;
@@ -474,7 +577,8 @@ export const findBillingInvoiceForPaidOrder = internalQuery({
 /**
  * Mark a claimed invoice paid and flip linked fees to `invoiced`.
  * Replay-safe: a second paid delivery is a no-op success.
- * Does not mark paid on test-mode orders or non-paid LS statuses.
+ * Does not mark paid on test-mode, non-paid status, or when both
+ * subtotal and total are below the claimed cents (tax may exceed).
  */
 export const markBillingInvoicePaid = internalMutation({
   args: {
@@ -482,6 +586,7 @@ export const markBillingInvoicePaid = internalMutation({
     lsOrderId: v.string(),
     lsCheckoutId: v.optional(v.string()),
     orderStatus: v.string(),
+    subtotalCents: v.number(),
     totalCents: v.number(),
     testMode: v.boolean(),
     paidAt: v.number(),
@@ -527,6 +632,34 @@ export const markBillingInvoicePaid = internalMutation({
         marked: false,
         alreadyPaid: false,
         reason: "test_mode",
+        feeCount: invoice.feeIds.length,
+      };
+    }
+
+    if (
+      !orderCoversClaimedCents(
+        invoice.totalCents,
+        args.subtotalCents,
+        args.totalCents,
+      )
+    ) {
+      await writeAuditLog(ctx, {
+        actorUserId: null,
+        targetUserId: invoice.userId,
+        action: "fee_invoice:amount_below",
+        metadata: {
+          invoiceId: invoice._id,
+          lsOrderId: args.lsOrderId,
+          claimKey: invoice.claimKey,
+          claimedCents: invoice.totalCents,
+          subtotalCents: args.subtotalCents,
+          totalCents: args.totalCents,
+        },
+      });
+      return {
+        marked: false,
+        alreadyPaid: false,
+        reason: "amount_below",
         feeCount: invoice.feeIds.length,
       };
     }
@@ -616,10 +749,88 @@ export const assertStaffCanInvoiceUser = internalMutation({
   },
 });
 
+function toFeeInvoiceListItem(row: Doc<"billingInvoices">) {
+  return {
+    _id: row._id,
+    userId: row.userId,
+    claimKey: row.claimKey,
+    periodKey: row.periodKey,
+    currency: row.currency,
+    totalCents: row.totalCents,
+    feeCount: row.feeIds.length,
+    status: row.status,
+    lsCheckoutId: row.lsCheckoutId ?? null,
+    lsCheckoutUrl: allowHttpsUrl(row.lsCheckoutUrl),
+    lsOrderId: row.lsOrderId ?? null,
+    expiresAt: row.expiresAt ?? null,
+    checkoutEmailSentAt: row.checkoutEmailSentAt ?? null,
+    createdAt: row.createdAt,
+    paidAt: row.paidAt ?? null,
+    lastError: row.lastError ?? null,
+  };
+}
+
+/**
+ * Staff/Admin: open and historical fee invoices for a merchant, including
+ * the HTTPS checkout URL. After `expiresAt` the LS link dies — release
+ * the claim (this mutation below) so the next run can re-invoice.
+ */
+export const adminListFeeInvoicesForUser = query({
+  args: {
+    userId: v.id("users"),
+    limit: v.optional(v.number()),
+  },
+  returns: v.array(feeInvoiceListItemValidator),
+  handler: async (ctx, args) => {
+    const actor = await requireStaff(ctx);
+    const target = await ctx.db.get(args.userId);
+    if (!target) throw new Error("Target user not found");
+    assertCanActOnTarget(actor, target);
+
+    const limit = Math.min(Math.max(args.limit ?? 24, 1), 100);
+    const rows = await ctx.db
+      .query("billingInvoices")
+      .withIndex("by_user_period", (q) => q.eq("userId", args.userId))
+      .order("desc")
+      .take(limit);
+
+    return rows.map(toFeeInvoiceListItem);
+  },
+});
+
+/**
+ * Merchant: unpaid `created` invoices that still have a reachable pay URL.
+ * Auth-scoped to the signed-in product user — no self-invoice create.
+ */
+export const getMyOpenFeeInvoices = query({
+  args: {},
+  returns: v.array(feeInvoiceListItemValidator),
+  handler: async (ctx) => {
+    const user = await resolveProductUserOrNull(ctx);
+    if (!user) return [];
+
+    const rows = await ctx.db
+      .query("billingInvoices")
+      .withIndex("by_user_period", (q) => q.eq("userId", user._id))
+      .order("desc")
+      .take(24);
+
+    return rows
+      .filter(
+        (row) =>
+          row.status === "created" && allowHttpsUrl(row.lsCheckoutUrl) != null,
+      )
+      .map(toFeeInvoiceListItem);
+  },
+});
+
 /**
  * Staff/Admin: release a stuck or unpaid period claim so the next run
  * can invoice the same owed set. Paid invoices cannot be released.
- * Does not void an LS checkout — ops must ignore/expire that checkout.
+ * Does not void an LS checkout — if `created` and past `expiresAt`,
+ * release here so the next monthly/force run can charge the same fees.
+ * If the LS checkout is still live, do not release unless ops will
+ * ignore that checkout (releasing then re-running can double-bill).
  */
 export const adminReleaseFeeInvoiceClaim = mutation({
   args: {

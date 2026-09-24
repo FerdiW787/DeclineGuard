@@ -72,3 +72,18 @@ export function parseBillingCustomData(
 export function isFeeInvoiceClaimKey(claimKey: string): boolean {
   return claimKey.startsWith("fee-invoice:");
 }
+
+/** LS checkout lifetime used by the monthly job (45 days). */
+export const FEE_INVOICE_CHECKOUT_TTL_MS = 45 * 24 * 60 * 60 * 1000;
+
+/**
+ * Accept payment when subtotal or total covers the claimed cents.
+ * Tax may push `total` above the claim — do not require equality.
+ */
+export function orderCoversClaimedCents(
+  claimedCents: number,
+  subtotalCents: number,
+  totalCents: number,
+): boolean {
+  return subtotalCents >= claimedCents || totalCents >= claimedCents;
+}

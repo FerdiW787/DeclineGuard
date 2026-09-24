@@ -284,11 +284,15 @@ export default defineSchema({
       v.literal("failed"),
     ),
     lsCheckoutId: v.optional(v.string()),
+    /** HTTPS checkout URL only (sanitized via allowHttpsUrl). */
     lsCheckoutUrl: v.optional(v.string()),
     lsOrderId: v.optional(v.string()),
     lastError: v.optional(v.string()),
     createdAt: v.number(),
     createdLsAt: v.optional(v.number()),
+    /** LS checkout expires_at — after this, staff must release to re-invoice. */
+    expiresAt: v.optional(v.number()),
+    checkoutEmailSentAt: v.optional(v.number()),
     paidAt: v.optional(v.number()),
   })
     .index("by_claimKey", ["claimKey"])

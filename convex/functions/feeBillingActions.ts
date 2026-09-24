@@ -5,7 +5,13 @@ import { v } from "convex/values";
 import { action, internalAction, type ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
-import { feeInvoiceClaimKey, utcPeriodKey } from "../lib/feeBilling";
+import {
+  FEE_INVOICE_CHECKOUT_TTL_MS,
+  feeInvoiceClaimKey,
+  utcPeriodKey,
+} from "../lib/feeBilling";
+import { allowHttpsUrl } from "../lib/safeUrl";
+import { resolveFromAddress } from "../lib/recoveryEmailFrom";
 
 /**
  * LS mechanism: Checkout + `custom_price` → paid webhook `order_created`.
@@ -77,7 +83,7 @@ async function lsPlatformFetch(
   return json;
 }
 
-function readCheckout(json: LsJson): { id: string; url?: string } {
+function readCheckout(json: LsJson): { id: string; url: string | null } {
   const data = json.data;
   if (typeof data !== "object" || data === null || !("id" in data)) {
     throw new Error("Lemon Squeezy checkout response missing id");
@@ -90,8 +96,91 @@ function readCheckout(json: LsJson): { id: string; url?: string } {
     "attributes" in data && typeof data.attributes === "object"
       ? (data.attributes as Record<string, unknown>)
       : null;
-  const url = typeof attrs?.url === "string" ? attrs.url : undefined;
+  const url = typeof attrs?.url === "string" ? allowHttpsUrl(attrs.url) : null;
   return { id: id.trim(), url };
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function formatMoney(cents: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat("en", {
+      style: "currency",
+      currency: currency.toUpperCase(),
+      maximumFractionDigits: 2,
+    }).format(cents / 100);
+  } catch {
+    return `${(cents / 100).toFixed(2)} ${currency.toUpperCase()}`;
+  }
+}
+
+async function sendFeeInvoiceEmail(args: {
+  to: string;
+  merchantName: string;
+  periodKey: string;
+  totalCents: number;
+  currency: string;
+  checkoutUrl: string;
+}): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  if (!apiKey) {
+    console.warn(
+      "RESEND_API_KEY not set — fee invoice checkout URL was not emailed",
+    );
+    return false;
+  }
+  const safeUrl = allowHttpsUrl(args.checkoutUrl);
+  if (!safeUrl) return false;
+
+  const amount = formatMoney(args.totalCents, args.currency);
+  const name = args.merchantName.trim() || "there";
+  const from = resolveFromAddress("DeclineGuard");
+  const subject = `DeclineGuard recovery fees — ${args.periodKey}`;
+  const text = [
+    `Hi ${name},`,
+    "",
+    `Your DeclineGuard recovery fees for ${args.periodKey} are ${amount}.`,
+    "Pay this invoice:",
+    safeUrl,
+    "",
+    "This link expires; if it no longer works, contact DeclineGuard support.",
+  ].join("\n");
+  const html = `<p>Hi ${escapeHtml(name)},</p>
+<p>Your DeclineGuard recovery fees for ${escapeHtml(args.periodKey)} are <strong>${escapeHtml(amount)}</strong>.</p>
+<p><a href="${escapeHtml(safeUrl)}">Pay invoice</a></p>
+<p>This link expires. If it no longer works, contact DeclineGuard support.</p>`;
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [args.to],
+        subject,
+        text,
+        html,
+      }),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("Fee invoice email failed", res.status, errText);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("Fee invoice email threw", err);
+    return false;
+  }
 }
 
 async function lookupClerkEmail(
@@ -125,6 +214,9 @@ const invoiceMerchantResultValidator = v.object({
   totalCents: v.number(),
   feeCount: v.number(),
   error: v.union(v.string(), v.null()),
+  lsCheckoutId: v.union(v.string(), v.null()),
+  lsCheckoutUrl: v.union(v.string(), v.null()),
+  checkoutEmailSent: v.boolean(),
 });
 
 type InvoiceMerchantResult = {
@@ -139,7 +231,21 @@ type InvoiceMerchantResult = {
   totalCents: number;
   feeCount: number;
   error: string | null;
+  lsCheckoutId: string | null;
+  lsCheckoutUrl: string | null;
+  checkoutEmailSent: boolean;
 };
+
+function emptyCheckoutFields(): Pick<
+  InvoiceMerchantResult,
+  "lsCheckoutId" | "lsCheckoutUrl" | "checkoutEmailSent"
+> {
+  return {
+    lsCheckoutId: null,
+    lsCheckoutUrl: null,
+    checkoutEmailSent: false,
+  };
+}
 
 type OwedFeePage = {
   page: Array<{
@@ -182,6 +288,7 @@ async function invoiceMerchant(
       totalCents: 0,
       feeCount: 0,
       error: "not_configured",
+      ...emptyCheckoutFields(),
     };
   }
 
@@ -195,6 +302,14 @@ async function invoiceMerchant(
     },
   );
 
+  const target = await ctx.runQuery(
+    internal.functions.feeBilling.getUserBillingTarget,
+    { userId },
+  );
+  const email = target
+    ? await lookupClerkEmail(target.clerkUserId)
+    : undefined;
+
   if (claim.skippedZero) {
     return {
       outcome: "skipped_zero",
@@ -202,6 +317,7 @@ async function invoiceMerchant(
       totalCents: 0,
       feeCount: 0,
       error: null,
+      ...emptyCheckoutFields(),
     };
   }
   if (claim.currencyMixed || claim.currencyMismatch) {
@@ -214,27 +330,51 @@ async function invoiceMerchant(
       totalCents: 0,
       feeCount: 0,
       error: claim.reason,
+      ...emptyCheckoutFields(),
     };
   }
   if (!claim.claimed || !claim.invoiceId) {
+    const existing = claim.invoiceId
+      ? await ctx.runQuery(
+          internal.functions.feeBilling.getInvoiceCheckoutFields,
+          { invoiceId: claim.invoiceId },
+        )
+      : null;
+    const existingUrl = existing?.lsCheckoutUrl ?? null;
+    let checkoutEmailSent = false;
+    if (actorUserId && existingUrl && email) {
+      checkoutEmailSent = await sendFeeInvoiceEmail({
+        to: email,
+        merchantName: target?.userName ?? "there",
+        periodKey,
+        totalCents: existing?.totalCents ?? claim.totalCents,
+        currency: claim.currency ?? config.currency,
+        checkoutUrl: existingUrl,
+      });
+      if (checkoutEmailSent && existing) {
+        await ctx.runMutation(
+          internal.functions.feeBilling.recordCheckoutEmailSent,
+          { invoiceId: existing._id, nowMs },
+        );
+      }
+    }
     return {
       outcome: "skipped_claimed",
       invoiceId: claim.invoiceId,
       totalCents: claim.totalCents,
       feeCount: claim.feeCount,
       error: claim.reason,
+      lsCheckoutId: existing?.lsCheckoutId ?? null,
+      lsCheckoutUrl: existingUrl,
+      checkoutEmailSent,
     };
   }
 
   const invoiceId = claim.invoiceId;
-  const target = await ctx.runQuery(
-    internal.functions.feeBilling.getUserBillingTarget,
-    { userId },
-  );
-  const email = target
-    ? await lookupClerkEmail(target.clerkUserId)
-    : undefined;
+  const expiresAt = nowMs + FEE_INVOICE_CHECKOUT_TTL_MS;
 
+  let checkoutId: string | null = null;
+  let checkoutUrl: string | null = null;
   try {
     const json = await lsPlatformFetch(config.apiKey, "/checkouts", {
       method: "POST",
@@ -255,7 +395,7 @@ async function invoiceMerchant(
                 billing_invoice_id: invoiceId,
               },
             },
-            expires_at: new Date(nowMs + 45 * 24 * 60 * 60 * 1000).toISOString(),
+            expires_at: new Date(expiresAt).toISOString(),
           },
           relationships: {
             store: { data: { type: "stores", id: config.storeId } },
@@ -264,33 +404,9 @@ async function invoiceMerchant(
         },
       },
     });
-
     const checkout = readCheckout(json);
-    const attached = await ctx.runMutation(
-      internal.functions.feeBilling.attachLsCheckout,
-      {
-        invoiceId,
-        lsCheckoutId: checkout.id,
-        lsCheckoutUrl: checkout.url,
-        nowMs,
-      },
-    );
-    if (!attached) {
-      throw new Error("Failed to persist Lemon Squeezy checkout id");
-    }
-
-    await ctx.runMutation(internal.functions.feeBilling.recordFeeInvoiceCreated, {
-      invoiceId,
-      actorUserId,
-    });
-
-    return {
-      outcome: "created",
-      invoiceId,
-      totalCents: claim.totalCents,
-      feeCount: claim.feeCount,
-      error: null,
-    };
+    checkoutId = checkout.id;
+    checkoutUrl = checkout.url;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Lemon Squeezy error";
     console.error(`Fee invoice LS create failed for ${userId}:`, message);
@@ -305,8 +421,107 @@ async function invoiceMerchant(
       totalCents: claim.totalCents,
       feeCount: claim.feeCount,
       error: message,
+      ...emptyCheckoutFields(),
     };
   }
+
+  // LS returned a checkout id: persist it, keep fees linked, never unlink.
+  if (!checkoutId) {
+    await ctx.runMutation(internal.functions.feeBilling.markBillingClaimFailed, {
+      invoiceId,
+      error: "checkout_missing_id",
+      unlinkFees: true,
+    });
+    return {
+      outcome: "failed",
+      invoiceId,
+      totalCents: claim.totalCents,
+      feeCount: claim.feeCount,
+      error: "checkout_missing_id",
+      ...emptyCheckoutFields(),
+    };
+  }
+
+  if (!checkoutUrl) {
+    try {
+      const refetch = await lsPlatformFetch(
+        config.apiKey,
+        `/checkouts/${checkoutId}`,
+      );
+      checkoutUrl = readCheckout(refetch).url;
+    } catch (err) {
+      console.warn(`Fee invoice: checkout ${checkoutId} refetch failed`, err);
+    }
+  }
+
+  try {
+    const attached = await ctx.runMutation(
+      internal.functions.feeBilling.attachLsCheckout,
+      {
+        invoiceId,
+        lsCheckoutId: checkoutId,
+        lsCheckoutUrl: checkoutUrl ?? undefined,
+        expiresAt,
+        nowMs,
+      },
+    );
+    if (!attached) {
+      console.error(
+        `Fee invoice: persist failed after LS checkout ${checkoutId} for ${invoiceId}`,
+      );
+    }
+  } catch (err) {
+    console.error(
+      `Fee invoice: persist threw after LS checkout ${checkoutId}:`,
+      err,
+    );
+  }
+
+  try {
+    await ctx.runMutation(internal.functions.feeBilling.recordFeeInvoiceCreated, {
+      invoiceId,
+      actorUserId,
+    });
+  } catch (err) {
+    console.error(`Fee invoice: created audit failed for ${invoiceId}:`, err);
+  }
+
+  let checkoutEmailSent = false;
+  if (checkoutUrl && email) {
+    checkoutEmailSent = await sendFeeInvoiceEmail({
+      to: email,
+      merchantName: target?.userName ?? "there",
+      periodKey,
+      totalCents: claim.totalCents,
+      currency: claim.currency ?? config.currency,
+      checkoutUrl,
+    });
+    if (checkoutEmailSent) {
+      await ctx.runMutation(
+        internal.functions.feeBilling.recordCheckoutEmailSent,
+        { invoiceId, nowMs },
+      );
+    }
+  } else if (!checkoutUrl) {
+    console.error(
+      `Fee invoice ${invoiceId}: LS checkout ${checkoutId} has no HTTPS URL — staff must copy from LS or release after expiresAt`,
+    );
+  } else if (!email) {
+    console.warn(
+      `Fee invoice ${invoiceId}: no merchant email — checkout URL is on the staff list / force-run return`,
+    );
+  }
+
+  return {
+    outcome: "created",
+    invoiceId,
+    totalCents: claim.totalCents,
+    feeCount: claim.feeCount,
+    error: checkoutUrl ? null : "missing_checkout_url",
+    lsCheckoutId: checkoutId,
+    lsCheckoutUrl: checkoutUrl,
+    checkoutEmailSent,
+  };
 }
 
 export const runMonthlyFeeInvoices = internalAction({

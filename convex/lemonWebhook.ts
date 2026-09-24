@@ -331,10 +331,9 @@ async function handleBillingOrderWebhook(
       },
     );
     if (!invoiceId) {
-      console.warn(
-        `Fee invoice webhook: no billingInvoices row for ${claimKey} / order ${args.data.id}`,
+      throw new Error(
+        `No billingInvoices row for ${claimKey} / order ${args.data.id}`,
       );
-      return new Response("No matching fee invoice", { status: 200 });
     }
 
     const orderStatus =
@@ -348,14 +347,23 @@ async function handleBillingOrderWebhook(
           : null,
     );
 
-    await ctx.runMutation(internal.functions.feeBilling.markBillingInvoicePaid, {
-      invoiceId,
-      lsOrderId: String(args.data.id),
-      orderStatus,
-      totalCents: asCents(args.attrs.total),
-      testMode,
-      paidAt,
-    });
+    const marked = await ctx.runMutation(
+      internal.functions.feeBilling.markBillingInvoicePaid,
+      {
+        invoiceId,
+        lsOrderId: String(args.data.id),
+        orderStatus,
+        subtotalCents: asCents(args.attrs.subtotal),
+        totalCents: asCents(args.attrs.total),
+        testMode,
+        paidAt,
+      },
+    );
+    if (marked.reason === "not_found") {
+      throw new Error(
+        `billingInvoices ${invoiceId} disappeared before mark paid`,
+      );
+    }
   } catch (err) {
     console.error(
       `Fee invoice webhook failed for ${eventKey}, releasing claim:`,
