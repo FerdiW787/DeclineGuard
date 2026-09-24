@@ -66,12 +66,55 @@ export function normalizeLsStatus(status: string): string {
 /**
  * Map an LS subscription/invoice status to a DeclineGuard plan.
  * Returns null when the status should not change plan (e.g. on_trial).
+ * Callers that write plan MUST also gate `test_mode` via
+ * `shouldIgnoreLsTestEvent` (see applyPlatformSubscription).
  */
 export function planFromLsStatus(status: string): Plan | null {
   const normalized = normalizeLsStatus(status);
   if (PROMOTE_STATUSES.has(normalized)) return "pro";
   if (DEMOTE_STATUSES.has(normalized)) return "free";
   return null;
+}
+
+/** LS test events may grant Pro only when this Convex env is explicitly set. */
+export function isLsTestBillingAllowed(
+  envValue: string | undefined = process.env.ALLOW_LS_TEST_BILLING,
+): boolean {
+  const raw = envValue?.trim().toLowerCase();
+  return raw === "true" || raw === "1";
+}
+
+/** Test-mode webhooks must not write plan unless ALLOW_LS_TEST_BILLING is set. */
+export function shouldIgnoreLsTestEvent(
+  testMode: boolean,
+  envValue?: string,
+): boolean {
+  return testMode && !isLsTestBillingAllowed(envValue);
+}
+
+export const PRO_CHECKOUT_NONCE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** True when the webhook nonce matches a checkout we created and it has not expired. */
+export function checkoutNonceMatches(args: {
+  provided: string | undefined;
+  stored: string | undefined;
+  expiresAt: number | undefined;
+  nowMs: number;
+}): boolean {
+  if (!args.provided || !args.stored) return false;
+  if (args.provided !== args.stored) return false;
+  return (args.expiresAt ?? 0) > args.nowMs;
+}
+
+/**
+ * When variant/product are omitted, do not trust bare custom_data user ids.
+ * Require a subscription we already stored, or a pending-checkout nonce.
+ */
+export function canPromoteWithoutCatalogIds(args: {
+  knownSub: boolean;
+  checkoutNonceOk: boolean;
+}): boolean {
+  return args.knownSub || args.checkoutNonceOk;
 }
 
 /** Prefer payload status; fall back from the event name when LS omits it. */
@@ -134,10 +177,14 @@ export function extractProductId(
 
 export function extractCustomUserRefs(meta: {
   custom_data?: unknown;
-}): { convexUserId: string | null; clerkUserId: string | null } {
+}): {
+  convexUserId: string | null;
+  clerkUserId: string | null;
+  checkoutNonce: string | null;
+} {
   const custom = meta.custom_data;
   if (!custom || typeof custom !== "object") {
-    return { convexUserId: null, clerkUserId: null };
+    return { convexUserId: null, clerkUserId: null, checkoutNonce: null };
   }
   const rec = custom as Record<string, unknown>;
   const convexUserId =
@@ -147,7 +194,9 @@ export function extractCustomUserRefs(meta: {
   const clerkUserId =
     stringifyLsId(rec.clerk_user_id) ??
     stringifyLsId(rec.clerkUserId);
-  return { convexUserId, clerkUserId };
+  const checkoutNonce =
+    stringifyLsId(rec.checkout_nonce) ?? stringifyLsId(rec.checkoutNonce);
+  return { convexUserId, clerkUserId, checkoutNonce };
 }
 
 /** Variant/product must match configured Pro ids when the payload includes them. */

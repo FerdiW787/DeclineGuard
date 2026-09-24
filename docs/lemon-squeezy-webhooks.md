@@ -63,6 +63,7 @@ Merchant recovery webhooks and DeclineGuard’s own Pro subscription share
 | `LEMONSQUEEZY_STORE_ID` | Identify platform-store webhook events |
 | `LEMONSQUEEZY_PRO_VARIANT_ID` | $29.99/mo variant (required) |
 | `LEMONSQUEEZY_PRO_PRODUCT_ID` | Product id (recommended verification) |
+| `ALLOW_LS_TEST_BILLING` | `true` / `1` only on isolated Convex env — lets `test_mode` events write `users.plan`. Unset in production. |
 
 On the platform store webhook, also subscribe to `subscription_created`,
 `subscription_cancelled`, `subscription_expired`, and
@@ -70,8 +71,13 @@ On the platform store webhook, also subscribe to `subscription_created`,
 
 | Platform event / status | Effect |
 | --- | --- |
-| `active` or `paid` | `users.plan = pro` + store `lsSubscriptionId` |
-| `cancelled`, `expired`, `unpaid`, `past_due`, failed payment | `users.plan = free` |
+| `active` or `paid` (live) | `users.plan = pro` + store `lsSubscriptionId` |
+| `cancelled`, `expired`, `unpaid`, `past_due`, failed payment (live) | `users.plan = free` |
+| any of the above with `test_mode: true` | ignored (`test_mode_ignored`) unless `ALLOW_LS_TEST_BILLING=true` — no plan / sub id write |
+
+Test-mode events share the same HMAC and `POST /lemonsqueezy` as live. `applyPlatformSubscription` receives `testMode: attrs.test_mode === true` (or `meta.test_mode`) and refuses to patch `plan`, `lsSubscriptionId`, or `lsSubscriptionStatus` unless the Convex env explicitly allows it. An audit row `plan_webhook:test_mode_ignored` is written when a user can be resolved.
+
+When a payment event omits variant/product ids, promote requires a **known** `lsSubscriptionId` on the user or the pending-checkout nonce from `createProCheckout` — not bare `custom_data` user ids.
 
 Checkout creation does **not** set plan. Merchants cannot self-set plan.
 Staff `setUserPlan` remains gated with an audit log; the next matching
