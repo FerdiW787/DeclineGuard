@@ -20,6 +20,17 @@ import { consumeRateLimit } from "../lib/rateLimit";
 /** Gap between preview emails (mirrors fast recovery drip, but 30s). */
 export const PREVIEW_GAP_MS = 30_000;
 
+/** Per merchant: 2 preview sequence starts every 3 × 24h (Fendem 2026-09-24). */
+export const PREVIEW_USER_START_LIMIT = 2;
+export const PREVIEW_USER_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+export const PREVIEW_USER_RATE_LIMIT_ERROR =
+  "Preview limit reached. You can start 2 preview sequences every 3 days.";
+
+/** Platform safety: 40 preview sequence starts per hour globally. */
+export const PREVIEW_GLOBAL_RATE_KEY = "preview_seq:global";
+export const PREVIEW_GLOBAL_START_LIMIT = 40;
+export const PREVIEW_GLOBAL_WINDOW_MS = 60 * 60 * 1000;
+
 const previewStepValidator = v.union(
   v.literal("step1"),
   v.literal("step2"),
@@ -155,9 +166,19 @@ export const start = mutation({
       throw new Error("Connect a Lemon Squeezy store before sending a preview.");
     }
 
-    await consumeRateLimit(ctx, `preview_seq:${user._id}`, 3, 60 * 60 * 1000);
-    await consumeRateLimit(ctx, `preview_seq:day:${user._id}`, 5, 24 * 60 * 60 * 1000);
-    await consumeRateLimit(ctx, "preview_seq:global", 40, 60 * 60 * 1000);
+    await consumeRateLimit(
+      ctx,
+      `preview_seq:${user._id}`,
+      PREVIEW_USER_START_LIMIT,
+      PREVIEW_USER_WINDOW_MS,
+      PREVIEW_USER_RATE_LIMIT_ERROR,
+    );
+    await consumeRateLimit(
+      ctx,
+      PREVIEW_GLOBAL_RATE_KEY,
+      PREVIEW_GLOBAL_START_LIMIT,
+      PREVIEW_GLOBAL_WINDOW_MS,
+    );
 
     const running = await ctx.db
       .query("previewSequences")

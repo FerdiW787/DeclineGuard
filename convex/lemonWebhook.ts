@@ -16,7 +16,7 @@ import {
 import { allowHttpsUrl } from "./lib/safeUrl";
 
 type LsWebhookBody = {
-  meta?: { event_name?: string; custom_data?: unknown };
+  meta?: { event_name?: string; custom_data?: unknown; test_mode?: boolean };
   data?: {
     type?: string;
     id?: string;
@@ -39,6 +39,7 @@ type LsWebhookBody = {
  *
  * Env: LEMONSQUEEZY_WEBHOOK_SECRET (same signing secret you enter in LS)
  * Platform events also need LEMONSQUEEZY_STORE_ID.
+ * Test-mode Pro events do not write users.plan unless ALLOW_LS_TEST_BILLING=true.
  */
 export const handleLemonSqueezyWebhook = httpAction(
   async (ctx: ActionCtx, request: Request) => {
@@ -189,7 +190,8 @@ export const handleLemonSqueezyWebhook = httpAction(
     const currency =
       typeof attrs.currency === "string" ? attrs.currency : "USD";
     const amountCents = asCents(attrs.total);
-    const testMode = attrs.test_mode === true;
+    const testMode =
+      attrs.test_mode === true || body.meta?.test_mode === true;
     const productName = extractProductName(attrs);
     const declineReason = extractDeclineReason(attrs);
     const occurredAt = parseIsoMs(
@@ -225,6 +227,8 @@ export const handleLemonSqueezyWebhook = httpAction(
             productId: extractProductId(attrs) ?? undefined,
             convexUserId: customRefs.convexUserId ?? undefined,
             clerkUserId: customRefs.clerkUserId ?? undefined,
+            checkoutNonce: customRefs.checkoutNonce ?? undefined,
+            testMode,
           },
         );
       }

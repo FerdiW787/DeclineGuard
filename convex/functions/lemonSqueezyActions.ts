@@ -949,6 +949,11 @@ export const createProCheckout = action({
       throw new Error("LEMONSQUEEZY_PRO_VARIANT_ID must be a numeric variant id.");
     }
 
+    const checkoutNonce = crypto.randomUUID();
+    await ctx.runMutation(internal.functions.billing.reserveProCheckoutNonce, {
+      nonce: checkoutNonce,
+    });
+
     const json = await lsFetch(apiKey, "/checkouts", {
       method: "POST",
       body: {
@@ -961,6 +966,7 @@ export const createProCheckout = action({
               custom: {
                 convex_user_id: viewer._id,
                 clerk_user_id: identity.subject,
+                checkout_nonce: checkoutNonce,
               },
             },
             product_options: {
