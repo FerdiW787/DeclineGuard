@@ -17,6 +17,8 @@ import type * as functions_adminTakeoverActions from "../functions/adminTakeover
 import type * as functions_brandImportActions from "../functions/brandImportActions.js";
 import type * as functions_devSeed from "../functions/devSeed.js";
 import type * as functions_featureRequests from "../functions/featureRequests.js";
+import type * as functions_feeBilling from "../functions/feeBilling.js";
+import type * as functions_feeBillingActions from "../functions/feeBillingActions.js";
 import type * as functions_lemonSqueezy from "../functions/lemonSqueezy.js";
 import type * as functions_lemonSqueezyActions from "../functions/lemonSqueezyActions.js";
 import type * as functions_previewSequence from "../functions/previewSequence.js";
@@ -41,6 +43,7 @@ import type * as lib_brandImport_extract from "../lib/brandImport/extract.js";
 import type * as lib_emailBlockValidators from "../lib/emailBlockValidators.js";
 import type * as lib_emailBlocks from "../lib/emailBlocks.js";
 import type * as lib_emailFonts from "../lib/emailFonts.js";
+import type * as lib_feeBilling from "../lib/feeBilling.js";
 import type * as lib_lsCrypto from "../lib/lsCrypto.js";
 import type * as lib_rateLimit from "../lib/rateLimit.js";
 import type * as lib_recoveryEmailFrom from "../lib/recoveryEmailFrom.js";
@@ -66,6 +69,8 @@ declare const fullApi: ApiFromModules<{
   "functions/brandImportActions": typeof functions_brandImportActions;
   "functions/devSeed": typeof functions_devSeed;
   "functions/featureRequests": typeof functions_featureRequests;
+  "functions/feeBilling": typeof functions_feeBilling;
+  "functions/feeBillingActions": typeof functions_feeBillingActions;
   "functions/lemonSqueezy": typeof functions_lemonSqueezy;
   "functions/lemonSqueezyActions": typeof functions_lemonSqueezyActions;
   "functions/previewSequence": typeof functions_previewSequence;
@@ -90,6 +95,7 @@ declare const fullApi: ApiFromModules<{
   "lib/emailBlockValidators": typeof lib_emailBlockValidators;
   "lib/emailBlocks": typeof lib_emailBlocks;
   "lib/emailFonts": typeof lib_emailFonts;
+  "lib/feeBilling": typeof lib_feeBilling;
   "lib/lsCrypto": typeof lib_lsCrypto;
   "lib/rateLimit": typeof lib_rateLimit;
   "lib/recoveryEmailFrom": typeof lib_recoveryEmailFrom;

@@ -239,8 +239,8 @@ export default defineSchema({
     .index("by_failure", ["failureId"]),
 
   /**
-   * Free-tier 10% recovery fee ledger (manual invoice for founding stores).
-   * No automated charging yet.
+   * Recovery fee ledger (Free 10% / Pro 4%). Fees stay `owed` until the
+   * monthly LS invoice is paid (`invoiced`) or staff waives them.
    */
   recoveryFees: defineTable({
     userId: v.id("users"),
@@ -256,9 +256,46 @@ export default defineSchema({
       v.literal("waived"),
     ),
     testMode: v.boolean(),
+    /** Set when a billing period claim associates this fee with an LS invoice. */
+    billingInvoiceId: v.optional(v.id("billingInvoices")),
   })
     .index("by_user_recoveredAt", ["userId", "recoveredAt"])
-    .index("by_failure", ["failureId"]),
+    .index("by_failure", ["failureId"])
+    .index("by_user_status", ["userId", "status"])
+    .index("by_status_userId", ["status", "userId"])
+    .index("by_billingInvoice", ["billingInvoiceId"]),
+
+  /**
+   * One monthly recovery-fee invoice per merchant (claim key = user + UTC month).
+   * Fees stay owed until the LS order is paid; retries reuse this row so we
+   * never create a second LS checkout for the same period.
+   */
+  billingInvoices: defineTable({
+    userId: v.id("users"),
+    claimKey: v.string(),
+    periodKey: v.string(),
+    currency: v.string(),
+    feeIds: v.array(v.id("recoveryFees")),
+    totalCents: v.number(),
+    status: v.union(
+      v.literal("claiming"),
+      v.literal("created"),
+      v.literal("paid"),
+      v.literal("failed"),
+    ),
+    lsCheckoutId: v.optional(v.string()),
+    lsCheckoutUrl: v.optional(v.string()),
+    lsOrderId: v.optional(v.string()),
+    lastError: v.optional(v.string()),
+    createdAt: v.number(),
+    createdLsAt: v.optional(v.number()),
+    paidAt: v.optional(v.number()),
+  })
+    .index("by_claimKey", ["claimKey"])
+    .index("by_user_period", ["userId", "periodKey"])
+    .index("by_lsOrderId", ["lsOrderId"])
+    .index("by_lsCheckoutId", ["lsCheckoutId"])
+    .index("by_status_createdAt", ["status", "createdAt"]),
 
   /**
    * Merchant-triggered test drip: Email 1 → +30s → Email 2 → +30s → Email 3.
