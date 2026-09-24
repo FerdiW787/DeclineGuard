@@ -31,10 +31,6 @@ import {
   toEmailCopyOverrides,
   type EmailCustomizationValues,
 } from "./EmailCustomizePanel";
-import AdminDestinationGate, {
-  adminNeedsDestinationChoice,
-  rememberMerchantDashboardChoice,
-} from "./AdminDestinationGate";
 import DashboardBoot from "./DashboardBoot";
 import LsSetupFlow from "./LsSetupFlow";
 import OverviewHub from "./OverviewHub";
@@ -346,8 +342,6 @@ function Dashboard() {
   /** First visit with no store — never show the boot splash */
   const [skipBoot, setSkipBoot] = useState(false);
   const [showShell, setShowShell] = useState(false);
-  /** Admin picked merchant dashboard for this browser session */
-  const [adminMerchantChosen, setAdminMerchantChosen] = useState(false);
   const displayCurrency =
     recoverySummary?.displayCurrency ??
     recoverySummary?.recoveredCurrency ??
@@ -495,7 +489,7 @@ function Dashboard() {
   // No store → setup only (no splash). Already connected → splash, then dashboard.
   // ?onboardingPreview=1 forces the setup UI with mocked steps (no API writes).
   useEffect(() => {
-    if (!isLoaded || !isSignedIn || connectionLoading) return;
+    if (!isLoaded || !isSignedIn) return;
 
     if (onboardingPreview) {
       setLsSetupOpen(true);
@@ -504,9 +498,18 @@ function Dashboard() {
       return;
     }
 
+    if (connectionLoading) {
+      if (!skipBoot && !bootDone && !bootActive) {
+        setBootActive(true);
+      }
+      return;
+    }
+
     if (!lsConnected) {
       setLsSetupOpen(true);
       setSkipBoot(true);
+      setBootActive(false);
+      setBootDone(true);
       return;
     }
 
@@ -717,45 +720,6 @@ function Dashboard() {
       <div className="flex min-h-screen items-center justify-center bg-white text-sm text-muted-foreground">
         Redirecting…
       </div>
-    );
-  }
-
-  // Admins get a destination chooser; wait for role + takeover before boot.
-  if (isLoaded && isSignedIn && currentUser === undefined) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#f7f8f8] text-sm text-[#8a8f98]">
-        Loading…
-      </div>
-    );
-  }
-
-  if (
-    currentUser?.role === "admin" &&
-    !adminMerchantChosen &&
-    activeTakeover === undefined
-  ) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#f7f8f8] text-sm text-[#8a8f98]">
-        Loading…
-      </div>
-    );
-  }
-
-  if (
-    !adminMerchantChosen &&
-    adminNeedsDestinationChoice({
-      role: currentUser?.role,
-      activeTakeover,
-      currentUserId: currentUser?._id,
-    })
-  ) {
-    return (
-      <AdminDestinationGate
-        onChooseMerchant={() => {
-          rememberMerchantDashboardChoice();
-          setAdminMerchantChosen(true);
-        }}
-      />
     );
   }
 
@@ -1058,7 +1022,9 @@ function Dashboard() {
             lsConnected ? "dg-inset" : ""
           } ${
             lsConnected && useChromeScroll
-              ? "overflow-hidden"
+              ? nav === "customizations" && !emailFocusMode
+                ? "overflow-x-hidden overflow-y-visible"
+                : "overflow-hidden"
               : "overflow-y-auto"
           } ${
             lsConnected
@@ -1387,7 +1353,7 @@ function Dashboard() {
                   )}
                 </section>
               ) : nav === "customizations" ? (
-                <section className="relative flex min-h-0 flex-1 flex-col">
+                <section className="relative flex min-h-0 flex-1 flex-col overflow-visible">
                   {emailFocusMode ? null : (
                   <div className="relative z-10 shrink-0 px-5 pt-3 pb-1 lg:hidden">
                     <nav className="flex gap-1 overflow-x-auto rounded-full border border-black/6 bg-white/80 p-1 text-sm font-medium">

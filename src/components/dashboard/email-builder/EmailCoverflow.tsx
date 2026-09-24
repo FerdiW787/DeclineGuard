@@ -1,5 +1,4 @@
 import {
-  useCallback,
   useEffect,
   useRef,
   useState,
@@ -8,12 +7,12 @@ import {
 } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
+import { SquarePen } from "lucide-react";
 import { TEMPLATE_META, type RecoveryTemplateId } from "@/lib/recoveryEmailCopy";
 import { cn } from "@/lib/utils";
 
 gsap.registerPlugin(useGSAP);
 
-const SWIPE_PX = 56;
 const STAGE_PAD = 0;
 const MIN_CARD = 240;
 const TARGET_CARD = 400;
@@ -39,7 +38,6 @@ type InboxMeta = {
 type Props = {
   templates: readonly RecoveryTemplateId[];
   selected: RecoveryTemplateId;
-  onSelect: (id: RecoveryTemplateId) => void;
   inboxMeta: (id: RecoveryTemplateId) => InboxMeta;
   renderEmail: (id: RecoveryTemplateId, frameWidth: number) => ReactNode;
   focusMode: boolean;
@@ -51,7 +49,6 @@ type Props = {
 export default function EmailCoverflow({
   templates,
   selected,
-  onSelect,
   inboxMeta,
   renderEmail,
   focusMode,
@@ -66,8 +63,17 @@ export default function EmailCoverflow({
     x: number;
     y: number;
   } | null>(null);
-  const selectedIndex = templates.indexOf(selected);
+  const defaultCenterIndex = Math.max(0, Math.floor((templates.length - 1) / 2));
+  const defaultCenterId =
+    templates[defaultCenterIndex] ?? templates[0] ?? "direct";
+  const [hoveredId, setHoveredId] = useState<RecoveryTemplateId | null>(null);
+  const [borderFadeOutId, setBorderFadeOutId] =
+    useState<RecoveryTemplateId | null>(null);
   const [stageWidth, setStageWidth] = useState(0);
+  const frontId = focusMode
+    ? selected
+    : (hoveredId ?? defaultCenterId);
+  const frontIndex = Math.max(0, templates.indexOf(frontId));
   const browse = layoutForStage(stageWidth);
   const focusCardW = Math.min(
     520,
@@ -75,16 +81,6 @@ export default function EmailCoverflow({
   );
   const cardW = focusMode ? focusCardW : browse.cardW;
   const gap = focusMode ? 0 : browse.gap;
-
-  const stepBy = useCallback(
-    (dir: -1 | 1) => {
-      const next = selectedIndex + dir;
-      if (next < 0 || next >= templates.length) return;
-      const id = templates[next];
-      if (id) onSelect(id);
-    },
-    [onSelect, selectedIndex, templates],
-  );
 
   useGSAP(
     () => {
@@ -95,7 +91,7 @@ export default function EmailCoverflow({
       templates.forEach((_, i) => {
         const el = cardRefs.current[i];
         if (!el) return;
-        const offset = i - selectedIndex;
+        const offset = i - frontIndex;
         const abs = Math.abs(offset);
         const focused = offset === 0;
         const hidden = focusMode && !focused;
@@ -119,7 +115,7 @@ export default function EmailCoverflow({
       });
     },
     {
-      dependencies: [selectedIndex, templates, cardW, gap, stageWidth, focusMode],
+      dependencies: [frontIndex, templates, cardW, gap, stageWidth, focusMode],
       scope: stageRef,
     },
   );
@@ -159,10 +155,6 @@ export default function EmailCoverflow({
     const dx = e.clientX - press.x;
     const dy = e.clientY - press.y;
     if (focusMode) return;
-    if (Math.abs(dx) >= SWIPE_PX && Math.abs(dx) >= Math.abs(dy)) {
-      stepBy(dx > 0 ? -1 : 1);
-      return;
-    }
     if (Math.hypot(dx, dy) > 18) return;
     onEnterFocus(id);
   };
@@ -171,13 +163,20 @@ export default function EmailCoverflow({
     <div
       ref={stageRef}
       className={cn(
-        "relative flex min-h-0 flex-1 touch-pan-y items-center justify-center overflow-hidden px-7 pb-24 [perspective:1400px]",
+        "relative flex min-h-0 flex-1 touch-pan-y items-center justify-center overflow-x-clip overflow-y-visible px-7 py-6 [perspective:1400px]",
         focusMode && "cursor-default",
       )}
       style={{ gap }}
       onClick={(e) => {
         if (!focusMode) return;
         if (e.target === e.currentTarget) onExitFocus();
+      }}
+      onMouseLeave={() => {
+        if (focusMode) return;
+        if (hoveredId) {
+          setBorderFadeOutId(hoveredId);
+        }
+        setHoveredId(null);
       }}
     >
       {focusMode ? (
@@ -189,7 +188,7 @@ export default function EmailCoverflow({
         />
       ) : null}
       {templates.map((id, i) => {
-        const focused = id === selected;
+        const focused = id === frontId;
         const hidden = focusMode && !focused;
         const meta = TEMPLATE_META[id];
         const inbox = inboxMeta(id);
@@ -204,10 +203,23 @@ export default function EmailCoverflow({
               opacity: hidden ? 0 : undefined,
             }}
             className={cn(
-              "relative z-10 shrink-0 overflow-hidden transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] [transform-style:preserve-3d]",
+              "relative z-10 shrink-0 transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] [transform-style:preserve-3d]",
+              hidden ? "overflow-hidden" : "overflow-visible",
               focused ? "z-20" : "z-10",
               hidden && "pointer-events-none border-0",
             )}
+            onMouseEnter={() => {
+              if (focusMode) return;
+              setBorderFadeOutId(null);
+              setHoveredId(id);
+            }}
+            onMouseLeave={() => {
+              if (focusMode) return;
+              if (hoveredId === id) {
+                setBorderFadeOutId(id);
+                setHoveredId(null);
+              }
+            }}
           >
             <div
               className={cn(
@@ -239,11 +251,10 @@ export default function EmailCoverflow({
             </div>
             <div
               className={cn(
-                "relative max-h-[min(34rem,calc(100%-5rem))] overflow-y-auto rounded-none transition-[border-color,box-shadow] duration-200",
                 hidden && "hidden",
                 focusMode && focused
-                  ? "border-0 p-2"
-                  : "border-4 border-transparent hover:border-[#2563eb]",
+                  ? "relative max-h-[min(34rem,calc(100%-5rem))] overflow-x-visible overflow-y-auto rounded-none border-0 p-2"
+                  : "relative overflow-visible",
               )}
               onPointerDown={(e) => onCardPointerDown(id, e)}
               onPointerUp={(e) => onCardPointerUp(id, e)}
@@ -251,22 +262,52 @@ export default function EmailCoverflow({
                 pressRef.current = null;
               }}
             >
-              {renderEmail(id, cardW)}
-              {focusMode ? null : (
-                <button
-                  type="button"
-                  aria-label={`Focus ${meta.label} email`}
-                  onClick={(e) => {
-                    if (e.detail !== 0) return;
-                    onEnterFocus(id);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key !== "Enter" && e.key !== " ") return;
-                    e.preventDefault();
-                    onEnterFocus(id);
-                  }}
-                  className="absolute inset-0 z-10 cursor-pointer rounded-none"
-                />
+              {focusMode && focused ? (
+                renderEmail(id, cardW)
+              ) : (
+                <div className="w-full overflow-visible pb-6 -mb-6">
+                  <div className="relative w-full overflow-visible">
+                  {!focusMode && (hoveredId === id || borderFadeOutId === id) ? (
+                    <div
+                      aria-hidden
+                      className={cn(
+                        "pointer-events-none absolute inset-0 z-[12] border-4 border-[#2563eb]",
+                        hoveredId === id
+                          ? "opacity-100"
+                          : "dg-email-coverflow-border-fade",
+                      )}
+                      onAnimationEnd={() => {
+                        if (borderFadeOutId === id) setBorderFadeOutId(null);
+                      }}
+                    />
+                  ) : null}
+                  {!focusMode && hoveredId === id ? (
+                    <div
+                      className="pointer-events-none absolute right-2.5 top-2.5 z-[13] flex size-9 items-center justify-center rounded-lg border border-black/8 bg-white/95 text-[#2563eb] shadow-[0_8px_24px_-8px_rgba(37,99,235,0.45)] backdrop-blur-sm"
+                      aria-hidden
+                    >
+                      <SquarePen className="size-4" strokeWidth={2} />
+                    </div>
+                  ) : null}
+                  <div className="relative z-[1] px-0.5 pt-0.5">
+                    {renderEmail(id, cardW)}
+                  </div>
+                  <button
+                    type="button"
+                    aria-label={`Edit ${meta.label} email`}
+                    onClick={(e) => {
+                      if (e.detail !== 0) return;
+                      onEnterFocus(id);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter" && e.key !== " ") return;
+                      e.preventDefault();
+                      onEnterFocus(id);
+                    }}
+                    className="absolute inset-0 z-10 cursor-pointer rounded-none"
+                  />
+                  </div>
+                </div>
               )}
             </div>
           </div>

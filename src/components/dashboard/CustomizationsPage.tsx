@@ -31,6 +31,12 @@ import {
   type EmailDocument,
 } from "@/lib/emailBuilder";
 import {
+  cloneEmailCopy,
+  mergeEmailCopyDocumentPatch,
+  syncBlockStylesAcrossTemplates,
+  type EmailCopyByTemplate,
+} from "@/lib/emailStyleSync";
+import {
   normalizeEmailFont,
   type EmailFontId,
 } from "@/lib/emailFonts";
@@ -176,13 +182,13 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
     ref,
   ) {
     const [previewTemplate, setPreviewTemplate] =
-      useState<RecoveryTemplateId>("gentle");
+      useState<RecoveryTemplateId>("direct");
     const [focusMode, setFocusMode] = useState(false);
     const focusSelectionRef = useRef<EmailSelectionApi>({
       clear: () => false,
     });
-    const [past, setPast] = useState<EmailDocument[]>([]);
-    const [future, setFuture] = useState<EmailDocument[]>([]);
+    const [past, setPast] = useState<EmailCopyByTemplate[]>([]);
+    const [future, setFuture] = useState<EmailCopyByTemplate[]>([]);
     const [saving, setSaving] = useState(false);
     const [showSaved, setShowSaved] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -317,9 +323,6 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
       firstName: previewSample.customer,
     };
     const activeDoc = live.emailCopy[previewTemplate];
-    const activeDocRef = useRef(activeDoc);
-    activeDocRef.current = activeDoc;
-
     const dirty = !valuesEqual(live, initial);
     const hasUrlErrors = SOCIAL_FIELDS.some(
       (key) => !isValidHttpsUrl(live[key]),
@@ -345,10 +348,23 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
       exitFocus();
     }, [exitFocus]);
 
-    const restoreDoc = (doc: EmailDocument) => {
+    const pushEmailCopyHistory = () => {
+      if (!historyArmedRef.current) return;
+      historyArmedRef.current = false;
+      setPast((p) => [
+        ...p.slice(-59),
+        cloneEmailCopy(liveRef.current.emailCopy),
+      ]);
+      setFuture([]);
+      window.setTimeout(() => {
+        historyArmedRef.current = true;
+      }, 800);
+    };
+
+    const restoreEmailCopy = (snap: EmailCopyByTemplate) => {
       setLive((prev) => ({
         ...prev,
-        emailCopy: { ...prev.emailCopy, [previewTemplate]: doc },
+        emailCopy: cloneEmailCopy(snap),
       }));
     };
 
@@ -356,76 +372,64 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
       id: RecoveryTemplateId,
       patch: Partial<EmailDocument>,
     ) => {
-      if (historyArmedRef.current) {
-        historyArmedRef.current = false;
-        setPast((p) => [...p.slice(-59), liveRef.current.emailCopy[id]]);
-        setFuture([]);
-        window.setTimeout(() => {
-          historyArmedRef.current = true;
-        }, 800);
-      }
-      setLive((prev) => {
-        const current = prev.emailCopy[id];
-        return {
-          ...prev,
-          emailCopy: {
-            ...prev.emailCopy,
-            [id]: { ...current, ...patch },
-          },
-        };
-      });
+      pushEmailCopyHistory();
+      setLive((prev) => ({
+        ...prev,
+        emailCopy: mergeEmailCopyDocumentPatch(prev.emailCopy, id, patch),
+      }));
     };
 
     const changeBlocks = (id: RecoveryTemplateId, blocks: EmailBlock[]) => {
-      if (historyArmedRef.current) {
-        historyArmedRef.current = false;
-        setPast((p) => [...p.slice(-59), liveRef.current.emailCopy[id]]);
-        setFuture([]);
-        window.setTimeout(() => {
-          historyArmedRef.current = true;
-        }, 800);
-      }
+      pushEmailCopyHistory();
       setLive((prev) => {
         const current = prev.emailCopy[id];
+        const prevBlocks = current.blocks;
         const legacy = deriveLegacyFromBlocks(current.subject, blocks, current);
-        return {
-          ...prev,
-          emailCopy: {
-            ...prev.emailCopy,
-            [id]: { ...current, ...legacy, blocks },
-          },
+        let emailCopy = {
+          ...prev.emailCopy,
+          [id]: { ...current, ...legacy, blocks },
         };
+        emailCopy = syncBlockStylesAcrossTemplates(
+          emailCopy,
+          id,
+          prevBlocks,
+          blocks,
+        );
+        return { ...prev, emailCopy };
       });
     };
 
     const undo = useCallback(() => {
       setPast((p) => {
         if (p.length === 0) return p;
-        const prevDoc = p[p.length - 1]!;
-        setFuture((f) => [activeDocRef.current, ...f].slice(0, 60));
-        restoreDoc(prevDoc);
+        const prevSnap = p[p.length - 1]!;
+        setFuture((f) =>
+          [cloneEmailCopy(liveRef.current.emailCopy), ...f].slice(0, 60),
+        );
+        restoreEmailCopy(prevSnap);
         return p.slice(0, -1);
       });
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [previewTemplate]);
+    }, []);
 
     const redo = useCallback(() => {
       setFuture((f) => {
         if (f.length === 0) return f;
-        const nextDoc = f[0]!;
-        setPast((p) => [...p.slice(-59), activeDocRef.current]);
-        restoreDoc(nextDoc);
+        const nextSnap = f[0]!;
+        setPast((p) => [
+          ...p.slice(-59),
+          cloneEmailCopy(liveRef.current.emailCopy),
+        ]);
+        restoreEmailCopy(nextSnap);
         return f.slice(1);
       });
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [previewTemplate]);
+    }, []);
 
     const canUndo = past.length > 0;
     const canRedo = future.length > 0;
-    const selectedIndex = TEMPLATE_ORDER.indexOf(previewTemplate);
-    const canGoLeft = selectedIndex > 0;
-    const canGoRight = selectedIndex < TEMPLATE_ORDER.length - 1;
     const canSave = dirty && !hasUrlErrors && !saving;
+    const dockVisible = focusMode || dirty || saving || showSaved;
+    const dockVariant =
+      focusMode && (dirty || saving) ? "full" : "compact";
 
     const runSave = useCallback(async (): Promise<boolean> => {
       const current = liveRef.current;
@@ -485,22 +489,6 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
           dismissFocus();
           return;
         }
-        if (e.key === "ArrowLeft") {
-          if (selectedIndex > 0) {
-            e.preventDefault();
-            const next = TEMPLATE_ORDER[selectedIndex - 1];
-            if (next) setPreviewTemplate(next);
-          }
-          return;
-        }
-        if (e.key === "ArrowRight") {
-          if (selectedIndex < TEMPLATE_ORDER.length - 1) {
-            e.preventDefault();
-            const next = TEMPLATE_ORDER[selectedIndex + 1];
-            if (next) setPreviewTemplate(next);
-          }
-          return;
-        }
         if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return;
         const el = document.activeElement;
         if (
@@ -516,24 +504,18 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
       };
       window.addEventListener("keydown", onKey);
       return () => window.removeEventListener("keydown", onKey);
-    }, [dismissFocus, focusMode, redo, selectedIndex, undo]);
-
-    const goBy = (dir: -1 | 1) => {
-      const next = TEMPLATE_ORDER[selectedIndex + dir];
-      if (next) setPreviewTemplate(next);
-    };
+    }, [dismissFocus, focusMode, redo, undo]);
 
     return (
       <div
         className={cn(
-          "relative flex min-h-0 flex-1 flex-col overflow-hidden transition-colors duration-500",
+          "relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-visible transition-colors duration-500",
           focusMode ? "bg-white" : "bg-[#f7f8f8]",
         )}
       >
         <EmailCoverflow
           templates={TEMPLATE_ORDER}
           selected={previewTemplate}
-          onSelect={setPreviewTemplate}
           focusMode={focusMode}
           primaryColor={primary}
           onEnterFocus={enterFocus}
@@ -576,7 +558,6 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
               vars={copyVars}
               showDeclineGuardBadge={showDeclineGuardBadge}
               showInboxMeta={false}
-              frameClassName=""
               footerSupport={footerSupport}
               socialLinks={socialLinks}
             />
@@ -584,16 +565,14 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
         />
 
         <CustomizeDock
-          canGoLeft={canGoLeft}
-          canGoRight={canGoRight}
+          visible={dockVisible}
+          variant={dockVariant}
           canUndo={canUndo}
           canRedo={canRedo}
           canSave={canSave}
           saving={saving}
           showSaved={showSaved}
           error={error}
-          onGoLeft={() => goBy(-1)}
-          onGoRight={() => goBy(1)}
           onUndo={undo}
           onRedo={redo}
           onSave={() => {

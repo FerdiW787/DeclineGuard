@@ -318,6 +318,26 @@ html:not(.show-scrollbar) *::-webkit-scrollbar {
   animation: dg-format-in 150ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+@keyframes dg-email-coverflow-border-fade {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.dg-email-coverflow-border-fade {
+  opacity: 1;
+  animation: dg-email-coverflow-border-fade 0.48s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dg-email-coverflow-border-fade {
+    animation-duration: 0.15s;
+  }
+}
+
 @keyframes dg-island-in-side {
   from {
     opacity: 0;
