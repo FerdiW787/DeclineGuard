@@ -11,7 +11,7 @@ const featureCells = [
   },
   {
     title: "Pay on recovery",
-    body: "10% on Free, 4% on Pro — only after our sequence started and money returns.",
+    body: "10% on Free, 4% on Pro — only after our sequence started and money returns within 30 days.",
   },
   {
     title: "Cards stay with LS",

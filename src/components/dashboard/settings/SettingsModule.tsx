@@ -51,6 +51,7 @@ export default function SettingsModule({
   webhookSetup,
   webhookStatus,
   feesSummary,
+  emailQuota,
   emailSetup,
   brandColor = "#0c0c0c",
   onSaveSender,
@@ -270,6 +271,7 @@ export default function SettingsModule({
               <WebhooksTab
                 webhookSetup={webhookSetup}
                 webhookStatus={webhookStatus}
+                readOnly={readOnly}
               />
             ) : null}
             {tab === "email" ? (
@@ -283,7 +285,8 @@ export default function SettingsModule({
             {tab === "billing" ? (
               <BillingTab
                 feesSummary={feesSummary}
-                planName={planTier}
+                emailQuota={emailQuota}
+                planTier={planTier}
                 planId={planId}
                 lsSubscriptionStatus={lsSubscriptionStatus}
                 recoveryFeePercent={recoveryFeePercent}

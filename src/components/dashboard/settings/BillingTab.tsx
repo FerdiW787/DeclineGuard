@@ -6,31 +6,38 @@ import {
   SettingsRow,
   SettingsSection,
 } from "./SettingsFields";
-import type { SettingsFeesSummary } from "./settingsTypes";
+import type {
+  SettingsEmailQuota,
+  SettingsFeesSummary,
+} from "./settingsTypes";
+import { ATTRIBUTION_WINDOW_DAYS } from "@/lib/pricing";
 
 export function BillingTab({
   feesSummary,
-  planName = "Free",
+  emailQuota,
+  planTier = "Free",
   recoveryFeePercent = 10,
   planId = "free",
   lsSubscriptionStatus = null,
 }: {
   feesSummary: SettingsFeesSummary | undefined;
-  planName?: string;
+  emailQuota?: SettingsEmailQuota | undefined;
+  planTier?: string;
   recoveryFeePercent?: number;
   planId?: "free" | "pro";
   lsSubscriptionStatus?: string | null;
 }) {
   const isPro = planId === "pro";
   const pro = PLANS.pro;
+  const feeLabel = `${recoveryFeePercent}%`;
 
   return (
     <SettingsSection
       title="Billing"
       description={
         isPro
-          ? `${planName} plan: ${recoveryFeePercent}% of recovered revenue. Pro is $29.99/mo via Lemon Squeezy.`
-          : `${planName} plan: ${recoveryFeePercent}% of recovered revenue. Upgrade to Pro for ${pro.recoveryFeePercent}% fees.`
+          ? `${planTier} plan: ${feeLabel} of recovered revenue if payment returns within ${ATTRIBUTION_WINDOW_DAYS} days of our first recovery email. Pro is $29.99/mo via Lemon Squeezy.`
+          : `${planTier} plan: ${feeLabel} of recovered revenue if payment returns within ${ATTRIBUTION_WINDOW_DAYS} days of our first recovery email. Upgrade to Pro for ${pro.recoveryFeePercent}% fees.`
       }
     >
       <SettingsCard>
@@ -44,7 +51,7 @@ export function BillingTab({
               : "Free until a paid Pro subscription is active."
           }
         >
-          <p className="text-[15px] font-semibold text-[#08090a]">{planName}</p>
+          <p className="text-[15px] font-semibold text-[#08090a]">{planTier}</p>
         </SettingsRow>
         {isPro ? null : (
           <SettingsRow
@@ -71,7 +78,7 @@ export function BillingTab({
               description={
                 feesSummary.currencyMixed
                   ? "Mixed currencies across recoveries."
-                  : `${recoveryFeePercent}% of recovered revenue this calendar month.`
+                  : `${feeLabel} of attributed recovered revenue this calendar month.`
               }
             >
               <p className="text-[15px] font-semibold tabular-nums text-[#08090a]">
@@ -99,15 +106,66 @@ export function BillingTab({
       </SettingsCard>
 
       <SettingsCard>
+        {emailQuota === undefined ? (
+          <SettingsRow
+            title="Recovery emails this month"
+            description="Loading quota…"
+          />
+        ) : emailQuota === null ? (
+          <SettingsRow
+            title="Recovery emails this month"
+            description="Quota unavailable."
+          />
+        ) : (
+          <SettingsRow
+            title="Recovery emails this month"
+            description={emailQuotaHint(emailQuota)}
+          >
+            <div className="w-40">
+              <p className="text-right text-[15px] font-semibold tabular-nums text-[#08090a]">
+                {emailQuota.sent} / {emailQuota.included}
+              </p>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-black/8">
+                <div
+                  className="h-full rounded-full bg-[#08090a]"
+                  style={{
+                    width: `${emailQuotaBarPercent(emailQuota)}%`,
+                  }}
+                />
+              </div>
+            </div>
+          </SettingsRow>
+        )}
+      </SettingsCard>
+
+      <SettingsCard>
         <SettingsRow
           title="You only pay after we recover"
-          description="No recovery sequence start, no fee. If Lemon Squeezy retries before our first email, you owe nothing."
+          description={`No Day-0 email, no fee. If Lemon Squeezy retries before our first email, or the customer pays after the ${ATTRIBUTION_WINDOW_DAYS}-day window, you owe nothing.`}
         />
         <SettingsRow
           title="Pro is a Lemon Squeezy subscription"
           description="Choosing Pro opens checkout. Cancel or past_due returns you to Free automatically."
         />
+        <SettingsRow
+          title="Invoiced manually"
+          description="Founding stores are invoiced by hand while we’re in beta. Recovery fees and email overage packs ($3) are not charged automatically yet. Sequences are never stopped mid-flight."
+        />
       </SettingsCard>
     </SettingsSection>
   );
+}
+
+function emailQuotaBarPercent(quota: NonNullable<SettingsEmailQuota>): number {
+  if (quota.included <= 0) return 0;
+  return Math.min(100, Math.round((quota.sent / quota.included) * 100));
+}
+
+function emailQuotaHint(quota: NonNullable<SettingsEmailQuota>): string {
+  if (quota.overageEmails > 0) {
+    return `${quota.overageEmails} over · ${quota.overagePacks} pack${
+      quota.overagePacks === 1 ? "" : "s"
+    } · $${quota.overageUsd} (invoiced manually)`;
+  }
+  return `${quota.remaining} remaining this month. Sequences still send if you go over.`;
 }

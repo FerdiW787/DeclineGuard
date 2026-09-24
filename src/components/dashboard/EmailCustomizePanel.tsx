@@ -86,7 +86,7 @@ function isValidHttpsUrl(value: string): boolean {
   }
 }
 
-function valuesEqual(
+export function valuesEqual(
   a: EmailCustomizationValues,
   b: EmailCustomizationValues,
 ): boolean {
@@ -135,6 +135,11 @@ export function toEmailCopyOverrides(
       blocks: doc.blocks,
       linkColor: doc.linkColor,
       emailPadding: doc.emailPadding,
+      shellBackground: doc.shellBackground,
+      shellBorderColor: doc.shellBorderColor,
+      shellBorder: doc.shellBorder,
+      shellBorderWidth: doc.shellBorderWidth,
+      shellRadius: doc.shellRadius,
     };
     const defaultDoc = defaultEmailDocument(id);
     if (!documentEquals(resolved, defaultDoc)) {
@@ -146,6 +151,11 @@ export function toEmailCopyOverrides(
         blocks: resolved.blocks,
         linkColor: resolved.linkColor,
         emailPadding: resolved.emailPadding,
+        shellBackground: resolved.shellBackground,
+        shellBorderColor: resolved.shellBorderColor,
+        shellBorder: resolved.shellBorder,
+        shellBorderWidth: resolved.shellBorderWidth,
+        shellRadius: resolved.shellRadius,
       };
     }
   }

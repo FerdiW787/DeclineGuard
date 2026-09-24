@@ -274,6 +274,7 @@ function AdminConsoleInner() {
   const [note, setNote] = useState("");
   const [showDanger, setShowDanger] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<"all" | "quota">("all");
   const [confirmBan, setConfirmBan] = useState(false);
   const pageEnterRef = useRef<PageEnterHandle>(null);
   const navBusyRef = useRef(false);
@@ -313,6 +314,16 @@ function AdminConsoleInner() {
       ? { targetUserId: selectedId, limit: 40 }
       : "skip",
   );
+  const quotaBlocked = useQuery(
+    api.functions.admin.listResendQuotaBlocked,
+    portalOk ? { limit: 25 } : "skip",
+  );
+  const historyRows =
+    audit === undefined
+      ? undefined
+      : historyFilter === "quota"
+        ? audit.filter((row) => row.action === "resend_quota_blocked")
+        : audit;
 
   const merchantGrant = useQuery(
     api.functions.supportAccess.getActiveGrantForMerchant,
@@ -672,6 +683,47 @@ function AdminConsoleInner() {
                   </p>
                 </div>
 
+                <section
+                  className="mb-6 shrink-0 rounded-2xl border border-black/8 bg-white"
+                  data-enter
+                >
+                  <div className="px-5 py-4">
+                    <p className="text-sm font-semibold">Resend quota</p>
+                    <p className="mt-0.5 text-[13px] text-black/50">
+                      Provider 429 / quota blocks — sequences skip that send,
+                      they are not merchant plan overage.
+                    </p>
+                  </div>
+                  <ul className="max-h-48 overflow-auto border-t border-black/8">
+                    {quotaBlocked === undefined ? (
+                      <li className="px-5 py-3 text-sm text-black/40">
+                        Loading…
+                      </li>
+                    ) : quotaBlocked.length === 0 ? (
+                      <li className="px-5 py-3 text-sm text-black/40">
+                        No Resend quota blocks
+                      </li>
+                    ) : (
+                      quotaBlocked.map((row) => (
+                        <li
+                          key={row._id}
+                          className="flex flex-wrap items-baseline justify-between gap-2 border-b border-black/5 px-5 py-2.5 last:border-0"
+                        >
+                          <span className="text-sm font-medium">
+                            {row.targetName ?? "Unknown merchant"}
+                            <span className="ml-2 text-[12px] font-normal text-black/45">
+                              {humanAction(row.action)}
+                            </span>
+                          </span>
+                          <span className="text-[12px] text-black/40">
+                            {new Date(row.createdAt).toLocaleString()}
+                          </span>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </section>
+
                 <div
                   className="grid min-h-0 flex-1 gap-8 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]"
                   data-enter
@@ -725,6 +777,7 @@ function AdminConsoleInner() {
                         setMessage(null);
                         setConfirmBan(false);
                         setShowDanger(false);
+                        setHistoryFilter("all");
                       }}
                       className={`flex w-full flex-col gap-1.5 px-4 py-3.5 text-left transition ${
                         active ? "bg-black/[0.04]" : "hover:bg-black/[0.02]"
@@ -1453,17 +1506,44 @@ function AdminConsoleInner() {
                   />
                 </button>
                 {showHistory ? (
+                  <>
+                    <div className="flex gap-2 border-t border-black/8 px-5 py-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setHistoryFilter("all")}
+                        className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${
+                          historyFilter === "all"
+                            ? "bg-black text-white"
+                            : "bg-black/5 text-black/60"
+                        }`}
+                      >
+                        All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHistoryFilter("quota")}
+                        className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${
+                          historyFilter === "quota"
+                            ? "bg-black text-white"
+                            : "bg-black/5 text-black/60"
+                        }`}
+                      >
+                        Quota blocks
+                      </button>
+                    </div>
                   <ul className="max-h-72 space-y-0 overflow-auto border-t border-black/8">
-                    {audit === undefined ? (
+                    {historyRows === undefined ? (
                       <li className="px-5 py-4 text-sm text-black/40">
                         Loading…
                       </li>
-                    ) : audit.length === 0 ? (
+                    ) : historyRows.length === 0 ? (
                       <li className="px-5 py-4 text-sm text-black/40">
-                        No staff actions yet
+                        {historyFilter === "quota"
+                          ? "No Resend quota blocks on this account"
+                          : "No staff actions yet"}
                       </li>
                     ) : (
-                      audit.map(
+                      historyRows.map(
                         (row: {
                           _id: Id<"auditLogs">;
                           action: string;
@@ -1498,6 +1578,7 @@ function AdminConsoleInner() {
                       )
                     )}
                   </ul>
+                  </>
                 ) : null}
               </section>
             </>
@@ -1532,6 +1613,7 @@ function humanAction(action: string): string {
     support_close: "Closed support chat",
     staff_access_grant: "Merchant granted temporary access",
     staff_access_revoke: "Revoked temporary staff access",
+    resend_quota_blocked: "Resend quota blocked",
   };
   return map[action] ?? action.replace(/_/g, " ");
 }

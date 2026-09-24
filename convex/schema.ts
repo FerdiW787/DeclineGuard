@@ -471,7 +471,8 @@ export default defineSchema({
     revokeNote: v.optional(v.string()),
   })
     .index("by_createdAt", ["createdAt"])
-    .index("by_target_createdAt", ["targetUserId", "createdAt"]),
+    .index("by_target_createdAt", ["targetUserId", "createdAt"])
+    .index("by_action_createdAt", ["action", "createdAt"]),
 
   /** Customer ↔ Staff support conversations */
   supportThreads: defineTable({

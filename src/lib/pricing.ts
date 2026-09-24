@@ -5,6 +5,9 @@
 
 export type PlanId = "free" | "pro";
 
+/** Keep in sync with `ATTRIBUTION_WINDOW_DAYS` in `convex/lib/accountGuard.ts`. */
+export const ATTRIBUTION_WINDOW_DAYS = 30;
+
 export type PlanDefinition = {
   id: PlanId;
   name: string;
@@ -55,6 +58,8 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       "Logo, colors, and copy in every email",
       "Recovery dashboard & activity timeline",
       "1 Lemon Squeezy store",
+      `10% fee only when we recover within ${ATTRIBUTION_WINDOW_DAYS} days after our sequence starts`,
+      "DeclineGuard badge in email footer",
     ],
     cta: "Start free",
   },
@@ -77,6 +82,8 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       "Same stackable +10 decline add-on",
       "Over quota, new declines wait in the hold queue",
       "Unlimited Lemon Squeezy stores",
+      "500 recovery emails per month",
+      `4% recovery fee (vs 10% on Free), same ${ATTRIBUTION_WINDOW_DAYS}-day window`,
       "No DeclineGuard branding in emails",
       "Full email customization & block editor",
       "Recovery history, charts & CSV export",
@@ -90,6 +97,10 @@ export const PRICING_FAQS = [
   {
     q: "What counts as a decline?",
     a: "Each failed renewal that enters DeclineGuard is one decline toward your monthly bucket — not each email in the sequence. A 3-step sequence for one failed payment still uses one decline.",
+  },
+  {
+    q: "When do you charge the recovery fee?",
+    a: `Only after DeclineGuard’s email sequence has started and the payment comes back within ${ATTRIBUTION_WINDOW_DAYS} days of the first recovery email. If Lemon Squeezy retries successfully before our first email, or after that window, you owe nothing — on Free or Pro.`,
   },
   {
     q: "What happens when I hit my monthly quota?",

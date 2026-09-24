@@ -144,12 +144,30 @@ type EmailBlockInput = {
   html?: string;
   fontSize?: number;
   color?: string;
+  hexColor?: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
   align?: string;
   src?: string;
   alt?: string;
   width?: number;
   heightPx?: number;
   zoom?: number;
+  radius?: number;
+  cropTop?: number;
+  cropBottom?: number;
+  cropLeft?: number;
+  cropRight?: number;
+  shadow?: boolean;
+  shadowColor?: string;
+  border?: boolean;
+  borderColor?: string;
+  borderWidth?: number;
+  shape?: string;
+  fit?: string;
+  panX?: number;
+  offsetX?: number;
   label?: string;
   backgroundColor?: string;
   height?: number;
@@ -166,6 +184,11 @@ type EditableCopyInput = {
   blocks?: EmailBlockInput[];
   linkColor?: string;
   emailPadding?: number;
+  shellBackground?: string;
+  shellBorderColor?: string;
+  shellBorder?: boolean;
+  shellBorderWidth?: number;
+  shellRadius?: number;
 };
 
 type EmailCopyInput = {
@@ -208,17 +231,33 @@ function normalizeBlock(block: EmailBlockInput): EmailBlockInput | null {
 
   switch (block.type) {
     case "text": {
-      const html = clampText(block.html, 4000) ?? "";
+      const html = (clampText(block.html, 4000) ?? "")
+        .replace(
+          /(\S)(<a\b[^>]*href="(?:#update-payment|#billing)")/gi,
+          "$1 $2",
+        )
+        .replace(
+          /(<a\b[^>]*href="(?:#update-payment|#billing)"[^>]*>[\s\S]*?<\/a>)(\S)/gi,
+          "$1 $2",
+        );
       const color =
         block.color === "muted" || block.color === "link"
           ? block.color
           : "default";
+      const hex = block.hexColor?.trim() ?? "";
+      const hexColor = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)
+        ? hex
+        : undefined;
       return {
         id,
         type: "text",
         html,
         fontSize: clampNumber(block.fontSize ?? 15, 12, 28),
         color,
+        hexColor,
+        bold: block.bold === true ? true : undefined,
+        italic: block.italic === true ? true : undefined,
+        underline: block.underline === true ? true : undefined,
         align,
         marginTop,
         marginBottom,
@@ -231,8 +270,45 @@ function normalizeBlock(block: EmailBlockInput): EmailBlockInput | null {
         src: normalizeHttpsUrl(block.src),
         alt: clampText(block.alt, 120) ?? "",
         width: clampNumber(block.width ?? 100, 20, 100),
-        heightPx: clampNumber(block.heightPx ?? 180, 80, 320),
+        heightPx: clampNumber(block.heightPx ?? 180, 80, 560),
         zoom: clampNumber(block.zoom ?? 1, 1, 2.4),
+        radius: clampNumber(block.radius ?? 8, 0, 9999),
+        cropTop: clampNumber(block.cropTop ?? 0, 0, 560),
+        cropBottom: clampNumber(block.cropBottom ?? 0, 0, 560),
+        cropLeft: clampNumber(block.cropLeft ?? 0, 0, 80),
+        cropRight: clampNumber(block.cropRight ?? 0, 0, 80),
+        shadow: block.shadow === true ? true : undefined,
+        shadowColor: (() => {
+          const c = block.shadowColor?.trim() ?? "";
+          return /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(c) ? c : undefined;
+        })(),
+        border: block.border === true ? true : undefined,
+        borderColor: (() => {
+          const c = block.borderColor?.trim() ?? "";
+          return /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(c) ? c : undefined;
+        })(),
+        borderWidth: clampNumber(block.borderWidth ?? 1, 1, 8),
+        shape:
+          block.shape === "square" ||
+          block.shape === "circle" ||
+          block.shape === "pill" ||
+          block.shape === "star" ||
+          block.shape === "triangle"
+            ? block.shape
+            : undefined,
+        fit: block.fit === "stretch" ? "stretch" : undefined,
+        panX: clampNumber(block.panX ?? 50, 0, 100),
+        offsetX: clampNumber(
+          typeof block.offsetX === "number"
+            ? block.offsetX
+            : align === "center"
+              ? 50
+              : align === "right"
+                ? 100
+                : 0,
+          0,
+          100,
+        ),
         align,
         marginTop,
         marginBottom,
@@ -265,16 +341,19 @@ function normalizeBlock(block: EmailBlockInput): EmailBlockInput | null {
         marginTop,
         marginBottom,
       };
-    case "linkRow":
+    case "linkRow": {
+      const prefixRaw = clampText(block.prefix, 80) ?? "Or";
+      const suffixRaw = clampText(block.suffix, 120) ?? "to update your card.";
       return {
         id,
         type: "linkRow",
-        prefix: clampText(block.prefix, 80) ?? "Or ",
+        prefix: prefixRaw.endsWith(" ") ? prefixRaw : `${prefixRaw} `,
         linkLabel: clampText(block.linkLabel, 80) ?? "open the billing page",
-        suffix: clampText(block.suffix, 120) ?? " to update your card.",
+        suffix: suffixRaw.startsWith(" ") ? suffixRaw : ` ${suffixRaw}`,
         marginTop,
         marginBottom,
       };
+    }
     default:
       return null;
   }
@@ -296,6 +375,22 @@ function normalizeEditableCopy(
     typeof input.emailPadding === "number"
       ? clampNumber(input.emailPadding, 12, 48)
       : undefined;
+  const hex = (raw: string | undefined) => {
+    const c = raw?.trim() ?? "";
+    return /^#[0-9a-fA-F]{6}$/.test(c) ? c.toLowerCase() : undefined;
+  };
+  const shellBackground = hex(input.shellBackground);
+  const shellBorderColor = hex(input.shellBorderColor);
+  const shellBorder =
+    typeof input.shellBorder === "boolean" ? input.shellBorder : undefined;
+  const shellBorderWidth =
+    typeof input.shellBorderWidth === "number"
+      ? clampNumber(input.shellBorderWidth, 1, 8)
+      : undefined;
+  const shellRadius =
+    typeof input.shellRadius === "number"
+      ? clampNumber(input.shellRadius, 0, 48)
+      : undefined;
   const blocks = Array.isArray(input.blocks)
     ? input.blocks
         .slice(0, 40)
@@ -310,6 +405,11 @@ function normalizeEditableCopy(
     !cta &&
     !linkColor &&
     emailPadding === undefined &&
+    !shellBackground &&
+    !shellBorderColor &&
+    shellBorder === undefined &&
+    shellBorderWidth === undefined &&
+    shellRadius === undefined &&
     (!blocks || blocks.length === 0)
   ) {
     return undefined;
@@ -322,6 +422,11 @@ function normalizeEditableCopy(
     ...(blocks && blocks.length > 0 ? { blocks } : {}),
     ...(linkColor ? { linkColor } : {}),
     ...(emailPadding !== undefined ? { emailPadding } : {}),
+    ...(shellBackground ? { shellBackground } : {}),
+    ...(shellBorderColor ? { shellBorderColor } : {}),
+    ...(shellBorder !== undefined ? { shellBorder } : {}),
+    ...(shellBorderWidth !== undefined ? { shellBorderWidth } : {}),
+    ...(shellRadius !== undefined ? { shellRadius } : {}),
   };
 }
 

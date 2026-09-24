@@ -50,6 +50,7 @@ function humanAction(action: string): string {
     support_close: "Closed support chat",
     staff_access_grant: "Merchant granted temporary access",
     staff_access_revoke: "Revoked temporary staff access",
+    resend_quota_blocked: "Resend quota blocked",
   };
   return map[action] ?? action.replace(/_/g, " ");
 }

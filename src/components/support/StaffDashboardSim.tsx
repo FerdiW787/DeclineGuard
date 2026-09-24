@@ -161,19 +161,25 @@ export default function StaffDashboardSim({
   const [addStoreName, setAddStoreName] = useState("");
   const [dummyStores, setDummyStores] = useState<SimStore[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
+  const [emailFocusMode, setEmailFocusMode] = useState(false);
   const customizationsRef = useRef<EmailCustomizeHandle>(null);
   const storeMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (nav !== "customizations") setEmailFocusMode(false);
+  }, [nav]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         if (settingsOpen) return;
+        if (emailFocusMode) return;
         onClose();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, settingsOpen]);
+  }, [onClose, settingsOpen, emailFocusMode]);
 
   useEffect(() => {
     if (!storeMenuOpen) return;
@@ -434,12 +440,13 @@ export default function StaffDashboardSim({
         </div>
       ) : (
         <div
-          className="dg-shell light ln-surface relative flex min-h-0 flex-1 overflow-hidden bg-[#f7f8f8] text-[#08090a]"
+          className="dg-shell light ln-surface relative flex min-h-0 flex-1 overflow-hidden text-[#08090a] transition-colors duration-500"
+          style={emailFocusMode ? { background: "#ffffff" } : undefined}
         >
           <aside
-            className={`relative z-20 flex w-[248px] shrink-0 flex-col bg-[#f7f8f8] max-lg:hidden ${
-              storeMenuOpen ? "overflow-visible" : "overflow-hidden"
-            }`}
+            className={`relative z-20 flex w-[248px] shrink-0 flex-col bg-[#f7f8f8] max-lg:hidden transition-[margin] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              storeMenuOpen && !emailFocusMode ? "overflow-visible" : "overflow-hidden"
+            } ${emailFocusMode ? "-ml-[248px] pointer-events-none" : ""}`}
           >
             <div
               className="pointer-events-none absolute inset-0 bg-[#f7f8f8]"
@@ -790,6 +797,7 @@ export default function StaffDashboardSim({
                 fromAddressHint={data.emailSetup?.fromAddress ?? null}
                 onGoToSequences={() => setNav("sequences")}
                 onUploadImage={uploadEmailImage}
+                onFocusModeChange={setEmailFocusMode}
                 onSave={async () => {
                   flash(
                     "Simulated save — their real email customizations were not changed.",

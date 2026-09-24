@@ -1,11 +1,14 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type DragEvent,
   type KeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type CSSProperties,
+  type MutableRefObject,
   type RefObject,
 } from "react";
 import {
@@ -28,12 +31,21 @@ import {
 } from "../../../../convex/lib/brandImport/colors";
 import {
   BLOCK_TYPE_META,
+  collectEmailColors,
   createEmptyBlock,
   imageCropPreviewStyles,
   markersToHtml,
+  resolveTextBlockColor,
+  styleEmailAnchors,
+  textBlockFaceStyle,
   wrapSelectionWithBold,
   type EmailBlock,
   type EmailBlockType,
+  resolveShellBackground,
+  resolveShellBorder,
+  resolveShellBorderColor,
+  resolveShellBorderWidth,
+  resolveShellRadius,
   type EmailDocument,
 } from "@/lib/emailBuilder";
 import { applyCopyVars } from "@/lib/recoveryEmailCopy";
@@ -54,21 +66,37 @@ import {
   type EmailFontId,
 } from "@/lib/emailFonts";
 import TextFormatToolbar from "./TextFormatToolbar";
+import TextBlockEditBar from "./TextBlockEditBar";
+import EmailShellEditBar from "./EmailShellEditBar";
+import EmailShellRadiusHandles from "./EmailShellRadiusHandles";
+import ImageBlockHandles from "./ImageBlockHandles";
+import ImageBlockEditBar from "./ImageBlockEditBar";
+import InlineRichText from "./InlineRichText";
 
 type Vars = { product: string; amount: string; firstName?: string };
 type Device = "desktop" | "mobile";
+
+export type EmailSelectionApi = {
+  clear: () => boolean;
+};
 
 type Props = {
   document: EmailDocument;
   device: Device;
   /** Preview-only: hides all editing affordances (guided mode). */
   readOnly?: boolean;
+  /** Focus-mode: hover a block and edit it in place. */
+  inlineEdit?: boolean;
+  /** Lets the parent clear the current shell / block selection synchronously. */
+  selectionApiRef?: MutableRefObject<EmailSelectionApi>;
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
   onChangeBlocks?: (blocks: EmailBlock[]) => void;
+  onPatchDocument?: (patch: Partial<EmailDocument>) => void;
   onChangeSubject?: (subject: string) => void;
   onDuplicateBlock?: (id: string) => void;
   onRemoveBlock?: (id: string) => void;
+  onUploadImage?: (file: File) => Promise<string>;
   storeName: string;
   storeLogoUrl: string | null;
   primary: string;
@@ -89,6 +117,7 @@ type Props = {
   showDeclineGuardBadge: boolean;
   /** Inbox From / Subject chrome above the message. */
   showInboxMeta?: boolean;
+  frameClassName?: string;
   footerSupport: string;
   socialLinks: readonly (readonly [string, string])[];
 };
@@ -99,7 +128,6 @@ const ADDABLE: EmailBlockType[] = [
   "button",
   "spacer",
   "divider",
-  "linkRow",
 ];
 
 /** Sentinel index for the persistent "Add block" button at the very end. */
@@ -109,11 +137,15 @@ export default function EmailBuilderCanvas({
   document,
   device,
   readOnly = false,
+  inlineEdit = false,
+  selectionApiRef,
   selectedId = null,
   onSelect,
   onChangeBlocks,
+  onPatchDocument,
   onDuplicateBlock,
   onRemoveBlock,
+  onUploadImage,
   storeName,
   storeLogoUrl,
   primary,
@@ -131,11 +163,22 @@ export default function EmailBuilderCanvas({
   vars,
   showDeclineGuardBadge,
   showInboxMeta = true,
+  frameClassName,
   footerSupport,
   socialLinks,
 }: Props) {
   useEmailFontLoader(emailFont);
-  const shellBg = emailBackgroundColor?.trim() || "#ffffff";
+  const shellBg = resolveShellBackground(
+    document,
+    emailBackgroundColor?.trim() || "#ffffff",
+  );
+  const shellBorderOn = resolveShellBorder(document);
+  const shellBorderColor = resolveShellBorderColor(document, primary);
+  const shellBorderWidth = resolveShellBorderWidth(document);
+  const shellRadius = resolveShellRadius(document);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [hoveringShell, setHoveringShell] = useState(false);
+  const [shellSelected, setShellSelected] = useState(false);
   const hierarchy = ensureShellTextHierarchy(
     shellBg,
     emailTextColor?.trim() || "#0c0c0c",
@@ -163,9 +206,57 @@ export default function EmailBuilderCanvas({
     typeof ctaBorderRadiusPx === "number"
       ? Math.max(0, Math.min(9999, ctaBorderRadiusPx))
       : 12;
+  const emailColors = collectEmailColors(document, [
+    primary,
+    secondary,
+    shellBg,
+    shellText,
+    mutedSecondary,
+    effectiveLinkColor,
+    ctaBg,
+    ctaFg,
+    shellBorderColor,
+  ]);
   const [addAt, setAddAt] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [inlinePickedId, setInlinePickedId] = useState<string | null>(null);
   const dragId = useRef<string | null>(null);
+  const activeSelectedId = inlineEdit ? inlinePickedId : selectedId;
+
+  useEffect(() => {
+    if (!inlineEdit) {
+      setInlinePickedId(null);
+      setEditingId(null);
+      setAddAt(null);
+      setShellSelected(false);
+      setHoveringShell(false);
+    }
+  }, [inlineEdit]);
+
+  const selectedRef = useRef(false);
+  selectedRef.current = Boolean(
+    inlineEdit && (shellSelected || inlinePickedId || editingId),
+  );
+
+  useLayoutEffect(() => {
+    if (!selectionApiRef) return;
+    selectionApiRef.current = {
+      clear: () => {
+        if (!selectedRef.current) return false;
+        selectedRef.current = false;
+        setInlinePickedId(null);
+        setEditingId(null);
+        setAddAt(null);
+        setShellSelected(false);
+        setHoveringShell(false);
+        onSelect?.(null);
+        return true;
+      },
+    };
+    return () => {
+      selectionApiRef.current = { clear: () => false };
+    };
+  }, [selectionApiRef, onSelect]);
 
   const patchBlock = useCallback(
     (id: string, patch: Partial<EmailBlock>) => {
@@ -184,6 +275,7 @@ export default function EmailBuilderCanvas({
     next.splice(index, 0, block);
     onChangeBlocks?.(next);
     onSelect?.(block.id);
+    setInlinePickedId(block.id);
     if (type === "text") setEditingId(block.id);
     setAddAt(null);
   };
@@ -227,6 +319,8 @@ export default function EmailBuilderCanvas({
       ? Math.max(240, Math.round(frameWidth))
       : defaultMax;
 
+  const showShellChrome = Boolean(inlineEdit && (hoveringShell || shellSelected));
+
   return (
     <div
       className="mx-auto w-full transition-[max-width] duration-300 ease-out"
@@ -234,11 +328,55 @@ export default function EmailBuilderCanvas({
       onClick={() => {
         if (readOnly) return;
         onSelect?.(null);
+        setInlinePickedId(null);
         setEditingId(null);
         setAddAt(null);
+        setShellSelected(false);
       }}
     >
-      <div className="dg-keep-light overflow-hidden rounded-md border border-black/8 bg-white shadow-[0_24px_60px_-36px_rgba(0,0,0,0.4)]">
+      <div
+        ref={cardRef}
+        className={`dg-keep-light overflow-hidden bg-white shadow-[0_24px_60px_-36px_rgba(0,0,0,0.4)] ${frameClassName ?? ""}`}
+        style={{
+          background: shellBg,
+          borderStyle: "solid",
+          borderWidth: shellBorderOn ? shellBorderWidth : 0,
+          borderColor: shellBorderColor,
+          borderRadius: shellRadius,
+        }}
+        onPointerMove={(e) => {
+          if (!inlineEdit) return;
+          const t = e.target;
+          if (!(t instanceof HTMLElement)) return;
+          if (t.closest("[data-email-block]")) {
+            setHoveringShell(false);
+            return;
+          }
+          setHoveringShell(true);
+        }}
+        onPointerLeave={(e) => {
+          const next = e.relatedTarget;
+          if (
+            next instanceof HTMLElement &&
+            next.closest("[data-shell-handle], [data-image-handle]")
+          ) {
+            return;
+          }
+          setHoveringShell(false);
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!inlineEdit || readOnly) return;
+          const t = e.target;
+          if (t instanceof HTMLElement && t.closest("[data-email-block]")) {
+            return;
+          }
+          setShellSelected(true);
+          setInlinePickedId(null);
+          setEditingId(null);
+          onSelect?.(null);
+        }}
+      >
         {showInboxMeta ? (
           <div className="border-b border-black/6 bg-[#fafafa] px-5 py-3">
             <p className="truncate text-[10px] font-medium uppercase tracking-[0.08em] text-black/40">
@@ -257,6 +395,7 @@ export default function EmailBuilderCanvas({
         ) : null}
 
         <div
+          data-email-column=""
           className="px-6 py-8 md:px-8"
           style={{
             paddingLeft: document.emailPadding,
@@ -281,7 +420,7 @@ export default function EmailBuilderCanvas({
             Hi {customerFirstName},
           </p>
 
-          {!readOnly ? (
+          {!readOnly && !inlineEdit ? (
             <AddGap
               open={addAt === 0}
               suppressed={addAt != null && addAt !== 0}
@@ -296,7 +435,8 @@ export default function EmailBuilderCanvas({
               <CanvasBlock
                 block={block}
                 readOnly={readOnly}
-                selected={selectedId === block.id}
+                inlineEdit={inlineEdit}
+                selected={activeSelectedId === block.id}
                 editing={editingId === block.id}
                 primary={primary}
                 ctaBackgroundColor={ctaBg}
@@ -305,8 +445,13 @@ export default function EmailBuilderCanvas({
                 linkColor={effectiveLinkColor}
                 mutedColor={mutedSecondary}
                 bodyTextColor={shellText}
+                emailColors={emailColors}
                 vars={vars}
                 onSelect={() => {
+                  setShellSelected(false);
+                  if (inlineEdit) {
+                    setInlinePickedId(block.id);
+                  }
                   onSelect?.(block.id);
                   setAddAt(null);
                 }}
@@ -319,13 +464,19 @@ export default function EmailBuilderCanvas({
                 onMoveUp={() => move(block.id, -1)}
                 onMoveDown={() => move(block.id, 1)}
                 onDuplicate={() => onDuplicateBlock?.(block.id)}
-                onRemove={() => onRemoveBlock?.(block.id)}
+                onRemove={() => {
+                  setInlinePickedId(null);
+                  setEditingId(null);
+                  onSelect?.(null);
+                  onRemoveBlock?.(block.id);
+                }}
+                onUploadImage={onUploadImage}
                 canMoveUp={index > 0}
                 canMoveDown={index < document.blocks.length - 1}
                 onDragStart={() => onDragStart(block.id)}
                 onDrop={() => onDropOn(block.id)}
               />
-              {!readOnly ? (
+              {!readOnly && !inlineEdit ? (
                 <AddGap
                   open={addAt === index + 1}
                   suppressed={addAt != null && addAt !== index + 1}
@@ -338,7 +489,7 @@ export default function EmailBuilderCanvas({
           ))}
 
           {/* Persistent, discoverable add affordance (sentinel -2) */}
-          {!readOnly ? (
+          {!readOnly && !inlineEdit ? (
             <>
               <button
                 type="button"
@@ -416,6 +567,26 @@ export default function EmailBuilderCanvas({
           ) : null}
         </div>
       </div>
+      {showShellChrome ? (
+        <EmailShellRadiusHandles
+          radius={shellRadius}
+          anchorRef={cardRef}
+          onChange={(next) => onPatchDocument?.({ shellRadius: next })}
+        />
+      ) : null}
+      {inlineEdit && shellSelected ? (
+        <EmailShellEditBar
+          background={shellBg}
+          borderColor={shellBorderColor}
+          borderOn={shellBorderOn}
+          borderWidth={shellBorderWidth}
+          radius={shellRadius}
+          brandColor={primary}
+          emailColors={emailColors}
+          anchorRef={cardRef}
+          onPatch={(patch) => onPatchDocument?.(patch)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -601,6 +772,7 @@ function BlockTypeIcon({ type }: { type: EmailBlockType }) {
 function CanvasBlock({
   block,
   readOnly,
+  inlineEdit,
   selected,
   editing,
   primary,
@@ -610,6 +782,7 @@ function CanvasBlock({
   linkColor,
   mutedColor,
   bodyTextColor,
+  emailColors,
   vars,
   onSelect,
   onStartEdit,
@@ -619,6 +792,7 @@ function CanvasBlock({
   onMoveDown,
   onDuplicate,
   onRemove,
+  onUploadImage,
   canMoveUp,
   canMoveDown,
   onDragStart,
@@ -626,6 +800,7 @@ function CanvasBlock({
 }: {
   block: EmailBlock;
   readOnly: boolean;
+  inlineEdit: boolean;
   selected: boolean;
   editing: boolean;
   primary: string;
@@ -635,6 +810,7 @@ function CanvasBlock({
   linkColor: string;
   mutedColor: string;
   bodyTextColor: string;
+  emailColors: string[];
   vars: Vars;
   onSelect: () => void;
   onStartEdit: () => void;
@@ -644,12 +820,15 @@ function CanvasBlock({
   onMoveDown: () => void;
   onDuplicate: () => void;
   onRemove: () => void;
+  onUploadImage?: (file: File) => Promise<string>;
   canMoveUp: boolean;
   canMoveDown: boolean;
   onDragStart: () => void;
   onDrop: () => void;
 }) {
   const textRef = useRef<HTMLTextAreaElement>(null);
+  const chromeRef = useRef<HTMLDivElement>(null);
+  const imageWrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (editing && block.type === "text" && textRef.current) {
@@ -733,19 +912,82 @@ function CanvasBlock({
         },
       };
 
-  if (readOnly) {
+  if (readOnly || inlineEdit) {
+    const live = Boolean(inlineEdit && !readOnly);
+    const isText = block.type === "text";
+    const chrome = live && isText;
+    const faceFallbacks = {
+      body: bodyTextColor,
+      muted: mutedColor,
+      link: linkColor,
+    };
     return (
-      <div className="relative rounded-md">
+      <div
+        data-email-block={block.id}
+        className="relative"
+        style={{
+          marginTop: block.marginTop,
+          marginBottom: block.marginBottom,
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect();
+        }}
+      >
+        {chrome && selected && block.type === "text" ? (
+          <TextBlockEditBar
+            block={block}
+            activeColor={resolveTextBlockColor(block, faceFallbacks)}
+            brandColor={primary}
+            emailColors={emailColors}
+            anchorRef={chromeRef}
+            onPatch={(patch) => onPatch(patch)}
+          />
+        ) : null}
+        {live && selected && block.type === "image" ? (
+          <>
+            <ImageBlockHandles
+              block={block}
+              anchorRef={imageWrapRef}
+              onPatch={(patch) => onPatch(patch)}
+            />
+            <ImageBlockEditBar
+              block={block}
+              brandColor={primary}
+              emailColors={emailColors}
+              anchorRef={imageWrapRef}
+              onPatch={(patch) => onPatch(patch)}
+              onRemove={onRemove}
+              onUploadImage={onUploadImage}
+            />
+          </>
+        ) : null}
         <div
-          style={{
-            marginTop: block.marginTop,
-            marginBottom: block.marginBottom,
+          ref={chromeRef}
+          role={chrome ? "group" : undefined}
+          aria-label={chrome ? "Text block" : undefined}
+          className={
+            chrome
+              ? `border-2 p-1 transition-colors duration-150 ${
+                  selected
+                    ? "border-[#2563eb]"
+                    : "border-transparent hover:border-[#2563eb]"
+                }`
+              : "relative"
+          }
+          onClick={(e) => {
+            if (!chrome) return;
+            e.stopPropagation();
+            onSelect();
           }}
         >
           <BlockContent
             block={block}
             editing={false}
+            inlineEdit={live}
+            selected={selected}
             textRef={textRef}
+            imageWrapRef={imageWrapRef}
             primary={primary}
             ctaBackgroundColor={ctaBackgroundColor}
             ctaTextColor={ctaTextColor}
@@ -753,6 +995,7 @@ function CanvasBlock({
             linkColor={linkColor}
             mutedColor={mutedColor}
             bodyTextColor={bodyTextColor}
+            emailColors={emailColors}
             vars={vars}
             onPatch={onPatch}
             onStopEdit={onStopEdit}
@@ -766,6 +1009,7 @@ function CanvasBlock({
   return (
     <div
       {...dragProps}
+      data-email-block={block.id}
       className={`group/block relative rounded-md transition-[box-shadow,background] ${
         selected
           ? "bg-teal-500/[0.04] ring-2 ring-teal-500/40 ring-offset-2"
@@ -832,7 +1076,10 @@ function CanvasBlock({
         <BlockContent
           block={block}
           editing={editing}
+          inlineEdit={false}
+          selected={selected}
           textRef={textRef}
+          imageWrapRef={imageWrapRef}
           primary={primary}
           ctaBackgroundColor={ctaBackgroundColor}
           ctaTextColor={ctaTextColor}
@@ -840,6 +1087,7 @@ function CanvasBlock({
           linkColor={linkColor}
           mutedColor={mutedColor}
           bodyTextColor={bodyTextColor}
+          emailColors={emailColors}
           vars={vars}
           onPatch={onPatch}
           onStopEdit={onStopEdit}
@@ -854,7 +1102,10 @@ function CanvasBlock({
 function BlockContent({
   block,
   editing,
+  inlineEdit,
+  selected,
   textRef,
+  imageWrapRef,
   primary,
   ctaBackgroundColor,
   ctaTextColor,
@@ -862,6 +1113,7 @@ function BlockContent({
   linkColor,
   mutedColor,
   bodyTextColor,
+  emailColors,
   vars,
   onPatch,
   onStopEdit,
@@ -869,7 +1121,10 @@ function BlockContent({
 }: {
   block: EmailBlock;
   editing: boolean;
+  inlineEdit: boolean;
+  selected: boolean;
   textRef: RefObject<HTMLTextAreaElement | null>;
+  imageWrapRef?: RefObject<HTMLDivElement | null>;
   primary: string;
   ctaBackgroundColor: string;
   ctaTextColor: string;
@@ -877,19 +1132,33 @@ function BlockContent({
   linkColor: string;
   mutedColor: string;
   bodyTextColor: string;
+  emailColors: string[];
   vars: Vars;
   onPatch: (patch: Partial<EmailBlock>) => void;
   onStopEdit: () => void;
   onKeyDown: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
 }) {
-  const textColor = (color: "default" | "muted" | "link") =>
-    color === "muted"
-      ? mutedColor
-      : color === "link"
-        ? linkColor
-        : bodyTextColor;
-
   if (block.type === "text") {
+    const face = textBlockFaceStyle(block, {
+      body: bodyTextColor,
+      muted: mutedColor,
+      link: linkColor,
+    });
+    if (inlineEdit) {
+      return (
+        <InlineRichText
+          value={block.html}
+          onChange={(html) => onPatch({ html })}
+          editable={selected}
+          showSelectionMenu
+          brandColor={primary}
+          emailColors={emailColors}
+          linkColor={linkColor}
+          className="min-h-[1.4em] w-full px-1 py-0.5"
+          style={face}
+        />
+      );
+    }
     return editing ? (
       <textarea
         ref={textRef}
@@ -900,22 +1169,16 @@ function BlockContent({
         onClick={(e) => e.stopPropagation()}
         rows={Math.max(2, block.html.split("\n").length + 1)}
         className="w-full resize-none border-0 bg-transparent p-1 text-[15px] leading-relaxed outline-none"
-        style={{
-          fontSize: block.fontSize,
-          color: textColor(block.color),
-          textAlign: block.align,
-        }}
+        style={face}
       />
     ) : (
       <p
-        style={{
-          fontSize: block.fontSize,
-          color: textColor(block.color),
-          textAlign: block.align,
-          lineHeight: 1.6,
-        }}
+        style={face}
         dangerouslySetInnerHTML={{
-          __html: markersToHtml(applyCopyVars(block.html, vars)),
+          __html: styleEmailAnchors(
+            markersToHtml(applyCopyVars(block.html, vars)),
+            linkColor,
+          ),
         }}
       />
     );
@@ -924,27 +1187,37 @@ function BlockContent({
   if (block.type === "image") {
     const crop = imageCropPreviewStyles(block);
     return block.src.trim() ? (
-      <div style={{ textAlign: block.align }}>
+      <div style={{ textAlign: "left" }}>
         <div
+          ref={imageWrapRef}
           style={{
             ...crop.wrap,
             display: "inline-block",
-            width: `${block.width}%`,
             maxWidth: "100%",
           }}
         >
           <img
             src={block.src}
             alt={block.alt || ""}
+            draggable={false}
             style={crop.img}
           />
         </div>
       </div>
     ) : (
-      <div className="rounded-md border border-dashed border-black/15 bg-black/[0.02] px-4 py-10 text-center">
+      <div
+        ref={imageWrapRef}
+        className="rounded-md border border-dashed border-black/15 bg-black/[0.02] px-4 py-10 text-center"
+        style={{
+          ...crop.wrap,
+          display: "inline-block",
+          maxWidth: "100%",
+          boxSizing: "border-box",
+        }}
+      >
         <ImageIcon className="mx-auto size-5 text-black/30" />
         <p className="mt-2 text-[12px] font-medium text-black/45">
-          Add an image URL to show it here
+          Add an image to show it here
         </p>
       </div>
     );
@@ -958,12 +1231,27 @@ function BlockContent({
     return (
       <div style={{ textAlign: block.align }}>
         <span
-          className="inline-flex px-5 py-2.5 text-xs font-semibold"
+          className={`inline-flex px-5 py-2.5 text-xs font-semibold transition-[box-shadow] duration-150 ${
+            inlineEdit
+              ? "cursor-text outline-none hover:shadow-[0_0_0_3px_rgba(8,9,10,0.08)]"
+              : ""
+          }`}
           style={{
             background: bg,
             color: label,
             borderRadius: ctaBorderRadiusPx,
           }}
+          contentEditable={inlineEdit}
+          suppressContentEditableWarning
+          spellCheck={inlineEdit}
+          onBlur={
+            inlineEdit
+              ? (e) => {
+                  const next = e.currentTarget.textContent?.trim() ?? "";
+                  if (next && next !== block.label) onPatch({ label: next });
+                }
+              : undefined
+          }
         >
           {block.label}
         </span>
@@ -989,18 +1277,66 @@ function BlockContent({
   if (block.type === "linkRow") {
     return (
       <p
-        className="text-[13px] leading-relaxed"
+        className={`text-[13px] leading-relaxed ${inlineEdit ? "px-1 py-0.5" : ""}`}
         style={{ color: mutedColor }}
       >
-        {block.prefix}
-        <span className="underline" style={{ color: linkColor }}>
-          {block.linkLabel}
-        </span>
-        {block.suffix}
+        <EditableSpan
+          enabled={inlineEdit}
+          value={block.prefix}
+          onChange={(prefix) => onPatch({ prefix })}
+        />
+        <EditableSpan
+          enabled={inlineEdit}
+          value={block.linkLabel}
+          onChange={(linkLabel) => onPatch({ linkLabel })}
+          className="underline"
+          style={{ color: linkColor }}
+        />
+        <EditableSpan
+          enabled={inlineEdit}
+          value={block.suffix}
+          onChange={(suffix) => onPatch({ suffix })}
+        />
       </p>
     );
   }
 
   const _exhaustive: never = block;
   return _exhaustive;
+}
+
+function EditableSpan({
+  enabled,
+  value,
+  onChange,
+  className,
+  style,
+}: {
+  enabled: boolean;
+  value: string;
+  onChange: (next: string) => void;
+  className?: string;
+  style?: CSSProperties;
+}) {
+  if (!enabled) {
+    return (
+      <span className={className} style={style}>
+        {value}
+      </span>
+    );
+  }
+  return (
+    <span
+      className={`cursor-text rounded-sm outline-none hover:bg-black/[0.04] ${className ?? ""}`}
+      style={style}
+      contentEditable
+      suppressContentEditableWarning
+      onBlur={(e) => {
+        const next = e.currentTarget.textContent ?? "";
+        if (next !== value) onChange(next);
+      }}
+    >
+      {value}
+    </span>
+  );
 }
