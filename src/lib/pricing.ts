@@ -1,6 +1,6 @@
 /**
  * DeclineGuard plan definitions — single source of truth for marketing + billing UI.
- * Wire checkout / metering to these constants when billing ships.
+ * Pro checkout is Lemon Squeezy $29.99/mo (see createProCheckout).
  */
 
 export type PlanId = "free" | "pro";

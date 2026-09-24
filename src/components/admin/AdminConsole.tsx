@@ -119,6 +119,9 @@ type Merchant = {
   openFailureCount: number;
   activityCount: number;
   hasSoftDeletedData: boolean;
+  plan: "free" | "pro";
+  lsSubscriptionId: string | null;
+  lsSubscriptionStatus: string | null;
 };
 
 type StatusInfo = {
@@ -329,6 +332,7 @@ function AdminConsoleInner() {
   );
 
   const setAccountStatus = useMutation(api.functions.admin.setAccountStatus);
+  const setUserPlan = useMutation(api.functions.admin.setUserPlan);
   const restoreAccount = useMutation(api.functions.admin.restoreAccount);
   const reclaimStore = useMutation(api.functions.admin.reclaimStore);
   const revokeSessions = useAction(api.functions.adminActions.revokeSessions);
@@ -931,6 +935,102 @@ function AdminConsoleInner() {
                     <p className="mt-0.5 text-[12px] text-black/45">
                       Kept ~90 days after disconnect
                     </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-xl bg-black/[0.03] px-3.5 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-black/40">
+                        Plan
+                      </p>
+                      <p className="mt-1 text-sm font-medium capitalize">
+                        {selected.plan}
+                      </p>
+                      <p className="mt-0.5 text-[12px] text-black/45">
+                        {selected.lsSubscriptionId
+                          ? `LS ${selected.lsSubscriptionId}${
+                              selected.lsSubscriptionStatus
+                                ? ` · ${selected.lsSubscriptionStatus}`
+                                : ""
+                            }`
+                          : "No Lemon Squeezy Pro subscription on file"}
+                      </p>
+                    </div>
+                    {canHelpSelected ? (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={busy != null || selected.plan === "pro"}
+                          className="rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-[12px] font-semibold disabled:opacity-45"
+                          onClick={() => {
+                            void (async () => {
+                              setBusy("Set Pro");
+                              setMessage(null);
+                              try {
+                                await setUserPlan({
+                                  userId: selected._id,
+                                  plan: "pro",
+                                  reason:
+                                    note.trim().length >= 8
+                                      ? note.trim()
+                                      : "Staff override: grant Pro",
+                                });
+                                setMessage({
+                                  tone: "ok",
+                                  text: "Plan set to Pro. Next matching LS webhook still wins.",
+                                });
+                              } catch (e) {
+                                setMessage({
+                                  tone: "error",
+                                  text:
+                                    e instanceof Error ? e.message : String(e),
+                                });
+                              } finally {
+                                setBusy(null);
+                              }
+                            })();
+                          }}
+                        >
+                          Grant Pro
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy != null || selected.plan === "free"}
+                          className="rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-[12px] font-semibold disabled:opacity-45"
+                          onClick={() => {
+                            void (async () => {
+                              setBusy("Set Free");
+                              setMessage(null);
+                              try {
+                                await setUserPlan({
+                                  userId: selected._id,
+                                  plan: "free",
+                                  reason:
+                                    note.trim().length >= 8
+                                      ? note.trim()
+                                      : "Staff override: demote to Free",
+                                });
+                                setMessage({
+                                  tone: "ok",
+                                  text: "Plan set to Free. Active LS Pro webhook can re-promote.",
+                                });
+                              } catch (e) {
+                                setMessage({
+                                  tone: "error",
+                                  text:
+                                    e instanceof Error ? e.message : String(e),
+                                });
+                              } finally {
+                                setBusy(null);
+                              }
+                            })();
+                          }}
+                        >
+                          Set Free
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </section>

@@ -97,6 +97,8 @@ export const getCurrentUser = query({
       frozenReason: v.union(v.string(), v.null()),
       /** Read-only billing plan. Merchants cannot self-set this. */
       plan: planValidator,
+      lsSubscriptionId: v.union(v.string(), v.null()),
+      lsSubscriptionStatus: v.union(v.string(), v.null()),
       recoveryFeePercent: v.union(v.literal(10), v.literal(4)),
     }),
     v.null(),
@@ -122,6 +124,8 @@ export const getCurrentUser = query({
       accountStatus: user.accountStatus ?? "active",
       frozenReason: user.frozenReason ?? null,
       plan,
+      lsSubscriptionId: user.lsSubscriptionId ?? null,
+      lsSubscriptionStatus: user.lsSubscriptionStatus ?? null,
       recoveryFeePercent: recoveryFeePercent(plan),
     };
   },

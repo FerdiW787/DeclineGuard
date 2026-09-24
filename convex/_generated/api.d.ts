@@ -11,6 +11,7 @@
 import type * as clerk from "../clerk.js";
 import type * as crons from "../crons.js";
 import type * as functions_admin from "../functions/admin.js";
+import type * as functions_billing from "../functions/billing.js";
 import type * as functions_adminActions from "../functions/adminActions.js";
 import type * as functions_adminTakeover from "../functions/adminTakeover.js";
 import type * as functions_adminTakeoverActions from "../functions/adminTakeoverActions.js";
@@ -33,6 +34,7 @@ import type * as functions_user from "../functions/user.js";
 import type * as http from "../http.js";
 import type * as lemonWebhook from "../lemonWebhook.js";
 import type * as lib_accountGuard from "../lib/accountGuard.js";
+import type * as lib_billingPlan from "../lib/billingPlan.js";
 import type * as lib_admin from "../lib/admin.js";
 import type * as lib_brandImport_brandKit from "../lib/brandImport/brandKit.js";
 import type * as lib_brandImport_browserCapture from "../lib/brandImport/browserCapture.js";
@@ -63,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   clerk: typeof clerk;
   crons: typeof crons;
   "functions/admin": typeof functions_admin;
+  "functions/billing": typeof functions_billing;
   "functions/adminActions": typeof functions_adminActions;
   "functions/adminTakeover": typeof functions_adminTakeover;
   "functions/adminTakeoverActions": typeof functions_adminTakeoverActions;
@@ -85,6 +88,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   lemonWebhook: typeof lemonWebhook;
   "lib/accountGuard": typeof lib_accountGuard;
+  "lib/billingPlan": typeof lib_billingPlan;
   "lib/admin": typeof lib_admin;
   "lib/brandImport/brandKit": typeof lib_brandImport_brandKit;
   "lib/brandImport/browserCapture": typeof lib_brandImport_browserCapture;

@@ -3,8 +3,9 @@
 import { v } from "convex/values";
 import { action, internalAction, type ActionCtx } from "../_generated/server";
 import { api, internal } from "../_generated/api";
+import { getPlatformBillingConfig } from "../lib/billingPlan";
 import { apiKeyLast4, decryptApiKey, encryptApiKey } from "../lib/lsCrypto";
-import { allowHttpsUrl } from "../lib/safeUrl";
+import { allowAppHttpsUrl, allowHttpsUrl } from "../lib/safeUrl";
 
 async function assertCallerActive(ctx: ActionCtx): Promise<void> {
   // Model B: Admin with active takeover resolves to merchant product user.
@@ -871,5 +872,125 @@ export const fetchFreshSubscriptionUrl = internalAction({
       console.warn("Failed to fetch fresh subscription data:", err);
       return null;
     }
+  },
+});
+
+function checkoutUrlFromLs(json: LsJson): string | null {
+  const data = json.data;
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const attrs =
+    "attributes" in data &&
+    data.attributes &&
+    typeof data.attributes === "object"
+      ? (data.attributes as Record<string, unknown>)
+      : null;
+  if (!attrs) return null;
+  if (typeof attrs.url === "string") return attrs.url;
+  const urls =
+    attrs.urls && typeof attrs.urls === "object"
+      ? (attrs.urls as Record<string, unknown>)
+      : null;
+  return typeof urls?.url === "string" ? urls.url : null;
+}
+
+/**
+ * Create a Lemon Squeezy checkout for DeclineGuard Pro ($29.99/mo).
+ * Does NOT set users.plan — webhooks are the source of truth after payment.
+ */
+export const createProCheckout = action({
+  args: {
+    returnUrl: v.optional(v.string()),
+  },
+  returns: v.object({
+    checkoutUrl: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    await ctx.runMutation(api.functions.user.ensureCurrentUser, {});
+
+    const viewer = await ctx.runQuery(
+      internal.functions.billing.getViewerForCheckout,
+      {},
+    );
+    if (viewer.accountStatus === "disabled") {
+      throw new Error("This account is disabled. Contact DeclineGuard support.");
+    }
+    if (viewer.accountStatus === "frozen") {
+      throw new Error(
+        "This account is frozen. Contact DeclineGuard support to restore access before upgrading.",
+      );
+    }
+    if (
+      viewer.plan === "pro" &&
+      (viewer.lsSubscriptionStatus ?? "").toLowerCase() === "active"
+    ) {
+      throw new Error("You already have an active Pro subscription.");
+    }
+
+    await ctx.runMutation(internal.functions.rateLimit.consume, {
+      key: `ls:proCheckout:${identity.subject}`,
+      limit: 5,
+      windowMs: 60_000,
+    });
+
+    const config = getPlatformBillingConfig();
+    const apiKey = config?.apiKey ?? process.env.LEMONSQUEEZY_API_KEY?.trim();
+    if (!config || !apiKey) {
+      throw new Error(
+        "Pro checkout is not configured. Set LEMONSQUEEZY_API_KEY, LEMONSQUEEZY_STORE_ID, and LEMONSQUEEZY_PRO_VARIANT_ID.",
+      );
+    }
+
+    const returnUrl = allowAppHttpsUrl(args.returnUrl);
+    const variantNumeric = Number(config.variantId);
+    if (!Number.isFinite(variantNumeric)) {
+      throw new Error("LEMONSQUEEZY_PRO_VARIANT_ID must be a numeric variant id.");
+    }
+
+    const json = await lsFetch(apiKey, "/checkouts", {
+      method: "POST",
+      body: {
+        data: {
+          type: "checkouts",
+          attributes: {
+            checkout_data: {
+              ...(identity.email ? { email: identity.email } : {}),
+              ...(identity.name ? { name: identity.name } : {}),
+              custom: {
+                convex_user_id: viewer._id,
+                clerk_user_id: identity.subject,
+              },
+            },
+            product_options: {
+              enabled_variants: [variantNumeric],
+              ...(returnUrl
+                ? {
+                    redirect_url: returnUrl,
+                    receipt_button_text: "Back to DeclineGuard",
+                    receipt_link_url: returnUrl,
+                  }
+                : {}),
+            },
+          },
+          relationships: {
+            store: {
+              data: { type: "stores", id: config.storeId },
+            },
+            variant: {
+              data: { type: "variants", id: config.variantId },
+            },
+          },
+        },
+      },
+    });
+
+    const rawUrl = checkoutUrlFromLs(json);
+    const checkoutUrl = allowHttpsUrl(rawUrl);
+    if (!checkoutUrl) {
+      throw new Error("Lemon Squeezy returned an invalid checkout URL");
+    }
+    return { checkoutUrl };
   },
 });
