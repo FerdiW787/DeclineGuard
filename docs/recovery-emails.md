@@ -28,11 +28,12 @@ From **Dashboard → Sequences → Send preview to me**:
 
 Uses your store branding + sample customer (“Maya” / Pro Monthly). Subjects are prefixed with `[Preview]`. Does **not** touch real customer recoveries or count toward “emails sent this month.”
 
-Limits: email must be verified; Lemon store required.
+Limits: verified Clerk email; Lemon store connected; active (not frozen/disabled) account; one running preview at a time; 30s gap between emails; claim-before-send.
 
-> **Testing:** preview start rate limits are currently **disabled**. Re-enable
-> the `consumeRateLimit` calls in `convex/functions/previewSequence.ts` before
-> production.
+Rate limits (`convex/functions/previewSequence.ts`):
+
+- Per merchant: **2 preview sequence starts every 3 days** (`preview_seq:{userId}`, window = 3 × 24h)
+- Global platform safety: **40 starts per hour** (`preview_seq:global`)
 
 ## Production email (verified domain)
 

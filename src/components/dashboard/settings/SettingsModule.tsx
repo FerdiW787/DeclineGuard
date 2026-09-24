@@ -45,6 +45,8 @@ export default function SettingsModule({
   apiKeyLast4,
   testMode,
   planTier = "Free",
+  planId = "free",
+  lsSubscriptionStatus = null,
   recoveryFeePercent = 10,
   webhookSetup,
   webhookStatus,
@@ -282,6 +284,8 @@ export default function SettingsModule({
               <BillingTab
                 feesSummary={feesSummary}
                 planName={planTier}
+                planId={planId}
+                lsSubscriptionStatus={lsSubscriptionStatus}
                 recoveryFeePercent={recoveryFeePercent}
               />
             ) : null}

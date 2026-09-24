@@ -15,4 +15,10 @@ crons.interval(
   internal.functions.adminTakeover.sweepExpiredTakeovers,
 );
 
+crons.monthly(
+  "invoice owed recovery fees",
+  { day: 1, hourUTC: 6, minuteUTC: 0 },
+  internal.functions.feeBillingActions.runMonthlyFeeInvoices,
+);
+
 export default crons;

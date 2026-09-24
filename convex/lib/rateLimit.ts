@@ -9,6 +9,7 @@ export async function consumeRateLimit(
   key: string,
   limit: number,
   windowMs: number,
+  message = "Too many requests. Please try again shortly.",
 ): Promise<void> {
   const now = Date.now();
   const existing = await ctx.db
@@ -30,7 +31,7 @@ export async function consumeRateLimit(
   }
 
   if (existing.count >= limit) {
-    throw new Error("Too many requests. Please try again shortly.");
+    throw new Error(message);
   }
 
   await ctx.db.patch(existing._id, { count: existing.count + 1 });

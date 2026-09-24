@@ -51,6 +51,45 @@ If events arrive for a store that isn’t linked, we ack `200` and ignore (so LS
 | `subscription_payment_recovered` | Marks that subscription’s open failure as **recovered** + activity item |
 | `subscription_updated` | Stops recovery sequences when subscription is cancelled/expired/unpaid |
 
+## DeclineGuard Pro billing (platform store)
+
+Merchant recovery webhooks and DeclineGuard’s own Pro subscription share
+`POST /lemonsqueezy`. Plan changes run **only** when `store_id` equals
+`LEMONSQUEEZY_STORE_ID` (DeclineGuard’s store), never from a merchant store.
+
+| Env | Purpose |
+| --- | --- |
+| `LEMONSQUEEZY_API_KEY` | Create Pro checkouts (`createProCheckout`) |
+| `LEMONSQUEEZY_STORE_ID` | Identify platform-store webhook events |
+| `LEMONSQUEEZY_PRO_VARIANT_ID` | $29.99/mo variant (required) |
+| `LEMONSQUEEZY_PRO_PRODUCT_ID` | Product id (recommended verification) |
+| `ALLOW_LS_TEST_BILLING` | `true` / `1` only on isolated Convex env — lets `test_mode` events write `users.plan`. Unset in production. |
+
+On the platform store webhook, also subscribe to `subscription_created`,
+`subscription_cancelled`, `subscription_expired`, and
+`subscription_payment_success` / `subscription_payment_failed`.
+
+| Platform event / status | Effect |
+| --- | --- |
+| `active` or `paid` (live) | `users.plan = pro` + store `lsSubscriptionId` |
+| `cancelled`, `expired`, `unpaid`, `past_due`, failed payment (live) | `users.plan = free` |
+| any of the above with `test_mode: true` | ignored (`test_mode_ignored`) unless `ALLOW_LS_TEST_BILLING=true` — no plan / sub id write |
+
+Test-mode events share the same HMAC and `POST /lemonsqueezy` as live. `applyPlatformSubscription` receives `testMode: attrs.test_mode === true` (or `meta.test_mode`) and refuses to patch `plan`, `lsSubscriptionId`, or `lsSubscriptionStatus` unless the Convex env explicitly allows it. An audit row `plan_webhook:test_mode_ignored` is written when a user can be resolved.
+
+When a payment event omits variant/product ids, promote requires a **known** `lsSubscriptionId` on the user or the pending-checkout nonce from `createProCheckout` — not bare `custom_data` user ids.
+
+Checkout creation does **not** set plan. Merchants cannot self-set plan.
+Staff `setUserPlan` remains gated with an audit log; the next matching
+webhook still overwrites plan.
+
+`createProCheckout` return/receipt URLs must pass `allowAppHttpsUrl`: https
+plus an allowlisted DeclineGuard origin (`PUBLIC_APP_URL` / `PUBLIC_APP_URLS`
+or `declineguard.com` / `www` / `app`). Arbitrary https hosts are rejected.
+
+Platform-store `order_created` is handled separately for monthly recovery-fee
+invoices (claim/release + mark paid). That path is unchanged.
+
 ## Dashboard queries
 
 - `api.functions.recoveries.listOpenFailures`

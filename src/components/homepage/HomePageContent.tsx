@@ -1,5 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import { SignedIn, SignedOut } from "@clerk/astro/react";
+import { PLANS } from "@/lib/pricing";
+import { HomePageTiers } from "./HomePageTiers";
 
 const steps = [
   {
@@ -15,7 +17,7 @@ const steps = [
   {
     n: "03",
     title: "Revenue returns",
-    body: "Track recoveries live. Pay only when we helped bring it back.",
+    body: "Track recoveries live. Upgrade when you need a bigger monthly bucket.",
   },
 ] as const;
 
@@ -25,8 +27,8 @@ const trust = [
     body: "API key in, webhooks on. No checkout changes.",
   },
   {
-    title: "Pay on recovery",
-    body: "10% on Free, 4% on Pro — only after money returns.",
+    title: "Monthly decline buckets",
+    body: `${PLANS.free.includedDeclinesPerMonth} on Free, ${PLANS.pro.includedDeclinesPerMonth} on Pro. Over quota, new declines wait in a hold queue.`,
   },
   {
     title: "Cards stay with LS",
@@ -79,6 +81,8 @@ export function HomePageContent() {
           </div>
         </div>
       </section>
+
+      <HomePageTiers />
 
       <section className="border-t border-black/[0.06]">
         <div className="mx-auto max-w-[1440px] px-6 lg:px-10">
