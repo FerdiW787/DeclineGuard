@@ -57,6 +57,9 @@ export default defineSchema({
     lsSubscriptionId: v.optional(v.string()),
     /** Last LS subscription/invoice status applied to this user. */
     lsSubscriptionStatus: v.optional(v.string()),
+    /** One-time nonce from createProCheckout; proves a webhook is our checkout. */
+    lsCheckoutNonce: v.optional(v.string()),
+    lsCheckoutNonceExpiresAt: v.optional(v.number()),
   })
     .index("by_userId", ["userId"])
     .index("by_lsSubscriptionId", ["lsSubscriptionId"]),
