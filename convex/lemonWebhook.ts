@@ -1,10 +1,14 @@
 import { httpAction } from "./_generated/server";
 import type { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
+import {
+  isFeeInvoiceClaimKey,
+  parseBillingCustomData,
+} from "./lib/feeBilling";
 import { allowHttpsUrl } from "./lib/safeUrl";
 
 type LsWebhookBody = {
-  meta?: { event_name?: string };
+  meta?: { event_name?: string; custom_data?: unknown };
   data?: {
     type?: string;
     id?: string;
@@ -19,8 +23,11 @@ type LsWebhookBody = {
  * Subscribe at least to:
  * - subscription_payment_failed
  * - subscription_payment_recovered
+ * - subscription_updated
+ * Platform store (fee invoices): order_created
  *
  * Env: LEMONSQUEEZY_WEBHOOK_SECRET (same signing secret you enter in LS)
+ * Fee invoices also need LEMONSQUEEZY_STORE_ID (platform store).
  */
 export const handleLemonSqueezyWebhook = httpAction(
   async (ctx: ActionCtx, request: Request) => {
@@ -67,6 +74,23 @@ export const handleLemonSqueezyWebhook = httpAction(
       eventName === "subscription_payment_recovered";
 
     const isSubscriptionLifecycleEvent = eventName === "subscription_updated";
+
+    const billingStoreId = process.env.LEMONSQUEEZY_STORE_ID?.trim();
+    const isBillingOrderEvent =
+      eventName === "order_created" &&
+      !!storeIdEarly &&
+      !!billingStoreId &&
+      storeIdEarly === billingStoreId;
+
+    if (isBillingOrderEvent && storeIdEarly) {
+      return await handleBillingOrderWebhook(ctx, {
+        eventName,
+        storeId: storeIdEarly,
+        body,
+        data,
+        attrs,
+      });
+    }
 
     // Record every signed delivery we can attribute to a store — including LS
     // "Send test" / non-payment events — so onboarding can verify the webhook.
@@ -258,6 +282,105 @@ export const handleLemonSqueezyWebhook = httpAction(
     return new Response("OK", { status: 200 });
   },
 );
+
+/**
+ * Paid signal for DeclineGuard’s own-store fee invoices (checkout + custom_price).
+ * Uses the same claim/release path as merchant payment webhooks.
+ */
+async function handleBillingOrderWebhook(
+  ctx: ActionCtx,
+  args: {
+    eventName: string;
+    storeId: string;
+    body: LsWebhookBody;
+    data: LsWebhookBody["data"];
+    attrs: Record<string, unknown> | undefined;
+  },
+): Promise<Response> {
+  if (!args.data?.id || !args.attrs) {
+    return new Response("Missing payload data", { status: 400 });
+  }
+
+  const custom = parseBillingCustomData(args.body.meta?.custom_data);
+  const claimKey = custom.claimKey;
+  if (!claimKey || !isFeeInvoiceClaimKey(claimKey)) {
+    await ctx.runMutation(internal.functions.recoveries.recordWebhookEvent, {
+      eventKey: `${args.eventName}:${args.data.type ?? "orders"}:${args.data.id}`,
+      eventName: args.eventName,
+      storeId: args.storeId,
+    });
+    return new Response("Ignored", { status: 200 });
+  }
+
+  const eventKey = `${args.eventName}:${args.data.type ?? "orders"}:${args.data.id}`;
+  const { claimed } = await ctx.runMutation(
+    internal.functions.recoveries.claimWebhookEvent,
+    { eventKey, eventName: args.eventName, storeId: args.storeId },
+  );
+  if (!claimed) {
+    return new Response("Already processed", { status: 200 });
+  }
+
+  try {
+    const invoiceId = await ctx.runQuery(
+      internal.functions.feeBilling.findBillingInvoiceForPaidOrder,
+      {
+        claimKey,
+        billingInvoiceId: custom.billingInvoiceId,
+        lsOrderId: String(args.data.id),
+      },
+    );
+    if (!invoiceId) {
+      throw new Error(
+        `No billingInvoices row for ${claimKey} / order ${args.data.id}`,
+      );
+    }
+
+    const orderStatus =
+      typeof args.attrs.status === "string" ? args.attrs.status : "";
+    const testMode = args.attrs.test_mode === true;
+    const paidAt = parseIsoMs(
+      typeof args.attrs.updated_at === "string"
+        ? args.attrs.updated_at
+        : typeof args.attrs.created_at === "string"
+          ? args.attrs.created_at
+          : null,
+    );
+
+    const marked = await ctx.runMutation(
+      internal.functions.feeBilling.markBillingInvoicePaid,
+      {
+        invoiceId,
+        lsOrderId: String(args.data.id),
+        orderStatus,
+        subtotalCents: asCents(args.attrs.subtotal),
+        totalCents: asCents(args.attrs.total),
+        testMode,
+        paidAt,
+      },
+    );
+    if (marked.reason === "not_found") {
+      throw new Error(
+        `billingInvoices ${invoiceId} disappeared before mark paid`,
+      );
+    }
+  } catch (err) {
+    console.error(
+      `Fee invoice webhook failed for ${eventKey}, releasing claim:`,
+      err,
+    );
+    try {
+      await ctx.runMutation(internal.functions.recoveries.releaseWebhookEvent, {
+        eventKey,
+      });
+    } catch (releaseErr) {
+      console.error(`Failed to release claim for ${eventKey}:`, releaseErr);
+    }
+    return new Response("Internal error", { status: 500 });
+  }
+
+  return new Response("OK", { status: 200 });
+}
 
 /**
  * Timing-safe HMAC-SHA256 signature verification for a single secret.
