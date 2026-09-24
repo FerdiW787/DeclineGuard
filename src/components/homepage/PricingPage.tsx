@@ -1,83 +1,40 @@
-import { ArrowRight, Check, Minus } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { SignedIn, SignedOut } from "@clerk/astro/react";
 import { ProCheckoutButton } from "@/components/billing/ProCheckoutButton";
 import { LinearNav } from "@/components/homepage-linear/LinearNav";
 import { LinearCta } from "@/components/homepage-linear/LinearCta";
 import { withConvexClerkProvider } from "@/lib/withConvexClerkProvider";
 import { HomePageFooter } from "./HomePageBento";
-import PricingCalculator from "./PricingCalculator";
 import {
+  DECLINE_ADDON,
+  formatDeclineAddon,
+  formatDeclineQuota,
   formatUsd,
   PLANS,
   PRICING_FAQS,
-  proBreakevenRecoveredUsd,
 } from "@/lib/pricing";
 
 const free = PLANS.free;
 const pro = PLANS.pro;
-const breakeven = proBreakevenRecoveredUsd();
 
-const comparisonRows = [
-  {
-    label: "Monthly price",
-    free: "$0",
-    pro: formatUsd(pro.monthlyPriceUsd) + "/mo",
-  },
-  {
-    label: "Recovery fee",
-    free: `${free.recoveryFeePercent}% when we recover`,
-    pro: `${pro.recoveryFeePercent}% when we recover`,
-  },
-  {
-    label: "Recovery emails / mo",
-    free: String(free.includedRecoveryEmails),
-    pro: String(pro.includedRecoveryEmails),
-  },
-  {
-    label: "Email overage",
-    free: `$${free.emailOveragePackPriceUsd}/mo per +${free.emailOveragePackSize}`,
-    pro: `$${pro.emailOveragePackPriceUsd}/mo per +${pro.emailOveragePackSize}`,
-  },
-  {
-    label: "Lemon Squeezy stores",
-    free: "1 (+ $5 one-time each extra)",
-    pro: "Unlimited",
-  },
-  {
-    label: "DeclineGuard badge in emails",
-    free: "Yes",
-    pro: "No",
-  },
-  {
-    label: "Branded recovery sequence",
-    free: true,
-    pro: true,
-  },
-  {
-    label: "Recovery dashboard",
-    free: true,
-    pro: true,
-  },
-  {
-    label: "Full email customization",
-    free: false,
-    pro: true,
-  },
-  {
-    label: "CSV export",
-    free: false,
-    pro: true,
-  },
-] as const;
+const darkCtaClass =
+  "inline-flex w-full items-center justify-center rounded-full bg-[#f7f8f8] px-4 py-2.5 text-sm font-medium text-[#08090a] transition-colors hover:bg-white";
 
-function CellValue({ value }: { value: string | boolean }) {
-  if (value === true) {
-    return <Check className="mx-auto size-4 text-[#08090a]" aria-label="Included" />;
-  }
-  if (value === false) {
-    return <Minus className="mx-auto size-4 text-black/25" aria-label="Not included" />;
-  }
-  return <span>{value}</span>;
+function FreePlanCtas() {
+  return (
+    <>
+      <SignedOut>
+        <LinearCta href="/a/sign-up" className="w-full justify-center">
+          {free.cta}
+        </LinearCta>
+      </SignedOut>
+      <SignedIn>
+        <LinearCta href="/a/dashboard" className="w-full justify-center">
+          Open dashboard
+        </LinearCta>
+      </SignedIn>
+    </>
+  );
 }
 
 function PricingPage() {
@@ -86,29 +43,30 @@ function PricingPage() {
       <LinearNav />
 
       <main className="ln-container pb-24 pt-28 md:pb-32 md:pt-36">
-        <div className="mx-auto max-w-2xl text-center">
+        <div className="mx-auto max-w-xl text-center">
           <p className="ln-eyebrow">Pricing</p>
           <h1 className="ln-h1 mt-4 text-[clamp(2rem,4.5vw,3rem)] leading-[1.08] tracking-[-0.03em]">
-            Pay when we recover. Scale when you grow.
+            Free and Pro. Monthly decline buckets.
           </h1>
           <p className="mt-4 text-base leading-relaxed text-[#8a8a8e]">
-            Start free with no card. Upgrade to Pro when lower fees and more
-            volume beat the math — usually around {formatUsd(breakeven)} recovered
-            per month.
+            {free.includedDeclinesPerMonth} or {pro.includedDeclinesPerMonth}{" "}
+            declines each month. Need more? Stack {formatDeclineAddon()}. Over
+            quota, new declines wait in a hold queue — we never kill a sequence
+            mid-flight.
           </p>
         </div>
 
-        <div className="mt-14 grid gap-4 md:mt-16 md:grid-cols-2 md:gap-5">
-          <article className="flex flex-col rounded-xl border border-black/[0.08] bg-white p-8 md:p-9">
+        <div className="mt-14 grid items-stretch gap-4 md:mt-16 md:grid-cols-2 md:gap-5">
+          <article className="flex flex-col rounded-2xl border border-black/[0.08] bg-white p-7 md:p-8">
             <p className="text-sm font-medium text-[#8a8a8e]">{free.name}</p>
             <p className="mt-3 text-5xl tracking-tight">$0</p>
-            <p className="mt-2 text-base text-[#8a8a8e]">
-              + {free.recoveryFeePercent}% per recovery we help win
+            <p className="mt-2 text-[15px] font-medium text-[#08090a]">
+              {formatDeclineQuota(free.includedDeclinesPerMonth)}
             </p>
-            <p className="mt-3 text-sm font-medium text-[#08090a]">
-              No card. No monthly fee. Nothing until a payment comes back.
+            <p className="mt-2 text-sm leading-relaxed text-[#8a8a8e]">
+              {free.tagline}
             </p>
-            <ul className="mt-8 flex-1 space-y-3 text-sm text-[#b1b1b3]">
+            <ul className="mt-8 flex-1 space-y-3 text-sm text-[#6b6f76]">
               {free.features.map((line) => (
                 <li key={line} className="flex gap-3">
                   <Check className="mt-0.5 size-4 shrink-0 text-black/35" />
@@ -117,87 +75,74 @@ function PricingPage() {
               ))}
             </ul>
             <div className="mt-8">
-              <SignedOut>
-                <LinearCta href="/a/sign-up" className="w-full justify-center">
-                  {free.cta}
-                </LinearCta>
-              </SignedOut>
-              <SignedIn>
-                <LinearCta href="/a/dashboard" className="w-full justify-center">
-                  Open dashboard
-                </LinearCta>
-              </SignedIn>
+              <FreePlanCtas />
             </div>
           </article>
 
-          <article className="relative flex flex-col rounded-xl border border-black/[0.08] bg-white p-8 md:p-9 shadow-[0_1px_0_rgba(0,0,0,0.03)]">
-            <span className="absolute right-6 top-6 rounded-full bg-[#08090a] px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#f7f8f8]">
-              Popular
-            </span>
-            <p className="text-sm font-medium text-[#8a8a8e]">{pro.name}</p>
+          <article className="flex flex-col rounded-2xl bg-[#08090a] p-7 text-[#f7f8f8] md:p-8">
+            <p className="text-sm font-medium text-white/50">{pro.name}</p>
             <p className="mt-3 text-5xl tracking-tight">
               {formatUsd(pro.monthlyPriceUsd)}
-              <span className="text-xl font-medium text-black/35">/mo</span>
+              <span className="text-xl font-medium text-white/40">/mo</span>
             </p>
-            <p className="mt-2 text-base text-[#8a8a8e]">
-              + {pro.recoveryFeePercent}% per recovery — half the Free rate
+            <p className="mt-2 text-[15px] font-medium text-[#f7f8f8]">
+              {formatDeclineQuota(pro.includedDeclinesPerMonth)}
             </p>
-            <ul className="mt-8 flex-1 space-y-3 text-sm text-[#b1b1b3]">
+            <p className="mt-2 text-sm leading-relaxed text-white/50">
+              {pro.tagline}
+            </p>
+            <ul className="mt-8 flex-1 space-y-3 text-sm text-white/65">
               {pro.features.map((line) => (
                 <li key={line} className="flex gap-3">
-                  <Check className="mt-0.5 size-4 shrink-0 text-black/35" />
+                  <Check className="mt-0.5 size-4 shrink-0 text-white/40" />
                   {line}
                 </li>
               ))}
             </ul>
             <div className="mt-8">
-              <ProCheckoutButton />
+              <ProCheckoutButton className={darkCtaClass} label={pro.cta} />
             </div>
           </article>
         </div>
 
-        <section className="mx-auto mt-16 max-w-4xl md:mt-20">
-          <h2 className="text-center text-xl tracking-tight md:text-2xl">
-            Compare plans
-          </h2>
-          <div className="mt-8 overflow-x-auto rounded-xl border border-black/[0.08] bg-white">
-            <table className="w-full min-w-[520px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-black/[0.08] bg-[#f7f8f8]">
-                  <th className="px-5 py-4 font-medium text-black/35" scope="col">
-                    &nbsp;
-                  </th>
-                  <th className="px-5 py-4 font-semibold tracking-tight" scope="col">
-                    Free
-                  </th>
-                  <th className="px-5 py-4 font-semibold tracking-tight" scope="col">
-                    Pro
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {comparisonRows.map((row) => (
-                  <tr key={row.label} className="border-b border-black/[0.06] last:border-0">
-                    <th
-                      scope="row"
-                      className="px-5 py-3.5 font-normal text-[#8a8a8e]"
-                    >
-                      {row.label}
-                    </th>
-                    <td className="px-5 py-3.5 text-center text-[#b1b1b3]">
-                      <CellValue value={row.free} />
-                    </td>
-                    <td className="px-5 py-3.5 text-center text-[#b1b1b3]">
-                      <CellValue value={row.pro} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <section className="mt-10 rounded-2xl border border-black/[0.08] bg-white px-6 py-7 md:px-8">
+          <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] md:items-start md:gap-12">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/35">
+                Add-on
+              </p>
+              <h2 className="mt-2 text-xl tracking-tight md:text-2xl">
+                Need more than your bucket?
+              </h2>
+              <p className="mt-3 text-sm leading-relaxed text-[#8a8a8e]">
+                Same add-on on Free and Pro. Stack as many as you need — extra
+                monthly decline capacity on top of your plan bucket.
+              </p>
+            </div>
+            <dl className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-xl bg-[#f7f8f8] px-4 py-4">
+                <dt className="text-[12px] font-medium text-[#8a8a8e]">Capacity</dt>
+                <dd className="mt-1 text-[15px] font-medium tracking-tight">
+                  +{DECLINE_ADDON.extraDeclines} declines
+                </dd>
+              </div>
+              <div className="rounded-xl bg-[#f7f8f8] px-4 py-4">
+                <dt className="text-[12px] font-medium text-[#8a8a8e]">Price</dt>
+                <dd className="mt-1 text-[15px] font-medium tracking-tight">
+                  {formatUsd(DECLINE_ADDON.monthlyPriceUsd)}/mo
+                </dd>
+              </div>
+              <div className="rounded-xl bg-[#f7f8f8] px-4 py-4">
+                <dt className="text-[12px] font-medium text-[#8a8a8e]">
+                  Over quota
+                </dt>
+                <dd className="mt-1 text-[15px] font-medium tracking-tight">
+                  Hold queue
+                </dd>
+              </div>
+            </dl>
           </div>
         </section>
-
-        <PricingCalculator />
 
         <section className="mx-auto mt-20 max-w-2xl md:mt-24">
           <h2 className="text-center text-2xl tracking-tight">

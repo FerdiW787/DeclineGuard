@@ -1,6 +1,7 @@
 import { ArrowRight, Plus } from "lucide-react";
 import { SignedIn, SignedOut } from "@clerk/astro/react";
 import BrandLogo from "@/components/BrandLogo";
+import { formatDeclineAddon, formatUsd, PLANS } from "@/lib/pricing";
 
 export const homeFaqs = [
   {
@@ -17,7 +18,7 @@ export const homeFaqs = [
   },
   {
     q: "When is Pro worth it?",
-    a: "When you recover more than ~$500/month, Pro’s 4% fee plus $29.99 usually beats Free’s 10%. You also get 500 emails, unlimited stores, and no DeclineGuard badge. See the calculator on pricing.",
+    a: `When ${PLANS.free.includedDeclinesPerMonth} declines a month isn’t enough. Pro is ${formatUsd(PLANS.pro.monthlyPriceUsd)}/mo with ${PLANS.pro.includedDeclinesPerMonth} declines, unlimited stores, and no DeclineGuard badge. Need more than that? Stack ${formatDeclineAddon()}.`,
   },
 ] as const;
 

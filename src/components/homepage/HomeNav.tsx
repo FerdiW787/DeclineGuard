@@ -6,7 +6,7 @@ import { useClerkClient } from "@/components/auth/useClerkClient";
 const navLinks = [
   { label: "Product", href: "#product" },
   { label: "How it works", href: "#how" },
-  { label: "Pricing", href: "/pricing" },
+  { label: "Pricing", href: "#plans" },
   { label: "Requests", href: "/features" },
 ];
 
