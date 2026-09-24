@@ -218,6 +218,9 @@ function Dashboard() {
     connection ? {} : "skip",
   );
   const ensureCurrentUser = useMutation(api.functions.user.ensureCurrentUser);
+  const createProCheckout = useAction(
+    api.functions.lemonSqueezyActions.createProCheckout,
+  );
   const currentUser = useQuery(api.functions.user.getCurrentUser);
   const plan = currentUser?.plan ?? "free";
   const recoveryFeePercent =
@@ -520,6 +523,46 @@ function Dashboard() {
       window.location.href = "/a/sign-in";
     }
   }, [isLoaded, isSignedIn]);
+
+  const billingQueryHandledRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !isSignedIn) return;
+    if (billingQueryHandledRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const wantBilling = params.get("billing") === "1";
+    const wantUpgrade = params.get("upgrade") === "pro";
+    if (!wantBilling && !wantUpgrade) return;
+    billingQueryHandledRef.current = true;
+
+    params.delete("billing");
+    params.delete("upgrade");
+    const next = `${window.location.pathname}${
+      params.toString() ? `?${params}` : ""
+    }${window.location.hash}`;
+    window.history.replaceState({}, "", next);
+
+    if (wantBilling && lsConnected) {
+      openSettings("billing");
+    }
+    if (!wantUpgrade) return;
+
+    void (async () => {
+      try {
+        await ensureCurrentUser({});
+        const { checkoutUrl } = await createProCheckout({
+          returnUrl: `${window.location.origin}/a/dashboard?billing=1`,
+        });
+        window.location.assign(checkoutUrl);
+      } catch {
+        if (lsConnected) openSettings("billing");
+      }
+    })();
+  }, [
+    isSignedIn,
+    lsConnected,
+    ensureCurrentUser,
+    createProCheckout,
+  ]);
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -1469,6 +1512,8 @@ function Dashboard() {
           apiKeyLast4={connection.apiKeyLast4}
           testMode={connection.testMode}
           planTier={planTier}
+          planId={plan}
+          lsSubscriptionStatus={currentUser?.lsSubscriptionStatus ?? null}
           recoveryFeePercent={recoveryFeePercent}
           webhookSetup={webhookSetup}
           webhookStatus={webhookStatus}

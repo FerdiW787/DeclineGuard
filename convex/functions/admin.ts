@@ -17,7 +17,8 @@ import {
   requireActionReason,
   isReversibleAuditAction,
 } from "../lib/admin";
-import { accountStatusOf, isSoftDeleted } from "../lib/accountGuard";
+import { accountStatusOf, isSoftDeleted, resolvePlan } from "../lib/accountGuard";
+import { planValidator } from "../schema";
 
 const accountStatusValidator = v.union(
   v.literal("active"),
@@ -54,6 +55,9 @@ const merchantSummaryValidator = v.object({
   openFailureCount: v.number(),
   activityCount: v.number(),
   hasSoftDeletedData: v.boolean(),
+  plan: planValidator,
+  lsSubscriptionId: v.union(v.string(), v.null()),
+  lsSubscriptionStatus: v.union(v.string(), v.null()),
 });
 
 async function summarizeMerchant(ctx: QueryCtx | MutationCtx, user: Doc<"users">) {
@@ -105,6 +109,9 @@ async function summarizeMerchant(ctx: QueryCtx | MutationCtx, user: Doc<"users">
     openFailureCount,
     activityCount,
     hasSoftDeletedData,
+    plan: resolvePlan(user),
+    lsSubscriptionId: user.lsSubscriptionId ?? null,
+    lsSubscriptionStatus: user.lsSubscriptionStatus ?? null,
   };
 }
 
@@ -923,11 +930,10 @@ export const getUserClerkId = query({
   },
 });
 
-const planValidator = v.union(v.literal("free"), v.literal("pro"));
-
 /**
- * Admin mutation to update a user's billing plan.
- * Creates audit trail for plan changes.
+ * Staff/admin override for a user's billing plan.
+ * Merchants cannot call this. Webhooks remain source of truth for paid Pro;
+ * this path is for comps / support and always writes an audit row.
  */
 export const setUserPlan = mutation({
   args: {
@@ -937,12 +943,13 @@ export const setUserPlan = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const actor = await requireAdmin(ctx);
+    const actor = await requireStaff(ctx);
     const user = await ctx.db.get(args.userId);
     if (!user) throw new Error("User not found");
+    assertCanActOnTarget(actor, user);
 
     const reason = requireActionReason(args.reason);
-    const priorPlan = user.plan ?? "free";
+    const priorPlan = resolvePlan(user);
 
     if (priorPlan === args.plan) {
       return null;
@@ -955,7 +962,11 @@ export const setUserPlan = mutation({
       targetUserId: args.userId,
       action: `plan_change:${args.plan}`,
       reason,
-      metadata: { priorPlan },
+      metadata: {
+        priorPlan,
+        lsSubscriptionId: user.lsSubscriptionId ?? null,
+        lsSubscriptionStatus: user.lsSubscriptionStatus ?? null,
+      },
     });
     return null;
   },

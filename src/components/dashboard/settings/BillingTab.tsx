@@ -1,4 +1,6 @@
 import { formatMoneyAmount } from "../dashboardUi";
+import { ProCheckoutButton } from "@/components/billing/ProCheckoutButton";
+import { PLANS } from "@/lib/pricing";
 import {
   SettingsCard,
   SettingsRow,
@@ -10,16 +12,53 @@ export function BillingTab({
   feesSummary,
   planName = "Free",
   recoveryFeePercent = 10,
+  planId = "free",
+  lsSubscriptionStatus = null,
 }: {
   feesSummary: SettingsFeesSummary | undefined;
   planName?: string;
   recoveryFeePercent?: number;
+  planId?: "free" | "pro";
+  lsSubscriptionStatus?: string | null;
 }) {
+  const isPro = planId === "pro";
+  const pro = PLANS.pro;
+
   return (
     <SettingsSection
       title="Billing"
-      description={`${planName} plan: ${recoveryFeePercent}% of recovered revenue. Founding stores are invoiced manually — nothing is charged automatically yet.`}
+      description={
+        isPro
+          ? `${planName} plan: ${recoveryFeePercent}% of recovered revenue. Pro is $29.99/mo via Lemon Squeezy.`
+          : `${planName} plan: ${recoveryFeePercent}% of recovered revenue. Upgrade to Pro for ${pro.recoveryFeePercent}% fees.`
+      }
     >
+      <SettingsCard>
+        <SettingsRow
+          title="Current plan"
+          description={
+            isPro
+              ? lsSubscriptionStatus
+                ? `Lemon Squeezy subscription ${lsSubscriptionStatus}.`
+                : "Pro is active. Fee rate follows this plan."
+              : "Free until a paid Pro subscription is active."
+          }
+        >
+          <p className="text-[15px] font-semibold text-[#08090a]">{planName}</p>
+        </SettingsRow>
+        {isPro ? null : (
+          <SettingsRow
+            title="DeclineGuard Pro"
+            description={`$${pro.monthlyPriceUsd}/mo · ${pro.recoveryFeePercent}% recovery fee · unlimited stores.`}
+          >
+            <ProCheckoutButton
+              className="dg-btn dg-btn-primary !px-4 !py-2 cursor-pointer text-xs"
+              label="Upgrade to Pro"
+            />
+          </SettingsRow>
+        )}
+      </SettingsCard>
+
       <SettingsCard>
         {feesSummary === undefined ? (
           <SettingsRow title="This month" description="Loading fees…" />
@@ -65,8 +104,8 @@ export function BillingTab({
           description="No recovery sequence start, no fee. If Lemon Squeezy retries before our first email, you owe nothing."
         />
         <SettingsRow
-          title="No card on file"
-          description="No monthly subscription. Founding stores are invoiced manually while we’re in beta."
+          title="Pro is a Lemon Squeezy subscription"
+          description="Choosing Pro opens checkout. Cancel or past_due returns you to Free automatically."
         />
       </SettingsCard>
     </SettingsSection>

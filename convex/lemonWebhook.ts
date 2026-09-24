@@ -2,6 +2,14 @@ import { httpAction } from "./_generated/server";
 import type { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import {
+  extractCustomUserRefs,
+  extractProductId,
+  extractVariantId,
+  isPlatformBillingEventName,
+  isPlatformBillingStore,
+  statusFromBillingEvent,
+} from "./lib/billingPlan";
+import {
   isFeeInvoiceClaimKey,
   parseBillingCustomData,
 } from "./lib/feeBilling";
@@ -20,14 +28,17 @@ type LsWebhookBody = {
  * Lemon Squeezy webhook endpoint.
  * URL: https://<deployment>.convex.site/lemonsqueezy
  *
- * Subscribe at least to:
+ * Subscribe merchant stores at least to:
  * - subscription_payment_failed
  * - subscription_payment_recovered
  * - subscription_updated
- * Platform store (fee invoices): order_created
+ *
+ * DeclineGuard’s own store (LEMONSQUEEZY_STORE_ID) also POSTs here:
+ * - order_created — recovery-fee invoices (claim/release + mark paid)
+ * - subscription_* — Pro $29.99/mo (applyPlatformSubscription)
  *
  * Env: LEMONSQUEEZY_WEBHOOK_SECRET (same signing secret you enter in LS)
- * Fee invoices also need LEMONSQUEEZY_STORE_ID (platform store).
+ * Platform events also need LEMONSQUEEZY_STORE_ID.
  */
 export const handleLemonSqueezyWebhook = httpAction(
   async (ctx: ActionCtx, request: Request) => {
@@ -74,6 +85,9 @@ export const handleLemonSqueezyWebhook = httpAction(
       eventName === "subscription_payment_recovered";
 
     const isSubscriptionLifecycleEvent = eventName === "subscription_updated";
+    const isPlatformStore = isPlatformBillingStore(storeIdEarly);
+    const isBillingEvent =
+      isPlatformStore && isPlatformBillingEventName(eventName);
 
     const billingStoreId = process.env.LEMONSQUEEZY_STORE_ID?.trim();
     const isBillingOrderEvent =
@@ -94,7 +108,7 @@ export const handleLemonSqueezyWebhook = httpAction(
 
     // Record every signed delivery we can attribute to a store — including LS
     // "Send test" / non-payment events — so onboarding can verify the webhook.
-    if (!isPaymentEvent && !isSubscriptionLifecycleEvent) {
+    if (!isPaymentEvent && !isSubscriptionLifecycleEvent && !isBillingEvent) {
       if (storeIdEarly) {
         const resourceId =
           typeof data?.id === "string" || typeof data?.id === "number"
@@ -115,10 +129,12 @@ export const handleLemonSqueezyWebhook = httpAction(
     }
 
     const storeId = storeIdEarly;
-    // For subscription_updated, data IS the subscription (use data.id)
+    // For subscription_* lifecycle events, data IS the subscription (use data.id)
     // For payment events, data is an invoice (use attrs.subscription_id)
     const subscriptionId =
-      isSubscriptionLifecycleEvent
+      isSubscriptionLifecycleEvent ||
+      (isBillingEvent && eventName.startsWith("subscription_") &&
+        !eventName.startsWith("subscription_payment_"))
         ? stringifyId(data.id)
         : stringifyId(attrs.subscription_id);
     if (!storeId || !subscriptionId) {
@@ -130,7 +146,7 @@ export const handleLemonSqueezyWebhook = httpAction(
     // Lifecycle events (subscription_updated) often omit user_email and don't need it.
     const customerEmail =
       typeof attrs.user_email === "string" ? attrs.user_email : "";
-    if (isPaymentEvent && !customerEmail) {
+    if (isPaymentEvent && !customerEmail && !isBillingEvent) {
       return new Response("Missing customer email", { status: 400 });
     }
 
@@ -138,9 +154,11 @@ export const handleLemonSqueezyWebhook = httpAction(
     // For subscription_updated: include status + updated_at to differentiate
     // For payment events: resource id is unique per invoice
     // NOTE: updated_at fallback is "unknown" (not Date.now()) for stable keys across retries
-    const eventKey = isSubscriptionLifecycleEvent
-      ? `${eventName}:${data.id}:${attrs.status ?? "unknown"}:${attrs.updated_at ?? "unknown"}`
-      : `${eventName}:${data.type ?? "resource"}:${data.id}`;
+    const eventKey =
+      isSubscriptionLifecycleEvent ||
+      (isBillingEvent && !isPaymentEvent)
+        ? `${eventName}:${data.id}:${attrs.status ?? "unknown"}:${attrs.updated_at ?? "unknown"}`
+        : `${eventName}:${data.type ?? "resource"}:${data.id}`;
 
     // Atomic claim: only the winner proceeds to business logic.
     // Prevents race conditions under LS retry bursts.
@@ -158,7 +176,7 @@ export const handleLemonSqueezyWebhook = httpAction(
       internal.functions.lemonSqueezy.getBindingByStoreId,
       { storeId },
     );
-    if (!binding) {
+    if (!binding && !isBillingEvent) {
       // Store not linked to any DeclineGuard account — ack so LS stops retrying
       // Keep claim (intentional: we don't want retries for unlinked stores)
       console.warn(`No binding for Lemon Squeezy store ${storeId}`);
@@ -194,7 +212,24 @@ export const handleLemonSqueezyWebhook = httpAction(
     // Business logic: wrap in try/catch — on failure, release claim and return 500
     // so LS retries get a fresh chance (not stuck "Already processed" forever)
     try {
-      if (eventName === "subscription_payment_failed") {
+      if (isBillingEvent) {
+        const attrsStatus =
+          typeof attrs.status === "string" ? attrs.status : "";
+        const customRefs = extractCustomUserRefs(body.meta ?? {});
+        await ctx.runMutation(
+          internal.functions.billing.applyPlatformSubscription,
+          {
+            lsSubscriptionId: subscriptionId,
+            status: statusFromBillingEvent(eventName, attrsStatus),
+            variantId: extractVariantId(attrs) ?? undefined,
+            productId: extractProductId(attrs) ?? undefined,
+            convexUserId: customRefs.convexUserId ?? undefined,
+            clerkUserId: customRefs.clerkUserId ?? undefined,
+          },
+        );
+      }
+
+      if (binding && eventName === "subscription_payment_failed" && customerEmail) {
         const result = await ctx.runMutation(
           internal.functions.recoveries.upsertFailedPayment,
           {
@@ -228,7 +263,11 @@ export const handleLemonSqueezyWebhook = httpAction(
             { failureId: result.failureId },
           );
         }
-      } else if (eventName === "subscription_payment_recovered") {
+      } else if (
+        binding &&
+        eventName === "subscription_payment_recovered" &&
+        customerEmail
+      ) {
         await ctx.runMutation(
           internal.functions.recoveries.markPaymentRecovered,
           {
@@ -243,7 +282,7 @@ export const handleLemonSqueezyWebhook = httpAction(
             eventName,
           },
         );
-      } else if (eventName === "subscription_updated") {
+      } else if (binding && eventName === "subscription_updated") {
         // Handle lifecycle stop: cancelled, expired, or unpaid → stop sequence
         const status =
           typeof attrs.status === "string" ? attrs.status : "";

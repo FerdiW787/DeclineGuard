@@ -51,6 +51,32 @@ If events arrive for a store that isn’t linked, we ack `200` and ignore (so LS
 | `subscription_payment_recovered` | Marks that subscription’s open failure as **recovered** + activity item |
 | `subscription_updated` | Stops recovery sequences when subscription is cancelled/expired/unpaid |
 
+## DeclineGuard Pro billing (platform store)
+
+Merchant recovery webhooks and DeclineGuard’s own Pro subscription share
+`POST /lemonsqueezy`. Plan changes run **only** when `store_id` equals
+`LEMONSQUEEZY_STORE_ID` (DeclineGuard’s store), never from a merchant store.
+
+| Env | Purpose |
+| --- | --- |
+| `LEMONSQUEEZY_API_KEY` | Create Pro checkouts (`createProCheckout`) |
+| `LEMONSQUEEZY_STORE_ID` | Identify platform-store webhook events |
+| `LEMONSQUEEZY_PRO_VARIANT_ID` | $29.99/mo variant (required) |
+| `LEMONSQUEEZY_PRO_PRODUCT_ID` | Product id (recommended verification) |
+
+On the platform store webhook, also subscribe to `subscription_created`,
+`subscription_cancelled`, `subscription_expired`, and
+`subscription_payment_success` / `subscription_payment_failed`.
+
+| Platform event / status | Effect |
+| --- | --- |
+| `active` or `paid` | `users.plan = pro` + store `lsSubscriptionId` |
+| `cancelled`, `expired`, `unpaid`, `past_due`, failed payment | `users.plan = free` |
+
+Checkout creation does **not** set plan. Merchants cannot self-set plan.
+Staff `setUserPlan` remains gated with an audit log; the next matching
+webhook still overwrites plan.
+
 ## Dashboard queries
 
 - `api.functions.recoveries.listOpenFailures`

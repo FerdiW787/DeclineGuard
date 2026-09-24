@@ -1,7 +1,9 @@
 import { ArrowRight, Check, Minus } from "lucide-react";
 import { SignedIn, SignedOut } from "@clerk/astro/react";
+import { ProCheckoutButton } from "@/components/billing/ProCheckoutButton";
 import { LinearNav } from "@/components/homepage-linear/LinearNav";
 import { LinearCta } from "@/components/homepage-linear/LinearCta";
+import { withConvexClerkProvider } from "@/lib/withConvexClerkProvider";
 import { HomePageFooter } from "./HomePageBento";
 import PricingCalculator from "./PricingCalculator";
 import {
@@ -78,7 +80,7 @@ function CellValue({ value }: { value: string | boolean }) {
   return <span>{value}</span>;
 }
 
-export default function PricingPage() {
+function PricingPage() {
   return (
     <div className="ln-surface min-h-screen bg-[#f7f8f8] text-[#08090a]">
       <LinearNav />
@@ -149,16 +151,7 @@ export default function PricingPage() {
               ))}
             </ul>
             <div className="mt-8">
-              <SignedOut>
-                <span className="inline-flex w-full cursor-default items-center justify-center rounded-lg border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm font-medium text-[#8a8a8e]">
-                  Coming soon
-                </span>
-              </SignedOut>
-              <SignedIn>
-                <span className="inline-flex w-full cursor-default items-center justify-center rounded-lg border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm font-medium text-[#8a8a8e]">
-                  Coming soon
-                </span>
-              </SignedIn>
+              <ProCheckoutButton />
             </div>
           </article>
         </div>
@@ -247,3 +240,7 @@ export default function PricingPage() {
     </div>
   );
 }
+
+export default withConvexClerkProvider(PricingPage, {
+  allowMissingConvex: true,
+});

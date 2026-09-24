@@ -49,9 +49,17 @@ export default defineSchema({
     accountStatus: v.optional(accountStatusValidator),
     frozenAt: v.optional(v.number()),
     frozenReason: v.optional(v.string()),
-    /** Billing plan: free (10% fee) or pro (4% fee). Defaults to free if unset. */
+    /** Billing plan: free (10% fee) or pro (4% fee). Defaults to free if unset.
+     * Merchants cannot self-set this. Source of truth is the LS Pro webhook
+     * (or staff `setUserPlan` with audit). */
     plan: v.optional(planValidator),
-  }).index("by_userId", ["userId"]),
+    /** Lemon Squeezy subscription id for the DeclineGuard Pro plan. */
+    lsSubscriptionId: v.optional(v.string()),
+    /** Last LS subscription/invoice status applied to this user. */
+    lsSubscriptionStatus: v.optional(v.string()),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_lsSubscriptionId", ["lsSubscriptionId"]),
 
   /** One Lemon Squeezy account connection per DeclineGuard user (pick active store) */
   lemonConnections: defineTable({

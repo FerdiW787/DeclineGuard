@@ -34,7 +34,7 @@ export function GeneralTab({
         </SettingsRow>
         <SettingsRow
           title="Plan"
-          description="Founding stores are invoiced manually in beta."
+          description="Set by your Lemon Squeezy Pro subscription. Staff can override with audit."
         >
           <span className="text-[13px] font-medium text-[#08090a]">
             {planTier}
