@@ -399,9 +399,13 @@ export default function RecoveriesPage({
       return;
     }
 
-    queueRowRefs.current
-      .get(selectedId)
-      ?.scrollIntoView({ block: "nearest" });
+    const desktopQueue =
+      desk || window.matchMedia("(min-width: 1024px)").matches;
+    if (desktopQueue) {
+      queueRowRefs.current
+        .get(selectedId)
+        ?.scrollIntoView({ block: "nearest" });
+    }
     const dest = measureQueueRow(selectedId);
     if (!dest) return;
 
@@ -426,7 +430,7 @@ export default function RecoveriesPage({
       gsap.set(glow, { x: dest.x, y: dest.y });
     }
     glowFromIdRef.current = selectedId;
-  }, [selectedId, measureQueueRow, filteredQueue.length]);
+  }, [desk, selectedId, measureQueueRow, filteredQueue.length]);
 
   useEffect(() => {
     const wrap = queueListWrapRef.current;
@@ -546,7 +550,7 @@ export default function RecoveriesPage({
           <button
             type="button"
             onClick={() => setSelectedId(null)}
-            className="dg-interactive mb-4 inline-flex w-fit items-center gap-1.5 rounded-md border border-black/8 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-[#6b6f76]"
+            className="dg-interactive mb-4 inline-flex min-h-11 w-fit items-center gap-1.5 rounded-md border border-black/8 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-[#6b6f76]"
           >
             <ArrowLeft className="size-3.5" />
             Back to queue
@@ -804,90 +808,92 @@ export default function RecoveriesPage({
                   className="w-full rounded-md border border-black/8 bg-[#f7f8f8] py-2 pr-3 pl-9 text-sm outline-none placeholder:text-black/35 focus:border-black/20"
                 />
               </label>
-              <SegmentedControl
-                ariaLabel="Queue filter"
-                idPrefix="queue-filter"
-                className="shrink-0 rounded-md bg-[#f7f8f8] shadow-none"
-                value={filter}
-                onChange={(next) => {
-                  setFilter(next);
-                  setVisibleCount(25);
-                }}
-                options={[
-                  {
-                    id: "all" as const,
-                    label: (
-                      <>
-                        All
-                        {counts.all > 0 ? (
-                          <span className="ml-1 tabular-nums opacity-60">
-                            {counts.all}
-                          </span>
-                        ) : null}
-                      </>
-                    ),
-                  },
-                  {
-                    id: "overdue" as const,
-                    label: (
-                      <>
-                        Overdue
-                        {counts.overdue > 0 ? (
-                          <span className="ml-1 tabular-nums opacity-60">
-                            {counts.overdue}
-                          </span>
-                        ) : null}
-                      </>
-                    ),
-                  },
-                  {
-                    id: "delivery" as const,
-                    label: (
-                      <>
-                        Delivery
-                        {counts.delivery > 0 ? (
-                          <span className="ml-1 tabular-nums opacity-60">
-                            {counts.delivery}
-                          </span>
-                        ) : null}
-                      </>
-                    ),
-                  },
-                  {
-                    id: "queued" as const,
-                    label: (
-                      <>
-                        Queued
-                        {counts.queued > 0 ? (
-                          <span className="ml-1 tabular-nums opacity-60">
-                            {counts.queued}
-                          </span>
-                        ) : null}
-                      </>
-                    ),
-                  },
-                  ...(stepFilterLabel
-                    ? [
-                        {
-                          id: filter,
-                          label: (
-                            <>
-                              {stepFilterLabel}
-                              {(filter === "day0" ||
-                                filter === "day2" ||
-                                filter === "day5") &&
-                              stageCounts[filter] > 0 ? (
-                                <span className="ml-1 tabular-nums opacity-60">
-                                  {stageCounts[filter]}
-                                </span>
-                              ) : null}
-                            </>
-                          ),
-                        },
-                      ]
-                    : []),
-                ]}
-              />
+              <div className="min-w-0 max-w-full overflow-x-auto">
+                <SegmentedControl
+                  ariaLabel="Queue filter"
+                  idPrefix="queue-filter"
+                  className="shrink-0 rounded-md bg-[#f7f8f8] shadow-none"
+                  value={filter}
+                  onChange={(next) => {
+                    setFilter(next);
+                    setVisibleCount(25);
+                  }}
+                  options={[
+                    {
+                      id: "all" as const,
+                      label: (
+                        <>
+                          All
+                          {counts.all > 0 ? (
+                            <span className="ml-1 tabular-nums opacity-60">
+                              {counts.all}
+                            </span>
+                          ) : null}
+                        </>
+                      ),
+                    },
+                    {
+                      id: "overdue" as const,
+                      label: (
+                        <>
+                          Overdue
+                          {counts.overdue > 0 ? (
+                            <span className="ml-1 tabular-nums opacity-60">
+                              {counts.overdue}
+                            </span>
+                          ) : null}
+                        </>
+                      ),
+                    },
+                    {
+                      id: "delivery" as const,
+                      label: (
+                        <>
+                          Delivery
+                          {counts.delivery > 0 ? (
+                            <span className="ml-1 tabular-nums opacity-60">
+                              {counts.delivery}
+                            </span>
+                          ) : null}
+                        </>
+                      ),
+                    },
+                    {
+                      id: "queued" as const,
+                      label: (
+                        <>
+                          Queued
+                          {counts.queued > 0 ? (
+                            <span className="ml-1 tabular-nums opacity-60">
+                              {counts.queued}
+                            </span>
+                          ) : null}
+                        </>
+                      ),
+                    },
+                    ...(stepFilterLabel
+                      ? [
+                          {
+                            id: filter,
+                            label: (
+                              <>
+                                {stepFilterLabel}
+                                {(filter === "day0" ||
+                                  filter === "day2" ||
+                                  filter === "day5") &&
+                                stageCounts[filter] > 0 ? (
+                                  <span className="ml-1 tabular-nums opacity-60">
+                                    {stageCounts[filter]}
+                                  </span>
+                                ) : null}
+                              </>
+                            ),
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
+              </div>
             </div>
 
             <div
@@ -964,7 +970,7 @@ export default function RecoveriesPage({
                           }}
                           aria-pressed={selected}
                           title="Open case"
-                          className="dg-queue-row group flex w-full items-start justify-between gap-2.5 rounded-md px-2.5 py-2.5 text-left"
+                          className="dg-queue-row group flex min-h-11 w-full items-start justify-between gap-2.5 rounded-md px-2.5 py-3 text-left"
                         >
                           <div className="min-w-0 flex-1">
                             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -1171,7 +1177,7 @@ function RailShell({
           <button
             type="button"
             onClick={onBack}
-            className="dg-interactive inline-flex items-center gap-1.5 rounded-full border border-black/8 bg-transparent px-2.5 py-1 text-[11px] font-semibold text-black/60"
+            className="dg-interactive inline-flex min-h-11 items-center gap-1.5 rounded-full border border-black/8 bg-transparent px-2.5 py-1 text-[11px] font-semibold text-black/60"
           >
             <ArrowLeft className="size-3.5" />
             {backLabel ?? "Back"}

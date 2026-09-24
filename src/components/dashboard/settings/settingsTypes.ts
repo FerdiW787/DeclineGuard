@@ -25,6 +25,18 @@ export type SettingsFeesSummary = {
   owedCount: number;
   currency: string | null;
   currencyMixed: boolean;
+  plan: "free" | "pro";
+  recoveryFeePercent: number;
+} | null;
+
+export type SettingsEmailQuota = {
+  plan: "free" | "pro";
+  sent: number;
+  included: number;
+  remaining: number;
+  overageEmails: number;
+  overagePacks: number;
+  overageUsd: number;
 } | null;
 
 export type SettingsEmailSetup = {
@@ -50,6 +62,7 @@ export type SettingsModuleProps = {
   webhookSetup: SettingsWebhookSetup | undefined;
   webhookStatus?: SettingsWebhookStatus | undefined;
   feesSummary?: SettingsFeesSummary | undefined;
+  emailQuota?: SettingsEmailQuota | undefined;
   emailSetup: SettingsEmailSetup | undefined;
   brandColor?: string;
   onSaveSender: (fromName: string, replyToEmail: string) => Promise<void>;

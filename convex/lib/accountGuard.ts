@@ -223,26 +223,17 @@ export function isSoftDeleted(row: { deletedAt?: number }): boolean {
 
 export type Plan = "free" | "pro";
 
+/** Keep in sync with `ATTRIBUTION_WINDOW_DAYS` in `src/lib/pricing.ts`. */
+export const ATTRIBUTION_WINDOW_DAYS = 30;
+export const ATTRIBUTION_WINDOW_MS =
+  ATTRIBUTION_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
 /**
  * Resolve billing plan for a user. Defaults to "free" if unset.
  * Used by fee calculation to determine recovery fee rate.
  */
 export function resolvePlan(user: Doc<"users">): Plan {
   return user.plan ?? "free";
-}
-
-/** Recovery fee rate by plan: Free = 10%, Pro = 4%. */
-export function recoveryFeeRate(plan: Plan): number {
-  switch (plan) {
-    case "free":
-      return 0.1;
-    case "pro":
-      return 0.04;
-    default: {
-      const _exhaustive: never = plan;
-      return 0.1;
-    }
-  }
 }
 
 /** Integer percent shown to merchants: Free = 10, Pro = 4. */
@@ -257,4 +248,55 @@ export function recoveryFeePercent(plan: Plan): 10 | 4 {
       return 10;
     }
   }
+}
+
+/** Recovery fee rate by plan: Free = 10%, Pro = 4%. */
+export function recoveryFeeRate(plan: Plan): number {
+  return recoveryFeePercent(plan) / 100;
+}
+
+/** Keep in sync with `includedRecoveryEmails` in `src/lib/pricing.ts`. */
+export function includedRecoveryEmails(plan: Plan): number {
+  switch (plan) {
+    case "free":
+      return 100;
+    case "pro":
+      return 500;
+    default: {
+      const _exhaustive: never = plan;
+      return 100;
+    }
+  }
+}
+
+/** Keep in sync with `emailOveragePackSize` in `src/lib/pricing.ts`. */
+export function emailOveragePackSize(plan: Plan): number {
+  switch (plan) {
+    case "free":
+      return 10;
+    case "pro":
+      return 30;
+    default: {
+      const _exhaustive: never = plan;
+      return 10;
+    }
+  }
+}
+
+/** Keep in sync with `emailOveragePackPriceUsd` in `src/lib/pricing.ts`. */
+export const EMAIL_OVERAGE_PACK_PRICE_USD = 3;
+
+export function emailOveragePacks(sent: number, plan: Plan): number {
+  const included = includedRecoveryEmails(plan);
+  if (sent <= included) return 0;
+  const over = sent - included;
+  return Math.ceil(over / emailOveragePackSize(plan));
+}
+
+/** Fee is owed only if recovery lands within the attribution window after Day-0. */
+export function isWithinAttributionWindow(
+  day0SentAt: number,
+  recoveredAt: number,
+): boolean {
+  return recoveredAt - day0SentAt <= ATTRIBUTION_WINDOW_MS;
 }

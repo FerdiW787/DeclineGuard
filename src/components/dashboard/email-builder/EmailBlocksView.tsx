@@ -2,6 +2,8 @@ import type { MouseEvent } from "react";
 import {
   imageCropPreviewStyles,
   markersToHtml,
+  styleEmailAnchors,
+  textBlockFaceStyle,
   type EmailBlock,
 } from "@/lib/emailBuilder";
 import { applyCopyVars } from "@/lib/recoveryEmailCopy";
@@ -102,23 +104,20 @@ function BlockView({
 
   switch (block.type) {
     case "text": {
-      const color =
-        block.color === "muted"
-          ? mutedColor
-          : block.color === "link"
-            ? linkColor
-            : bodyTextColor;
-      const html = markersToHtml(
-        resolveText(block.html, vars, showTokens),
+      const face = textBlockFaceStyle(block, {
+        body: bodyTextColor,
+        muted: mutedColor,
+        link: linkColor,
+      });
+      const html = styleEmailAnchors(
+        markersToHtml(resolveText(block.html, vars, showTokens)),
+        linkColor,
       );
       return (
         <p
           style={{
             ...style,
-            fontSize: block.fontSize,
-            color,
-            textAlign: block.align,
-            lineHeight: 1.6,
+            ...face,
           }}
           dangerouslySetInnerHTML={{ __html: html }}
         />
@@ -137,12 +136,11 @@ function BlockView({
       }
       const crop = imageCropPreviewStyles(block);
       return (
-        <div style={{ ...style, textAlign: block.align }}>
+        <div style={{ ...style, textAlign: "left" }}>
           <div
             style={{
               ...crop.wrap,
               display: "inline-block",
-              width: `${block.width}%`,
               maxWidth: "100%",
             }}
           >

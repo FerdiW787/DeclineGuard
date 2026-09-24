@@ -207,6 +207,65 @@ export const listAuditForTarget = query({
   },
 });
 
+const quotaBlockedRowValidator = v.object({
+  _id: v.id("auditLogs"),
+  action: v.string(),
+  reason: v.union(v.string(), v.null()),
+  metadata: v.union(v.string(), v.null()),
+  createdAt: v.number(),
+  targetUserId: v.union(v.id("users"), v.null()),
+  targetName: v.union(v.string(), v.null()),
+});
+
+/** System events when Resend returns 429 / quota — not reversible staff actions. */
+export const listResendQuotaBlocked = query({
+  args: {
+    targetUserId: v.optional(v.id("users")),
+    limit: v.optional(v.number()),
+  },
+  returns: v.array(quotaBlockedRowValidator),
+  handler: async (ctx, args) => {
+    await requireStaff(ctx);
+    const limit = Math.min(Math.max(args.limit ?? 50, 1), 100);
+
+    const rows = args.targetUserId
+      ? (
+          await ctx.db
+            .query("auditLogs")
+            .withIndex("by_target_createdAt", (q) =>
+              q.eq("targetUserId", args.targetUserId!),
+            )
+            .order("desc")
+            .take(200)
+        ).filter((row) => row.action === "resend_quota_blocked")
+      : await ctx.db
+          .query("auditLogs")
+          .withIndex("by_action_createdAt", (q) =>
+            q.eq("action", "resend_quota_blocked"),
+          )
+          .order("desc")
+          .take(limit);
+
+    const sliced = rows.slice(0, limit);
+    const out = [];
+    for (const row of sliced) {
+      const target = row.targetUserId
+        ? await ctx.db.get(row.targetUserId)
+        : null;
+      out.push({
+        _id: row._id,
+        action: row.action,
+        reason: row.reason ?? null,
+        metadata: row.metadata ?? null,
+        createdAt: row.createdAt,
+        targetUserId: row.targetUserId ?? null,
+        targetName: target?.userName ?? null,
+      });
+    }
+    return out;
+  },
+});
+
 const liveLogEntryValidator = v.object({
   _id: v.id("auditLogs"),
   action: v.string(),

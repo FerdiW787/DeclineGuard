@@ -332,6 +332,7 @@ export const marketingRecoveredWins: RecoveredWinRow[] = [
     failedAt: daysAgo(4),
     recoveredAt: daysAgo(0),
     testMode: false,
+    feeCents: 290,
   },
   {
     _id: "mw2",
@@ -343,6 +344,7 @@ export const marketingRecoveredWins: RecoveredWinRow[] = [
     failedAt: daysAgo(8),
     recoveredAt: daysAgo(2),
     testMode: false,
+    feeCents: 190,
   },
   {
     _id: "mw3",
@@ -354,6 +356,7 @@ export const marketingRecoveredWins: RecoveredWinRow[] = [
     failedAt: daysAgo(12),
     recoveredAt: daysAgo(5),
     testMode: false,
+    feeCents: 490,
   },
 ];
 

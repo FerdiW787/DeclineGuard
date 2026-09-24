@@ -21,6 +21,11 @@ export type EditableEmailCopy = {
   blocks?: EmailBlock[];
   linkColor?: string;
   emailPadding?: number;
+  shellBackground?: string;
+  shellBorderColor?: string;
+  shellBorder?: boolean;
+  shellBorderWidth?: number;
+  shellRadius?: number;
 };
 
 export type EmailCopyOverrides = Partial<
@@ -91,6 +96,11 @@ export function resolveEmailCopy(
     blocks: doc.blocks,
     linkColor: doc.linkColor,
     emailPadding: doc.emailPadding,
+    shellBackground: doc.shellBackground,
+    shellBorderColor: doc.shellBorderColor,
+    shellBorder: doc.shellBorder,
+    shellBorderWidth: doc.shellBorderWidth,
+    shellRadius: doc.shellRadius,
   };
 }
 
@@ -139,6 +149,11 @@ function toComparableDoc(copy: EditableEmailCopy): EmailDocument {
     blocks: copy.blocks ? cloneBlocks(copy.blocks) : [],
     linkColor: copy.linkColor ?? DEFAULT_LINK_COLOR,
     emailPadding: copy.emailPadding ?? DEFAULT_EMAIL_PADDING,
+    shellBackground: copy.shellBackground,
+    shellBorderColor: copy.shellBorderColor,
+    shellBorder: copy.shellBorder,
+    shellBorderWidth: copy.shellBorderWidth,
+    shellRadius: copy.shellRadius,
   };
 }
 

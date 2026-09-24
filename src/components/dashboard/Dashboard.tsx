@@ -151,6 +151,7 @@ function Dashboard() {
   const pageEnterRef = useRef<PageEnterHandle>(null);
   const navBusyRef = useRef(false);
   const [customizationsDirty, setCustomizationsDirty] = useState(false);
+  const [emailFocusMode, setEmailFocusMode] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
   const [shellWiggle, setShellWiggle] = useState(false);
   const pendingNavRef = useRef<NavId | null>(null);
@@ -199,6 +200,10 @@ function Dashboard() {
   );
   const feesSummary = useQuery(
     api.functions.recoveries.getFeesSummary,
+    connection ? { monthStartMs } : "skip",
+  );
+  const emailQuota = useQuery(
+    api.functions.recoveries.getEmailQuotaStatus,
     connection ? { monthStartMs } : "skip",
   );
   const webhookSetup = useQuery(
@@ -259,6 +264,7 @@ function Dashboard() {
     if (navBusyRef.current) return;
     navBusyRef.current = true;
     const finish = () => {
+      if (id !== "customizations") setEmailFocusMode(false);
       setNav(id);
       navBusyRef.current = false;
     };
@@ -757,16 +763,17 @@ function Dashboard() {
     <>
       {showShell ? (
     <div
-      className={`dg-shell light ln-surface relative flex h-dvh overflow-hidden bg-[#f7f8f8] text-[#08090a] ${
+      className={`dg-shell light ln-surface relative flex h-dvh overflow-hidden text-[#08090a] transition-colors duration-500 ${
         shellWiggle ? "dg-shell-wiggle" : ""
       }`}
+      style={emailFocusMode ? { background: "#ffffff" } : undefined}
     >
       {/* ── Left sidebar — only after a store is connected ── */}
       {lsConnected ? (
       <aside
-        className={`relative z-20 flex w-[248px] shrink-0 flex-col bg-[#f7f8f8] max-lg:hidden ${
-          storeMenuOpen ? "overflow-visible" : "overflow-hidden"
-        }`}
+        className={`relative z-20 flex w-[248px] shrink-0 flex-col bg-[#f7f8f8] max-lg:hidden transition-[margin] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          storeMenuOpen && !emailFocusMode ? "overflow-visible" : "overflow-hidden"
+        } ${emailFocusMode ? "-ml-[248px] pointer-events-none" : ""}`}
       >
         <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="flex shrink-0 items-center px-5 py-5">
@@ -1013,7 +1020,9 @@ function Dashboard() {
       {/* ── Main content ── */}
       <div className="relative z-10 flex min-w-0 flex-1 overflow-hidden max-lg:p-0">
         {/* Mobile top bar */}
-        <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 border-b border-black/6 bg-[#f7f8f8] px-4 py-3 lg:hidden">
+        <div className={`absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 border-b border-black/6 bg-[#f7f8f8] px-4 py-3 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] lg:hidden ${
+          emailFocusMode ? "-translate-y-full" : ""
+        }`}>
           <BrandLogo size="sm" />
           <div className="flex items-center gap-2">
             <button
@@ -1193,9 +1202,11 @@ function Dashboard() {
                       openCount={openCount}
                       openAtRiskLabel={openAtRiskLabel}
                       emailsSentLabel={emailsSentLabel}
+                      emailsIncludedThisMonth={emailQuota?.included}
                       recoveryRateLabel={recoveryRateLabel}
                       feesOwedLabel={feesOwedLabel}
                       youKeepLabel={youKeepLabel}
+                      recoveryFeePercent={recoveryFeePercent}
                       openFailures={openFailures}
                       recentActivity={recentActivity}
                       brandColor={recoverySettings?.brandColor ?? "#0c0c0c"}
@@ -1377,6 +1388,7 @@ function Dashboard() {
                 </section>
               ) : nav === "customizations" ? (
                 <section className="relative flex min-h-0 flex-1 flex-col">
+                  {emailFocusMode ? null : (
                   <div className="relative z-10 shrink-0 px-5 pt-3 pb-1 lg:hidden">
                     <nav className="flex gap-1 overflow-x-auto rounded-full border border-black/6 bg-white/80 p-1 text-sm font-medium">
                       {NAV.map((item) => (
@@ -1395,6 +1407,7 @@ function Dashboard() {
                       ))}
                     </nav>
                   </div>
+                  )}
                   {!brandImportComplete ? (
                     <BrandImportGate
                       storeName={connection.storeName}
@@ -1445,6 +1458,7 @@ function Dashboard() {
                     brandDomain={recoverySettings?.brandDomain ?? null}
                     onGoToSequences={() => requestNav("sequences")}
                     onDirtyChange={setCustomizationsDirty}
+                    onFocusModeChange={setEmailFocusMode}
                     onUploadImage={uploadEmailImage}
                     onSave={async (values: EmailCustomizationValues) => {
                       await saveEmailCustomizations({
@@ -1518,6 +1532,7 @@ function Dashboard() {
           webhookSetup={webhookSetup}
           webhookStatus={webhookStatus}
           feesSummary={feesSummary}
+          emailQuota={emailQuota}
           emailSetup={emailSetup}
           brandColor={recoverySettings?.brandColor ?? "#0c0c0c"}
           onSaveSender={async (fromName, replyToEmail) => {

@@ -7,7 +7,7 @@ const proof = [
   {
     label: "Pricing",
     title: "Free or Pro",
-    body: "10% on Free, 4% on Pro — only when we recover.",
+    body: "10% on Free, 4% on Pro — only when we recover within 30 days of Day-0.",
   },
   {
     label: "Security",

@@ -273,7 +273,10 @@ export default function PublicDashboardPreview() {
           owedCount: 12,
           currency: "EUR",
           currencyMixed: false,
+          plan: "free",
+          recoveryFeePercent: 10,
         }}
+        readOnlyNotice="Marketing preview — settings are read-only."
         emailSetup={{
           fromAddress: "Amonen <noreply@declineguard.com>",
           isProduction: true,

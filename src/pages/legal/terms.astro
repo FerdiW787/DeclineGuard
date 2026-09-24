@@ -1,6 +1,7 @@
 ---
 import LegalLayout from "@/layouts/LegalLayout.astro";
 import { legal } from "@/lib/legal";
+import { ATTRIBUTION_WINDOW_DAYS } from "@/lib/pricing";
 ---
 
 <LegalLayout
@@ -90,7 +91,7 @@ import { legal } from "@/lib/legal";
   <ol>
     <li>a failed-payment event for a subscription is ingested by DeclineGuard for your connected store; and</li>
     <li>DeclineGuard has started the recovery sequence for that failure (first email queued/sent according to our systems); and</li>
-    <li>we receive a corresponding recovery / success event (or equivalent confirmation) attributable to that subscription/failure within our attribution window of <strong>[ATTRIBUTION WINDOW: e.g. 30 days]</strong>.</li>
+    <li>we receive a corresponding recovery / success event (or equivalent confirmation) attributable to that subscription/failure within our attribution window of <strong>{ATTRIBUTION_WINDOW_DAYS} days</strong> from the first recovery email.</li>
   </ol>
   <p>
     If the customer pays successfully <em>before</em> our first recovery email

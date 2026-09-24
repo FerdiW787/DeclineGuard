@@ -9,6 +9,7 @@ import {
   type RecoveryTemplateId,
 } from "../lib/recoveryEmailTemplate";
 import { resolveFromAddress } from "../lib/recoveryEmailFrom";
+import { isResendQuotaError, parseResendError } from "../lib/resendErrors";
 import { safePaymentUpdateUrl } from "../lib/safeUrl";
 
 const sequenceStepValidator = v.union(
@@ -258,6 +259,8 @@ async function runSequenceStep(
     settings?.fromName?.trim() || payload.storeName || "DeclineGuard";
   const from = resolveFromAddress(displayName);
 
+  // Merchant monthly quota is soft overage — never skip Day 0/2/5 here.
+
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -279,12 +282,7 @@ async function runSequenceStep(
     console.error("Resend error", res.status, errText);
 
     const parsed = parseResendError(errText);
-    const isQuotaError =
-      res.status === 429 ||
-      parsed.code === "daily_quota_exceeded" ||
-      parsed.code === "rate_limit_exceeded" ||
-      /quota|rate.?limit/i.test(parsed.message ?? "") ||
-      /quota|rate.?limit/i.test(parsed.code ?? "");
+    const isQuotaError = isResendQuotaError(res.status, parsed);
 
     await ctx.runMutation(internal.functions.recoveries.recordResendQuotaError, {
       failureId,
@@ -328,31 +326,5 @@ function formatMoney(cents: number, currency: string): string {
     }).format(cents / 100);
   } catch {
     return `${(cents / 100).toFixed(2)} ${currency.toUpperCase()}`;
-  }
-}
-
-/**
- * Parse Resend error response body to extract structured error info.
- * Resend errors typically look like: { "statusCode": 429, "message": "...", "name": "rate_limit_exceeded" }
- */
-function parseResendError(body: string): {
-  code: string | undefined;
-  message: string | undefined;
-} {
-  try {
-    const parsed = JSON.parse(body) as Record<string, unknown>;
-    const code =
-      typeof parsed.name === "string"
-        ? parsed.name
-        : typeof parsed.code === "string"
-          ? parsed.code
-          : typeof parsed.error === "string"
-            ? parsed.error
-            : undefined;
-    const message =
-      typeof parsed.message === "string" ? parsed.message : undefined;
-    return { code, message };
-  } catch {
-    return { code: undefined, message: body.slice(0, 200) };
   }
 }

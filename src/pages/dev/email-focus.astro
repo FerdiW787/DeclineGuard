@@ -1,0 +1,12 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import EmailFocusSandbox from "@/components/dev/EmailFocusSandbox";
+---
+
+<Layout
+  theme="light"
+  title="Email focus — DeclineGuard"
+  description="Sandbox for email hover and focus mode."
+>
+  <EmailFocusSandbox client:only="react" />
+</Layout>

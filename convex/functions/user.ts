@@ -89,17 +89,17 @@ export const getCurrentUser = query({
       userName: v.string(),
       userProfilePic: v.union(v.string(), v.null()),
       role: appRoleValidator,
+      /** Read-only billing plan. Merchants cannot self-set this. */
+      plan: planValidator,
+      recoveryFeePercent: v.union(v.literal(10), v.literal(4)),
       accountStatus: v.union(
         v.literal("active"),
         v.literal("frozen"),
         v.literal("disabled"),
       ),
       frozenReason: v.union(v.string(), v.null()),
-      /** Read-only billing plan. Merchants cannot self-set this. */
-      plan: planValidator,
       lsSubscriptionId: v.union(v.string(), v.null()),
       lsSubscriptionStatus: v.union(v.string(), v.null()),
-      recoveryFeePercent: v.union(v.literal(10), v.literal(4)),
     }),
     v.null(),
   ),
@@ -121,12 +121,12 @@ export const getCurrentUser = query({
       userName: user.userName,
       userProfilePic: user.userProfilePic,
       role: normalizeRole(user.role),
-      accountStatus: user.accountStatus ?? "active",
-      frozenReason: user.frozenReason ?? null,
       plan,
       lsSubscriptionId: user.lsSubscriptionId ?? null,
       lsSubscriptionStatus: user.lsSubscriptionStatus ?? null,
       recoveryFeePercent: recoveryFeePercent(plan),
+      accountStatus: user.accountStatus ?? "active",
+      frozenReason: user.frozenReason ?? null,
     };
   },
 });

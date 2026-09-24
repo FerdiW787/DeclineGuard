@@ -33,6 +33,11 @@ type TemplateCopy = {
   blocks?: EmailBlock[];
   linkColor?: string;
   emailPadding?: number;
+  shellBackground?: string;
+  shellBorderColor?: string;
+  shellBorder?: boolean;
+  shellBorderWidth?: number;
+  shellRadius?: number;
 };
 
 /** Merchant-editable fields. Keep in sync with src/lib/recoveryEmailCopy.ts */
@@ -44,6 +49,11 @@ export type EditableEmailCopy = {
   blocks?: EmailBlock[];
   linkColor?: string;
   emailPadding?: number;
+  shellBackground?: string;
+  shellBorderColor?: string;
+  shellBorder?: boolean;
+  shellBorderWidth?: number;
+  shellRadius?: number;
 };
 
 export type EmailCopyOverrides = Partial<
@@ -145,6 +155,16 @@ function resolveCopy(
     linkColor: over.linkColor?.trim() || undefined,
     emailPadding:
       typeof over.emailPadding === "number" ? over.emailPadding : undefined,
+    shellBackground: over.shellBackground?.trim() || undefined,
+    shellBorderColor: over.shellBorderColor?.trim() || undefined,
+    shellBorder:
+      typeof over.shellBorder === "boolean" ? over.shellBorder : undefined,
+    shellBorderWidth:
+      typeof over.shellBorderWidth === "number"
+        ? over.shellBorderWidth
+        : undefined,
+    shellRadius:
+      typeof over.shellRadius === "number" ? over.shellRadius : undefined,
   };
 }
 
@@ -279,6 +299,29 @@ export function buildRecoveryEmail(input: RecoveryEmailVars): {
     copy.linkColor?.trim() ||
     primary;
   const pad = copy.emailPadding ?? 24;
+  const cardBg =
+    copy.shellBackground?.trim() ||
+    (shellBg.toLowerCase() === "#ffffff" ? "#ffffff" : shellBg);
+  const cardBorderOn = copy.shellBorder !== false;
+  const cardBorderColor =
+    copy.shellBorderColor?.trim() || primary;
+  const cardRadius =
+    typeof copy.shellRadius === "number" && Number.isFinite(copy.shellRadius)
+      ? Math.max(0, Math.min(48, Math.round(copy.shellRadius)))
+      : 0;
+  const cardBorderWidth =
+    typeof copy.shellBorderWidth === "number" &&
+    Number.isFinite(copy.shellBorderWidth)
+      ? Math.max(1, Math.min(8, Math.round(copy.shellBorderWidth)))
+      : 1;
+  const cardBox = [
+    `background:${escapeAttr(cardBg)}`,
+    cardBorderOn
+      ? `border:${cardBorderWidth}px solid ${escapeAttr(cardBorderColor)}`
+      : "border:0",
+    `border-radius:${cardRadius}px`,
+    "overflow:hidden",
+  ].join(";");
   const support = input.supportEmail?.trim() || null;
   const supportBlock = support
     ? `Questions or feedback? Drop us a line at
@@ -370,7 +413,7 @@ export function buildRecoveryEmail(input: RecoveryEmailVars): {
     ${fontHeadLinks}
   </head>
   <body style="margin:0;padding:0;background:${escapeAttr(shellBg)};font-family:${escapeAttr(fontFamily)};color:${escapeAttr(shellText)};-webkit-font-smoothing:antialiased;">
-    <div style="max-width:480px;margin:0 auto;padding:40px ${pad}px 48px;">
+    <div style="max-width:480px;margin:0 auto;padding:40px ${pad}px 48px;${cardBox}">
       ${headerHtml}
 
       ${bodySection}

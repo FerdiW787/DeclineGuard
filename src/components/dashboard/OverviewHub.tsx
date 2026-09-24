@@ -43,9 +43,11 @@ type Props = {
   openCount: number;
   openAtRiskLabel: string;
   emailsSentLabel: string;
+  emailsIncludedThisMonth?: number;
   recoveryRateLabel: string;
   feesOwedLabel: string;
   youKeepLabel: string;
+  recoveryFeePercent?: number;
   openFailures: OpenFailureRow[] | undefined;
   recentActivity?: unknown;
   brandColor: string;
@@ -101,9 +103,11 @@ export default function OverviewHub({
   openCount,
   openAtRiskLabel,
   emailsSentLabel,
+  emailsIncludedThisMonth,
   recoveryRateLabel,
   feesOwedLabel,
   youKeepLabel,
+  recoveryFeePercent = 10,
   openFailures,
   emailIsProduction,
   chartRows,
@@ -362,8 +366,8 @@ export default function OverviewHub({
               }
               hint={
                 recoveredThisMonthCents > 0
-                  ? `Fees owed · ${feesOwedLabel}`
-                  : "Free until we recover"
+                  ? `${recoveryFeePercent}% fee · ${feesOwedLabel}`
+                  : `${recoveryFeePercent}% fee after we recover`
               }
             />
             <ScoreStat
@@ -371,7 +375,11 @@ export default function OverviewHub({
               tone="sky"
               label="Emails sent"
               value={emailsSentLabel}
-              hint={monthTrend.label}
+              hint={
+                emailsIncludedThisMonth != null
+                  ? `${emailsSentLabel} / ${emailsIncludedThisMonth}`
+                  : monthTrend.label
+              }
             />
           </div>
         </Panel>

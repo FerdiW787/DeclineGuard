@@ -1,7 +1,12 @@
 import { ArrowRight, Plus } from "lucide-react";
 import { SignedIn, SignedOut } from "@clerk/astro/react";
 import BrandLogo from "@/components/BrandLogo";
-import { formatDeclineAddon, formatUsd, PLANS } from "@/lib/pricing";
+import {
+  ATTRIBUTION_WINDOW_DAYS,
+  formatDeclineAddon,
+  formatUsd,
+  PLANS,
+} from "@/lib/pricing";
 
 export const homeFaqs = [
   {
@@ -10,7 +15,7 @@ export const homeFaqs = [
   },
   {
     q: "When do you take a cut?",
-    a: "Only on Free, and only after DeclineGuard’s sequence has started and the payment comes back. Recover before our first email? You owe nothing. See pricing for details.",
+    a: `After DeclineGuard’s sequence has started and the payment comes back within ${ATTRIBUTION_WINDOW_DAYS} days of the first recovery email. Recover before our first email, or after that window? You owe nothing. Free is 10%, Pro is 4%.`,
   },
   {
     q: "Do you ever see card numbers?",

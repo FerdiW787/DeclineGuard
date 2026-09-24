@@ -131,7 +131,7 @@ export default function SegmentedControl<T extends string>({
               }}
               onClick={() => onChange(item.id)}
               className={cn(
-                "relative cursor-pointer rounded-md px-3 py-1.5 text-[12px] font-semibold tracking-[-0.01em] outline-none transition-colors duration-300 ease-out focus:outline-none focus-visible:outline-none",
+                "relative cursor-pointer rounded-md px-3 py-1.5 text-[12px] font-semibold tracking-[-0.01em] outline-none transition-colors duration-300 ease-out focus:outline-none focus-visible:outline-none max-lg:min-h-11 max-lg:py-2",
                 equal && "flex-1",
                 active
                   ? "text-black dark:text-[#f7f8f8]"

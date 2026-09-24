@@ -19,8 +19,14 @@ import {
   resolveProductUserOrNull,
   resolvePlan,
   recoveryFeeRate,
+  recoveryFeePercent,
+  isWithinAttributionWindow,
+  ATTRIBUTION_WINDOW_DAYS,
+  includedRecoveryEmails,
+  emailOveragePacks,
+  EMAIL_OVERAGE_PACK_PRICE_USD,
 } from "../lib/accountGuard";
-import { recoveryActionValidator } from "../schema";
+import { planValidator, recoveryActionValidator } from "../schema";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -39,6 +45,8 @@ export function computeRecoveryAction(attemptIndex: number): RecoveryAction {
 }
 
 function isFastSequence(): boolean {
+  const deployment = process.env.CONVEX_DEPLOYMENT ?? "";
+  if (deployment.startsWith("prod:")) return false;
   return (
     process.env.RECOVERY_SEQUENCE_FAST === "1" ||
     process.env.RECOVERY_SEQUENCE_FAST === "true"
@@ -877,9 +885,15 @@ export const markPaymentRecovered = internalMutation({
     });
 
     const amountLabel = formatMoney(args.amountCents, args.currency);
-    const recoveryDetail = open.day0SentAt != null
-      ? `${amountLabel} · Recovered after our sequence started`
-      : `${amountLabel} · Lemon Squeezy recovered before our sequence`;
+    const attributed =
+      open.day0SentAt != null &&
+      isWithinAttributionWindow(open.day0SentAt, args.recoveredAt);
+    const recoveryDetail =
+      open.day0SentAt == null
+        ? `${amountLabel} · Lemon Squeezy recovered before our sequence`
+        : attributed
+          ? `${amountLabel} · Recovered after our sequence started`
+          : `${amountLabel} · Recovered after the ${ATTRIBUTION_WINDOW_DAYS}-day attribution window`;
 
     await ctx.db.insert("activityEvents", {
       userId: args.userId,
@@ -897,10 +911,10 @@ export const markPaymentRecovered = internalMutation({
     // Plan-aware recovery fee ledger:
     // - Skip test-mode recoveries
     // - Skip if no recovery email was ever sent (day0SentAt null = LS recovered on its own)
+    // - Skip if recovered after the attribution window
     // - Fee rate: Free = 10%, Pro = 4%
     // - Idempotent via by_failure index
-    // NOTE: RECOVERY_SEQUENCE_FAST env var is an ops change on Convex prod, not code.
-    if (!open.testMode && open.day0SentAt != null) {
+    if (!open.testMode && attributed) {
       const existingFee = await ctx.db
         .query("recoveryFees")
         .withIndex("by_failure", (q) => q.eq("failureId", open._id))
@@ -1300,6 +1314,70 @@ export const getRecoverySummary = query({
       recoveryRatePercent,
       emailsSentThisMonth,
       displayCurrency,
+    };
+  },
+});
+
+const EMAIL_QUOTA_SCAN_LIMIT = 2000;
+
+/** Monthly recovery-email quota (soft overage — never blocks a sequence). */
+export const getEmailQuotaStatus = query({
+  args: { monthStartMs: v.number() },
+  returns: v.object({
+    plan: planValidator,
+    sent: v.number(),
+    included: v.number(),
+    remaining: v.number(),
+    overageEmails: v.number(),
+    overagePacks: v.number(),
+    overageUsd: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const empty = (plan: "free" | "pro") => {
+      const included = includedRecoveryEmails(plan);
+      return {
+        plan,
+        sent: 0,
+        included,
+        remaining: included,
+        overageEmails: 0,
+        overagePacks: 0,
+        overageUsd: 0,
+      };
+    };
+
+    const user = await requireUser(ctx);
+    if (!user) return empty("free");
+
+    const plan = resolvePlan(user);
+    const included = includedRecoveryEmails(plan);
+    const rows = (
+      await ctx.db
+        .query("activityEvents")
+        .withIndex("by_user_type_occurred", (q) =>
+          q.eq("userId", user._id).eq("type", "email_sent"),
+        )
+        .order("desc")
+        .take(EMAIL_QUOTA_SCAN_LIMIT)
+    ).filter((row) => row.deletedAt == null);
+
+    let sent = 0;
+    for (const row of rows) {
+      if (row.occurredAt < args.monthStartMs) break;
+      sent += 1;
+    }
+
+    const remaining = Math.max(0, included - sent);
+    const overageEmails = Math.max(0, sent - included);
+    const overagePacks = emailOveragePacks(sent, plan);
+    return {
+      plan,
+      sent,
+      included,
+      remaining,
+      overageEmails,
+      overagePacks,
+      overageUsd: overagePacks * EMAIL_OVERAGE_PACK_PRICE_USD,
     };
   },
 });
@@ -1728,7 +1806,7 @@ export const listActivityCustomerEmails = query({
   },
 });
 
-/** Free-tier fee ledger summary for Overview / Settings. */
+/** Fee ledger summary for Overview / Settings (product user, including takeover). */
 export const getFeesSummary = query({
   args: { monthStartMs: v.number() },
   returns: v.object({
@@ -1737,6 +1815,8 @@ export const getFeesSummary = query({
     owedCount: v.number(),
     currency: v.union(v.string(), v.null()),
     currencyMixed: v.boolean(),
+    plan: planValidator,
+    recoveryFeePercent: v.number(),
   }),
   handler: async (ctx, args) => {
     const empty = {
@@ -1745,9 +1825,12 @@ export const getFeesSummary = query({
       owedCount: 0,
       currency: null as string | null,
       currencyMixed: false,
+      plan: "free" as const,
+      recoveryFeePercent: recoveryFeePercent("free"),
     };
     const user = await requireUser(ctx);
     if (!user) return empty;
+    const plan = resolvePlan(user);
 
     const rows = await ctx.db
       .query("recoveryFees")
@@ -1784,6 +1867,8 @@ export const getFeesSummary = query({
       owedCount: owed.length,
       currency,
       currencyMixed: byCurrency.size > 1,
+      plan,
+      recoveryFeePercent: recoveryFeePercent(plan),
     };
   },
 });
@@ -2075,7 +2160,10 @@ export const adminListFeesForUser = query({
     }),
   ),
   handler: async (ctx, args) => {
-    await requireStaff(ctx);
+    const actor = await requireStaff(ctx);
+    const targetUser = await ctx.db.get(args.userId);
+    if (!targetUser) throw new Error("User not found");
+    assertCanActOnTarget(actor, targetUser);
 
     const limit = Math.min(Math.max(args.limit ?? 100, 1), 500);
     const rows = await ctx.db

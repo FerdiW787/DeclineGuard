@@ -303,6 +303,41 @@ html:not(.show-scrollbar) *::-webkit-scrollbar {
   animation: dg-menu-in 140ms ease-out;
 }
 
+@keyframes dg-format-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.dg-format-in {
+  animation: dg-format-in 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes dg-island-in-side {
+  from {
+    opacity: 0;
+    transform: translateX(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.dg-island-in-side {
+  animation: dg-island-in-side 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dg-email-rich a {
+  color: var(--dg-email-link, #2563eb);
+  text-decoration: underline;
+}
+
 @keyframes dg-float-in-right {
   from {
     opacity: 0;

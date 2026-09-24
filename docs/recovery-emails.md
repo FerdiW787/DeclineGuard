@@ -68,6 +68,8 @@ DeclineGuard stores each Resend message id and updates delivery status when Rese
 
 ```bash
 npx convex env set RESEND_WEBHOOK_SECRET "whsec_xxxxxxxx"
+# Optional rotation overlap:
+# npx convex env set RESEND_WEBHOOK_SECRET_PREVIOUS "whsec_old"
 ```
 
 Optional previous secret for zero-downtime rotation (`RESEND_WEBHOOK_SECRET_PREVIOUS`): set the new secret as current, keep the old as previous, update Resend, then remove previous after retries settle. See `.env.example`.
