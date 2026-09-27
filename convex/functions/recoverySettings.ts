@@ -49,6 +49,7 @@ import {
   stylingModeValidator,
   LIFECYCLE_EMAIL_TYPES,
 } from "../lib/emailTheme";
+import { buildLifecycleEmail } from "../lib/lifecycleEmailTemplate";
 import { requireStaff } from "../lib/admin";
 import { consumeRateLimit } from "../lib/rateLimit";
 import { assertStorageOwnedByUser } from "../lib/storageOwnership";
@@ -1192,40 +1193,105 @@ export const getEmailTheme = query({
  * Jules: resolve the shared theme for one MVP lifecycle type.
  * Same layout + tokens as getEmailTheme — type is for bind/preview only.
  */
+const lifecycleEmailPreviewValidator = v.object({
+  emailType: lifecycleEmailTypeValidator,
+  stylingMode: stylingModeValidator,
+  layoutPresetId: v.string(),
+  tokens: emailThemeTokensValidator,
+  subject: v.string(),
+  html: v.string(),
+  text: v.string(),
+});
+
+async function lifecyclePreviewContext(
+  ctx: QueryCtx,
+  userId: Doc<"users">["_id"],
+) {
+  const row = await ctx.db
+    .query("recoverySettings")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
+  const mapped = row && !isSoftDeleted(row) ? mapSettings(row) : null;
+  const connection = await ctx.db
+    .query("lemonConnections")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
+  const storeName =
+    connection && !isSoftDeleted(connection)
+      ? connection.storeName
+      : mapped?.fromName?.trim() || "Your store";
+  const themeInput = {
+    stylingMode: mapped?.stylingMode,
+    layoutPresetId: mapped?.layoutPresetId,
+    configured: configuredTokensFromSettings(mapped),
+  };
+  return {
+    mapped,
+    storeName,
+    themeInput,
+    supportEmail: mapped?.supportEmail ?? mapped?.replyToEmail ?? null,
+  };
+}
+
+function lifecyclePreviewPayload(
+  emailType: (typeof LIFECYCLE_EMAIL_TYPES)[number],
+  ctx: {
+    storeName: string;
+    supportEmail: string | null;
+    themeInput: {
+      stylingMode?: string | null;
+      layoutPresetId?: string | null;
+      configured: ReturnType<typeof configuredTokensFromSettings>;
+    };
+  },
+) {
+  const theme = resolveLifecycleEmailTheme(emailType, ctx.themeInput);
+  const built = buildLifecycleEmail({
+    emailType,
+    storeName: ctx.storeName,
+    productName: "your subscription",
+    amountLabel: "your plan",
+    customerName: null,
+    ctaUrl: "#",
+    supportEmail: ctx.supportEmail,
+    theme,
+  });
+  return {
+    emailType: theme.emailType,
+    stylingMode: theme.stylingMode,
+    layoutPresetId: theme.layoutPresetId,
+    tokens: theme.tokens,
+    subject: built.subject,
+    html: built.html,
+    text: built.text,
+  };
+}
+
 export const getLifecycleEmailTheme = query({
   args: { emailType: lifecycleEmailTypeValidator },
-  returns: v.union(
-    v.object({
-      emailType: lifecycleEmailTypeValidator,
-      stylingMode: stylingModeValidator,
-      layoutPresetId: v.string(),
-      tokens: emailThemeTokensValidator,
-    }),
-    v.null(),
-  ),
+  returns: v.union(lifecycleEmailPreviewValidator, v.null()),
   handler: async (ctx, args) => {
     if (!isLifecycleEmailType(args.emailType)) {
       throw new Error("Unknown lifecycle email type");
     }
     const user = await resolveProductUserOrNull(ctx);
     if (!user) return null;
+    const previewCtx = await lifecyclePreviewContext(ctx, user._id);
+    return lifecyclePreviewPayload(args.emailType, previewCtx);
+  },
+});
 
-    const row = await ctx.db
-      .query("recoverySettings")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .unique();
-    const mapped = row && !isSoftDeleted(row) ? mapSettings(row) : null;
-    const theme = resolveLifecycleEmailTheme(args.emailType, {
-      stylingMode: mapped?.stylingMode,
-      layoutPresetId: mapped?.layoutPresetId,
-      configured: configuredTokensFromSettings(mapped),
-    });
-    return {
-      emailType: theme.emailType,
-      stylingMode: theme.stylingMode,
-      layoutPresetId: theme.layoutPresetId,
-      tokens: theme.tokens,
-    };
+/** Jules: all five MVP lifecycle types, same global theme + stub send bodies. */
+export const getLifecycleEmailPreviews = query({
+  args: {},
+  returns: v.union(v.array(lifecycleEmailPreviewValidator), v.null()),
+  handler: async (ctx) => {
+    const user = await resolveProductUserOrNull(ctx);
+    if (!user) return null;
+    const previewCtx = await lifecyclePreviewContext(ctx, user._id);
+    return LIFECYCLE_EMAIL_TYPES.map((emailType) =>
+      lifecyclePreviewPayload(emailType, previewCtx),
+    );
   },
 });
 
