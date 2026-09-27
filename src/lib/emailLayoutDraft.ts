@@ -1,22 +1,23 @@
 import {
   DEFAULT_LAYOUT_PRESET_ID,
   DEFAULT_STYLING_MODE,
+  RECOVERY_DAY_IDS,
   isStylingMode,
   resolveLayoutPresetId,
-  LIFECYCLE_EMAIL_TYPES,
   type LayoutPresetId,
-  type LifecycleEmailType,
+  type RecoveryDayId,
   type StylingMode,
 } from "./emailLayoutPresets";
 import type { EmailCopyOverride, EmailLayoutCopyOverrides } from "./emailLayoutCopy";
 import type { EmailThemeTokens } from "./emailTheme";
 
-const STORAGE_KEY = "dg.emailLayoutDraft.v1";
+const STORAGE_KEY = "dg.emailLayoutDraft.v2";
 
 /**
- * Riley-shaped FE draft. recoverySettings will store stylingMode +
- * layoutPresetId (default quiet-verify) when Convex tips; until then
- * this stays in localStorage.
+ * FE draft for the global recovery-layout pick.
+ * `stylingMode` + BE-mapped `layoutPresetId` persist via
+ * `setStylingMode` / `setLayoutPresetId`. Riley currently only
+ * accepts `quiet-verify` — see `toBackendLayoutPresetId`.
  */
 export type EmailLayoutDraft = {
   stylingMode: StylingMode;
@@ -44,9 +45,9 @@ function sanitizeCopyOverrides(
 ): EmailLayoutCopyOverrides {
   if (!raw || typeof raw !== "object") return {};
   const out: EmailLayoutCopyOverrides = {};
-  for (const type of LIFECYCLE_EMAIL_TYPES) {
-    if (!(type in raw)) continue;
-    const entry = (raw as Record<string, unknown>)[type];
+  for (const day of RECOVERY_DAY_IDS) {
+    if (!(day in raw)) continue;
+    const entry = (raw as Record<string, unknown>)[day];
     if (!entry || typeof entry !== "object") continue;
     const rec = entry as Record<string, unknown>;
     const next: EmailCopyOverride = {};
@@ -56,7 +57,7 @@ function sanitizeCopyOverrides(
     if (typeof rec.secondaryLink === "string") {
       next.secondaryLink = rec.secondaryLink;
     }
-    if (Object.keys(next).length > 0) out[type] = next;
+    if (Object.keys(next).length > 0) out[day] = next;
   }
   return out;
 }
@@ -127,9 +128,9 @@ export type PersistableEmailLayoutFields = {
 /**
  * Thin persist adapter.
  *
- * Writes the Riley-shaped draft to localStorage. Color fields that
+ * Writes the recovery-layout draft to localStorage. Color fields that
  * `saveEmailCustomizations` already accepts are returned for the live
- * save path. `stylingMode` + `layoutPresetId` persist via
+ * save path. `stylingMode` + BE-mapped `layoutPresetId` persist via
  * `setStylingMode` / `setLayoutPresetId` when those refs exist.
  */
 export function persistEmailLayoutSettings(input: {
@@ -166,18 +167,18 @@ export function persistEmailLayoutSettings(input: {
       shellOverrides: input.draft.shellOverrides,
     },
     convexGap: [
-      "layoutPresetId",
+      "layoutPresetId (FE recovery-layout id; BE only accepts quiet-verify)",
       "stylingMode",
-      "copyOverrides (lifecycle short copy)",
+      "copyOverrides (recovery Day 0 / 2 / 5 short copy)",
       "emailBackgroundColor",
       "emailTextColor",
     ],
   };
 }
 
-export function copyOverrideForType(
+export function copyOverrideForDay(
   draft: EmailLayoutDraft,
-  emailType: LifecycleEmailType,
+  recoveryDay: RecoveryDayId,
 ): EmailCopyOverride | undefined {
-  return draft.copyOverrides[emailType];
+  return draft.copyOverrides[recoveryDay];
 }

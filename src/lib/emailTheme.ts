@@ -1,7 +1,17 @@
 /**
- * Thin FE mirror of Riley’s public API (`convex/lib/emailTheme.ts` @ d87c049).
- * After that branch merges to `dev`, re-export from convex/lib/emailTheme.
- * Do not import Convex validators here.
+ * FE email theme + recovery-layout catalog.
+ *
+ * Token / resolveTheme contract still mirrors Riley (`convex/lib/emailTheme.ts`).
+ * `layoutPresetId` on the FE is a **recovery-layout template id** (structure),
+ * not a lifecycle email type. Riley’s catalog currently only accepts
+ * `quiet-verify` — map through `toBackendLayoutPresetId` before Convex writes.
+ *
+ * Recovery-layout id ↔ reference structure (visual only; no third-party brands):
+ *   calm-verify       → 01-sonos-verify-your-email.png
+ *   account-expired   → 02-nordvpn-your-account-has-expired.png
+ *   trial-ended       → 03-avocode-trial-ended.png
+ *   upcoming-renewal  → 04-fontbase-upcoming-renewal.png
+ *   data-safe         → 05-benchmark-dont-worry-your-data-is-safe.png
  */
 
 import {
@@ -13,22 +23,34 @@ import {
 export const STYLING_MODES = ["preset", "configured"] as const;
 export type StylingMode = (typeof STYLING_MODES)[number];
 
-export const QUIET_VERIFY_LAYOUT_ID = "quiet-verify";
+/**
+ * Only id Riley’s `assertKnownLayoutPresetId` accepts today.
+ * Do not show this string as product language.
+ */
+export const BE_LAYOUT_PRESET_ID = "quiet-verify";
+
+/** @deprecated BE-only id. Use CALM_VERIFY_LAYOUT_ID in product UI. */
+export const QUIET_VERIFY_LAYOUT_ID = BE_LAYOUT_PRESET_ID;
+
+export const CALM_VERIFY_LAYOUT_ID = "calm-verify";
 
 export const LAYOUT_PRESET_IDS = [
-  "quiet-verify",
-  "soft-expire",
-  "safe-pause",
-  "soft-renew",
-  "alert-expire",
+  "calm-verify",
+  "account-expired",
+  "trial-ended",
+  "upcoming-renewal",
+  "data-safe",
 ] as const;
 
 export type LayoutPresetId = (typeof LAYOUT_PRESET_IDS)[number];
 
-export const DEFAULT_LAYOUT_PRESET_ID: LayoutPresetId = QUIET_VERIFY_LAYOUT_ID;
+export const DEFAULT_LAYOUT_PRESET_ID: LayoutPresetId = CALM_VERIFY_LAYOUT_ID;
 export const DEFAULT_STYLING_MODE: StylingMode = "preset";
 
-/** MVP lifecycle emails — same layout via the single global layoutPresetId. */
+/**
+ * Riley preview-query types — not a product email catalog.
+ * Do not surface these as picker labels or preview switcher options.
+ */
 export const LIFECYCLE_EMAIL_TYPES = [
   "verify",
   "decline_pause",
@@ -42,7 +64,7 @@ export type LifecycleEmailType = (typeof LIFECYCLE_EMAIL_TYPES)[number];
 export const DEFAULT_LIFECYCLE_EMAIL_TYPE: LifecycleEmailType = "verify";
 
 /**
- * Visual tokens applied to lifecycle + recovery emails.
+ * Visual tokens applied to recovery emails.
  * Field names match persisted BrandKit / recoverySettings columns.
  */
 export type EmailThemeTokens = {
@@ -61,23 +83,6 @@ export type EmailThemeTokens = {
   fontFamilyRaw: string | null;
 };
 
-/** Quiet Verify — muted, trustworthy verify aesthetic (Riley catalog). */
-export const QUIET_VERIFY_TOKENS: EmailThemeTokens = {
-  brandColor: "#3d5248",
-  secondaryColor: "#7a756c",
-  mutedTextColor: "#7a756c",
-  linkColor: "#3d5248",
-  pageBackgroundColor: "#f6f4f0",
-  pageTextColor: "#2c2a26",
-  emailBackgroundColor: "#f6f4f0",
-  emailTextColor: "#2c2a26",
-  ctaBackgroundColor: "#3d5248",
-  ctaTextColor: "#f7f6f3",
-  ctaBorderRadiusPx: 8,
-  emailFont: "georgia",
-  fontFamilyRaw: null,
-};
-
 function layoutTokens(
   partial: Omit<EmailThemeTokens, "fontFamilyRaw" | "emailFont"> & {
     emailFont?: EmailFontId;
@@ -90,6 +95,24 @@ function layoutTokens(
   };
 }
 
+/** Default recovery-layout tokens (calm-verify / Sonos-structure). */
+export const CALM_VERIFY_TOKENS: EmailThemeTokens = layoutTokens({
+  brandColor: "#0c0c0c",
+  secondaryColor: "#6b6b70",
+  mutedTextColor: "#6b6b70",
+  linkColor: "#0c0c0c",
+  pageBackgroundColor: "#f4f4f4",
+  pageTextColor: "#0c0c0c",
+  emailBackgroundColor: "#ffffff",
+  emailTextColor: "#0c0c0c",
+  ctaBackgroundColor: "#0c0c0c",
+  ctaTextColor: "#ffffff",
+  ctaBorderRadiusPx: 999,
+});
+
+/** Alias for older FE imports — same tokens as calm-verify. */
+export const QUIET_VERIFY_TOKENS = CALM_VERIFY_TOKENS;
+
 export type LayoutPreset = {
   id: string;
   name: string;
@@ -98,82 +121,81 @@ export type LayoutPreset = {
 };
 
 export const LAYOUT_PRESET_CATALOG: Record<string, LayoutPreset> = {
-  [QUIET_VERIFY_LAYOUT_ID]: {
-    id: QUIET_VERIFY_LAYOUT_ID,
-    name: "Quiet Verify",
-    description:
-      "Muted, trustworthy verify layout for all lifecycle emails (verify, decline/pause, trial ended, renewal, expiry).",
-    tokens: QUIET_VERIFY_TOKENS,
+  "calm-verify": {
+    id: "calm-verify",
+    name: "Calm verify",
+    description: "Centered wordmark, hero, pill CTA.",
+    tokens: CALM_VERIFY_TOKENS,
   },
-  "soft-expire": {
-    id: "soft-expire",
-    name: "Soft Expire",
-    description: "What’s ending, then a calm restore.",
+  "account-expired": {
+    id: "account-expired",
+    name: "Account expired",
+    description: "Header bar, dark hero, rounded CTA.",
     tokens: layoutTokens({
-      brandColor: "#111827",
+      brandColor: "#0c0c0c",
+      secondaryColor: "#6b6b70",
+      mutedTextColor: "#5c5c5c",
+      linkColor: "#0c0c0c",
+      pageBackgroundColor: "#f4f4f4",
+      pageTextColor: "#0c0c0c",
+      emailBackgroundColor: "#ffffff",
+      emailTextColor: "#0c0c0c",
+      ctaBackgroundColor: "#ff5a6a",
+      ctaTextColor: "#ffffff",
+      ctaBorderRadiusPx: 24,
+    }),
+  },
+  "trial-ended": {
+    id: "trial-ended",
+    name: "Trial ended",
+    description: "Centered icon, compact card, pill CTA.",
+    tokens: layoutTokens({
+      brandColor: "#2563eb",
       secondaryColor: "#6b7280",
       mutedTextColor: "#6b7280",
-      linkColor: "#374151",
-      pageBackgroundColor: "#f4f5f7",
+      linkColor: "#2563eb",
+      pageBackgroundColor: "#f3f4f6",
       pageTextColor: "#111827",
-      emailBackgroundColor: "#f4f5f7",
+      emailBackgroundColor: "#ffffff",
       emailTextColor: "#111827",
-      ctaBackgroundColor: "#1f2937",
-      ctaTextColor: "#f9fafb",
-      ctaBorderRadiusPx: 10,
+      ctaBackgroundColor: "#2563eb",
+      ctaTextColor: "#ffffff",
+      ctaBorderRadiusPx: 999,
     }),
   },
-  "safe-pause": {
-    id: "safe-pause",
-    name: "Safe Pause",
-    description: "Paused — data stays, resume when ready.",
+  "upcoming-renewal": {
+    id: "upcoming-renewal",
+    name: "Upcoming renewal",
+    description: "Dark frame, date lockup, centered type.",
     tokens: layoutTokens({
-      brandColor: "#2f3a2a",
-      secondaryColor: "#6b7264",
-      mutedTextColor: "#6b7264",
-      linkColor: "#3f4a38",
-      pageBackgroundColor: "#f6f7f4",
-      pageTextColor: "#1a1f16",
-      emailBackgroundColor: "#f6f7f4",
-      emailTextColor: "#1a1f16",
-      ctaBackgroundColor: "#2f3a2a",
-      ctaTextColor: "#f7f8f5",
-      ctaBorderRadiusPx: 12,
-    }),
-  },
-  "soft-renew": {
-    id: "soft-renew",
-    name: "Soft Renew",
-    description: "Upcoming renewal, what’s included.",
-    tokens: layoutTokens({
-      brandColor: "#3f3a33",
-      secondaryColor: "#7c746a",
-      mutedTextColor: "#7c746a",
-      linkColor: "#4a433b",
-      pageBackgroundColor: "#faf8f5",
-      pageTextColor: "#1c1917",
-      emailBackgroundColor: "#faf8f5",
-      emailTextColor: "#1c1917",
-      ctaBackgroundColor: "#3f3a33",
-      ctaTextColor: "#faf8f5",
+      brandColor: "#0c0c0c",
+      secondaryColor: "#6b6b70",
+      mutedTextColor: "#52525b",
+      linkColor: "#2563eb",
+      pageBackgroundColor: "#111111",
+      pageTextColor: "#fafafa",
+      emailBackgroundColor: "#ffffff",
+      emailTextColor: "#0c0c0c",
+      ctaBackgroundColor: "#0c0c0c",
+      ctaTextColor: "#ffffff",
       ctaBorderRadiusPx: 8,
     }),
   },
-  "alert-expire": {
-    id: "alert-expire",
-    name: "Alert Expire",
-    description: "Accent bar, what happens next.",
+  "data-safe": {
+    id: "data-safe",
+    name: "Data safe",
+    description: "Greeting, two help cards, P.S.",
     tokens: layoutTokens({
-      brandColor: "#18181b",
-      secondaryColor: "#71717a",
-      mutedTextColor: "#71717a",
-      linkColor: "#3f3f46",
+      brandColor: "#2563eb",
+      secondaryColor: "#6b7280",
+      mutedTextColor: "#52525b",
+      linkColor: "#2563eb",
       pageBackgroundColor: "#ffffff",
-      pageTextColor: "#18181b",
+      pageTextColor: "#0c0c0c",
       emailBackgroundColor: "#ffffff",
-      emailTextColor: "#18181b",
-      ctaBackgroundColor: "#18181b",
-      ctaTextColor: "#fafafa",
+      emailTextColor: "#0c0c0c",
+      ctaBackgroundColor: "#2563eb",
+      ctaTextColor: "#ffffff",
       ctaBorderRadiusPx: 8,
     }),
   },
@@ -181,7 +203,7 @@ export const LAYOUT_PRESET_CATALOG: Record<string, LayoutPreset> = {
 
 export const NEW_MERCHANT_THEME_DEFAULTS = {
   stylingMode: "preset" as const,
-  layoutPresetId: QUIET_VERIFY_LAYOUT_ID,
+  layoutPresetId: DEFAULT_LAYOUT_PRESET_ID,
 };
 
 export type ResolveThemeInput = {
@@ -201,13 +223,45 @@ export type RecoverySettingsLayoutFields = {
   layoutPresetId: string;
 };
 
+/**
+ * Old FE catalog + snake_case drafts → recovery-layout ids.
+ * `quiet-verify` is also the current BE write target.
+ */
 const LEGACY_LAYOUT_PRESET_IDS: Record<string, LayoutPresetId> = {
-  quiet_verify: "quiet-verify",
-  soft_expire: "soft-expire",
-  safe_pause: "safe-pause",
-  soft_renew: "soft-renew",
-  alert_expire: "alert-expire",
+  "quiet-verify": "calm-verify",
+  quiet_verify: "calm-verify",
+  "soft-expire": "account-expired",
+  soft_expire: "account-expired",
+  "safe-pause": "data-safe",
+  safe_pause: "data-safe",
+  "soft-renew": "upcoming-renewal",
+  soft_renew: "upcoming-renewal",
+  "alert-expire": "trial-ended",
+  alert_expire: "trial-ended",
 };
+
+/** Persist any FE recovery-layout id as the only BE-known catalog id. */
+export function toBackendLayoutPresetId(
+  _layoutPresetId: string | null | undefined,
+): string {
+  return BE_LAYOUT_PRESET_ID;
+}
+
+/**
+ * Read a BE/local id into a FE recovery-layout id.
+ * When BE returns only `quiet-verify`, keep a valid local FE selection.
+ */
+export function fromBackendLayoutPresetId(
+  backendId: string | null | undefined,
+  localFeId?: string | null,
+): LayoutPresetId {
+  const local = localFeId ? resolveLayoutPresetId(localFeId) : null;
+  const raw = backendId?.trim() ?? "";
+  if (!raw || raw === BE_LAYOUT_PRESET_ID || raw === "quiet-verify") {
+    return local ?? DEFAULT_LAYOUT_PRESET_ID;
+  }
+  return resolveLayoutPresetId(raw);
+}
 
 export function isStylingMode(value: unknown): value is StylingMode {
   return value === "preset" || value === "configured";
@@ -239,7 +293,7 @@ export function normalizeLayoutPresetId(
   const raw = value?.trim() ?? "";
   const id = LEGACY_LAYOUT_PRESET_IDS[raw] ?? raw;
   if (id && LAYOUT_PRESET_CATALOG[id]) return id;
-  return QUIET_VERIFY_LAYOUT_ID;
+  return DEFAULT_LAYOUT_PRESET_ID;
 }
 
 export function resolveLayoutPresetId(id: string): LayoutPresetId {
@@ -252,7 +306,7 @@ export function resolveLayoutPresetId(id: string): LayoutPresetId {
 export function getLayoutPreset(layoutPresetId: string): LayoutPreset {
   const id = normalizeLayoutPresetId(layoutPresetId);
   return (
-    LAYOUT_PRESET_CATALOG[id] ?? LAYOUT_PRESET_CATALOG[QUIET_VERIFY_LAYOUT_ID]!
+    LAYOUT_PRESET_CATALOG[id] ?? LAYOUT_PRESET_CATALOG[DEFAULT_LAYOUT_PRESET_ID]!
   );
 }
 

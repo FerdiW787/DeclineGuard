@@ -1,7 +1,7 @@
 /**
- * Compatibility barrel — Riley’s live export is mirrored in `emailTheme.ts`.
- * After `cursor/lifecycle-email-theme-2f33` merges to `dev`, switch to
- * `convex/lib/emailTheme`.
+ * Compatibility barrel — Riley token/resolveTheme API is mirrored in
+ * `emailTheme.ts`. FE `layoutPresetId` is a recovery-layout template id;
+ * BE writes still map to `quiet-verify` via `toBackendLayoutPresetId`.
  */
 
 export {
@@ -11,8 +11,13 @@ export {
   LAYOUT_PRESET_IDS,
   LIFECYCLE_EMAIL_TYPES,
   NEW_MERCHANT_THEME_DEFAULTS,
+  BE_LAYOUT_PRESET_ID,
+  CALM_VERIFY_LAYOUT_ID,
+  CALM_VERIFY_TOKENS,
   QUIET_VERIFY_LAYOUT_ID,
   QUIET_VERIFY_TOKENS,
+  fromBackendLayoutPresetId,
+  toBackendLayoutPresetId,
   assertKnownLayoutPresetId,
   configuredTokensFromSettings,
   getLayoutPreset,

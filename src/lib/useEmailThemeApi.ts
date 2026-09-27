@@ -7,7 +7,11 @@ import {
   type EmailThemeSettings,
   type LifecycleEmailPreview,
 } from "./emailThemeApi";
-import type { LifecycleEmailType, StylingMode } from "./emailTheme";
+import {
+  toBackendLayoutPresetId,
+  type LifecycleEmailType,
+  type StylingMode,
+} from "./emailTheme";
 
 /**
  * Optional Convex hooks. Safe when Riley’s functions are not generated yet
@@ -72,7 +76,10 @@ export function useSetLayoutPresetId() {
       const ref = emailThemeRefs.setLayoutPresetId();
       if (!ref) return null;
       try {
-        return await convex.mutation(ref, { layoutPresetId });
+        // Riley catalog currently only accepts quiet-verify.
+        return await convex.mutation(ref, {
+          layoutPresetId: toBackendLayoutPresetId(layoutPresetId),
+        });
       } catch {
         return null;
       }

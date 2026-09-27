@@ -603,8 +603,8 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
               Recovery sequence
             </p>
             <p className="mt-1 text-[13px] text-[#6b6f76]">
-              Gentle, Direct, and Urgent still send on day 0, 2, and 5. Layout
-              above is shared by every lifecycle email.
+              Gentle, Direct, and Urgent still send on day 0, 2, and 5. The
+              layout above styles all three recovery emails.
             </p>
           </div>
         ) : null}
