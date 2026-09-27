@@ -127,10 +127,10 @@ export type PersistableEmailLayoutFields = {
 /**
  * Thin persist adapter.
  *
- * Writes the Riley-shaped draft to localStorage. Returns only fields the
- * live Convex mutation already accepts. Riley will persist
- * `stylingMode` + `layoutPresetId` (default quiet-verify) on
- * recoverySettings; until then those stay local-only.
+ * Writes the Riley-shaped draft to localStorage. Color fields that
+ * `saveEmailCustomizations` already accepts are returned for the live
+ * save path. `stylingMode` + `layoutPresetId` persist via
+ * `setStylingMode` / `setLayoutPresetId` when those refs exist.
  */
 export function persistEmailLayoutSettings(input: {
   draft: EmailLayoutDraft;

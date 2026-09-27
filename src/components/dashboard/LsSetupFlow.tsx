@@ -24,6 +24,11 @@ import {
   loadEmailLayoutDraft,
   persistEmailLayoutSettings,
 } from "@/lib/emailLayoutDraft";
+import {
+  useEmailThemeQuery,
+  useImportBrandFromStorefront,
+  usePersistEmailTheme,
+} from "@/lib/useEmailThemeApi";
 import { applyClerkDisplayName } from "@/components/auth/clerkDisplayName";
 import {
   AuthBrandMark,
@@ -144,9 +149,9 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
   const saveRecoverySettings = useMutation(
     api.functions.recoverySettings.saveSettings,
   );
-  const importBrand = useAction(
-    api.functions.brandImportActions.importBrandFromDomain,
-  );
+  const importBrand = useImportBrandFromStorefront();
+  const persistEmailTheme = usePersistEmailTheme();
+  const emailTheme = useEmailThemeQuery();
   const completeBrandImport = useMutation(
     api.functions.recoverySettings.completeBrandImport,
   );
@@ -480,7 +485,6 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
         ctaTextColor: brandKit.ctaTextColor,
         ctaBorderRadiusPx: brandKit.ctaBorderRadiusPx,
         emailFont: brandKit.emailFont,
-        logoUrl: brandKit.storeLogoUrl,
       });
       if (preview) {
         await delay(500);
@@ -518,10 +522,17 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
   }, [brandKit, brandPhase, completeBrandImport, preview]);
 
   const finishLayout = useCallback(async () => {
+    const draft = loadEmailLayoutDraft();
     persistEmailLayoutSettings({
-      draft: loadEmailLayoutDraft(),
+      draft,
       configured: layoutConfigured,
     });
+    if (!preview) {
+      await persistEmailTheme({
+        stylingMode: draft.stylingMode,
+        layoutPresetId: draft.layoutPresetId,
+      });
+    }
     if (
       !preview &&
       layoutConfigured.brandColor &&
@@ -539,7 +550,7 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
       }
     }
     setStep("done");
-  }, [layoutConfigured, preview, saveEmailColors]);
+  }, [layoutConfigured, persistEmailTheme, preview, saveEmailColors]);
 
   const failVerifyBackToWebhook = useCallback(() => {
     if (verifyFailHandledRef.current) return;
@@ -1340,6 +1351,15 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                           null
                         }
                         configured={layoutConfigured}
+                        onPersistTheme={persistEmailTheme}
+                        serverTheme={
+                          emailTheme
+                            ? {
+                                stylingMode: emailTheme.stylingMode,
+                                layoutPresetId: emailTheme.layoutPresetId,
+                              }
+                            : null
+                        }
                         onConfiguredChange={(patch) =>
                           setLayoutConfigured((prev) => ({
                             ...prev,

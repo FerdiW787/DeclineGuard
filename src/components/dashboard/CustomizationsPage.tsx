@@ -43,7 +43,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatMoneyAmount, type OpenFailureRow } from "./dashboardUi";
 import EmailLayoutStudio from "./email-layouts/EmailLayoutStudio";
-import { configuredTokensFromSettings } from "@/lib/emailTheme";
+import { configuredTokensFromSettings, type StylingMode } from "@/lib/emailTheme";
 import {
   loadEmailLayoutDraft,
   persistEmailLayoutSettings,
@@ -105,6 +105,14 @@ type Props = {
   /** Last imported marketing domain — prefilled for re-import */
   brandDomain?: string | null;
   onGoToSequences?: () => void;
+  onPersistTheme?: (patch: {
+    stylingMode?: StylingMode;
+    layoutPresetId?: string;
+  }) => void;
+  serverTheme?: {
+    stylingMode?: string | null;
+    layoutPresetId?: string | null;
+  } | null;
   onSave: (values: EmailCustomizationValues) => Promise<void>;
   onDirtyChange?: (dirty: boolean) => void;
   onUploadImage?: (file: File) => Promise<string>;
@@ -181,6 +189,8 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
       openFailures,
       fromAddressHint,
       brandDomain,
+      onPersistTheme,
+      serverTheme,
       onSave,
       onDirtyChange,
       onUploadImage,
@@ -203,6 +213,8 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
     const historyArmedRef = useRef(true);
     const onSaveRef = useRef(onSave);
     onSaveRef.current = onSave;
+    const onPersistThemeRef = useRef(onPersistTheme);
+    onPersistThemeRef.current = onPersistTheme;
 
     const [live, setLive] = useState(() =>
       buildInitial({
@@ -455,8 +467,9 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
       }
       let ok = false;
       try {
+        const draft = loadEmailLayoutDraft();
         persistEmailLayoutSettings({
-          draft: loadEmailLayoutDraft(),
+          draft,
           configured: configuredTokensFromSettings({
             brandColor: current.brandColor,
             secondaryColor: current.secondaryColor,
@@ -470,8 +483,11 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
             ctaTextColor: current.ctaTextColor,
             ctaBorderRadiusPx,
             emailFont: current.emailFont,
-            logoUrl: storeLogoUrl,
           }),
+        });
+        await onPersistThemeRef.current?.({
+          stylingMode: draft.stylingMode,
+          layoutPresetId: draft.layoutPresetId,
         });
         await onSaveRef.current(current);
         ok = true;
@@ -557,8 +573,9 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
                 ctaTextColor: live.ctaTextColor,
                 ctaBorderRadiusPx,
                 emailFont: live.emailFont,
-                logoUrl: storeLogoUrl,
               })}
+              onPersistTheme={onPersistTheme}
+              serverTheme={serverTheme}
               onConfiguredChange={(patch) => {
                 setLive((prev) => ({
                   ...prev,

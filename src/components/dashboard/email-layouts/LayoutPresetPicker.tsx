@@ -1,8 +1,8 @@
 import {
-  LAYOUT_PRESET_CATALOG,
+  LAYOUT_PRESET_META,
   type LayoutPresetId,
 } from "@/lib/emailLayoutPresets";
-import { PRESET_THEMES } from "@/lib/emailTheme";
+import { PRESET_THEMES, QUIET_VERIFY_TOKENS } from "@/lib/emailTheme";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -25,9 +25,9 @@ export default function LayoutPresetPicker({
         className,
       )}
     >
-      {LAYOUT_PRESET_CATALOG.map((preset) => {
+      {LAYOUT_PRESET_META.map((preset) => {
         const active = preset.id === value;
-        const theme = PRESET_THEMES[preset.id];
+        const theme = PRESET_THEMES[preset.id] ?? QUIET_VERIFY_TOKENS;
         return (
           <button
             key={preset.id}
@@ -60,7 +60,7 @@ export default function LayoutPresetPicker({
 }
 
 function LayoutThumb({ id }: { id: LayoutPresetId }) {
-  const theme = PRESET_THEMES[id];
+  const theme = PRESET_THEMES[id] ?? QUIET_VERIFY_TOKENS;
   switch (id) {
     case "quiet-verify":
       return (

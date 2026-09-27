@@ -46,6 +46,10 @@ import MerchantSupport, {
 import SettingsModule from "./settings/SettingsModule";
 import type { SettingsTabId } from "./settings/settingsTypes";
 import { PLANS } from "@/lib/pricing";
+import {
+  useEmailThemeQuery,
+  usePersistEmailTheme,
+} from "@/lib/useEmailThemeApi";
 
 type DayRow = {
   date: string;
@@ -245,6 +249,8 @@ function Dashboard() {
   const saveEmailCustomizations = useMutation(
     api.functions.recoverySettings.saveEmailCustomizations,
   );
+  const persistEmailTheme = usePersistEmailTheme();
+  const emailTheme = useEmailThemeQuery();
   const uploadEmailImage = useEmailHeaderImageUpload();
 
   const brandImportComplete =
@@ -1422,6 +1428,15 @@ function Dashboard() {
                     openFailures={openFailures}
                     fromAddressHint={emailSetup?.fromAddress ?? null}
                     brandDomain={recoverySettings?.brandDomain ?? null}
+                    onPersistTheme={persistEmailTheme}
+                    serverTheme={
+                      emailTheme
+                        ? {
+                            stylingMode: emailTheme.stylingMode,
+                            layoutPresetId: emailTheme.layoutPresetId,
+                          }
+                        : null
+                    }
                     onGoToSequences={() => requestNav("sequences")}
                     onDirtyChange={setCustomizationsDirty}
                     onFocusModeChange={setEmailFocusMode}

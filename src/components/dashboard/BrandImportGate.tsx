@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import gsap from "gsap";
 import {
   Check,
@@ -27,6 +27,11 @@ import {
   loadEmailLayoutDraft,
   persistEmailLayoutSettings,
 } from "@/lib/emailLayoutDraft";
+import {
+  useEmailThemeQuery,
+  useImportBrandFromStorefront,
+  usePersistEmailTheme,
+} from "@/lib/useEmailThemeApi";
 
 type ImportResult = {
   domain: string;
@@ -146,9 +151,9 @@ export default function BrandImportGate({
   onDismiss,
   onComplete,
 }: Props) {
-  const importBrand = useAction(
-    api.functions.brandImportActions.importBrandFromDomain,
-  );
+  const importBrand = useImportBrandFromStorefront();
+  const persistEmailTheme = usePersistEmailTheme();
+  const emailTheme = useEmailThemeQuery();
   const completeImport = useMutation(
     api.functions.recoverySettings.completeBrandImport,
   );
@@ -313,8 +318,9 @@ export default function BrandImportGate({
         fontFamilyRaw: result.fontFamilyRaw ?? undefined,
         brandCaptureMethod: result.captureMethod,
       });
+      const draft = loadEmailLayoutDraft();
       persistEmailLayoutSettings({
-        draft: loadEmailLayoutDraft(),
+        draft,
         configured: configuredTokensFromSettings({
           brandColor: result.brandColor,
           secondaryColor: result.secondaryColor,
@@ -328,15 +334,18 @@ export default function BrandImportGate({
           ctaTextColor: result.ctaTextColor,
           ctaBorderRadiusPx: result.ctaBorderRadiusPx,
           emailFont: result.emailFont,
-          logoUrl: result.storeLogoUrl,
         }),
+      });
+      await persistEmailTheme({
+        stylingMode: draft.stylingMode,
+        layoutPresetId: draft.layoutPresetId,
       });
       onComplete?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save branding");
       setStep("preview");
     }
-  }, [completeImport, onComplete, result]);
+  }, [completeImport, onComplete, persistEmailTheme, result]);
 
   // Stage crossfade whenever the main step changes
   useLayoutEffect(() => {
@@ -817,8 +826,16 @@ export default function BrandImportGate({
                     ctaTextColor: result?.ctaTextColor,
                     ctaBorderRadiusPx: result?.ctaBorderRadiusPx,
                     emailFont: previewFont,
-                    logoUrl: previewLogo,
                   })}
+                  onPersistTheme={persistEmailTheme}
+                  serverTheme={
+                    emailTheme
+                      ? {
+                          stylingMode: emailTheme.stylingMode,
+                          layoutPresetId: emailTheme.layoutPresetId,
+                        }
+                      : null
+                  }
                   emailFont={previewFont}
                   footerSupport={footerSupport}
                   showDeclineGuardBadge={showDeclineGuardBadge}

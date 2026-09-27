@@ -26,6 +26,7 @@ type Props = {
   emailType: LifecycleEmailType;
   theme: EmailThemeTokens;
   storeName: string;
+  storeLogoUrl?: string | null;
   copyOverride?: EmailCopyOverride;
   emailFont?: EmailFontId;
   footerSupport?: string;
@@ -43,6 +44,7 @@ export default function EmailLayoutPreview({
   emailType,
   theme,
   storeName,
+  storeLogoUrl = null,
   copyOverride,
   emailFont = DEFAULT_EMAIL_FONT,
   footerSupport,
@@ -84,6 +86,7 @@ export default function EmailLayoutPreview({
           <QuietVerify
             theme={theme}
             storeName={storeName}
+            storeLogoUrl={storeLogoUrl}
             emailFont={emailFont}
             copy={copy}
           />
@@ -93,6 +96,7 @@ export default function EmailLayoutPreview({
           <SoftExpire
             theme={theme}
             storeName={storeName}
+            storeLogoUrl={storeLogoUrl}
             emailFont={emailFont}
             copy={copy}
             vars={vars}
@@ -103,6 +107,7 @@ export default function EmailLayoutPreview({
           <SafePause
             theme={theme}
             storeName={storeName}
+            storeLogoUrl={storeLogoUrl}
             emailFont={emailFont}
             copy={copy}
           />
@@ -112,6 +117,7 @@ export default function EmailLayoutPreview({
           <SoftRenew
             theme={theme}
             storeName={storeName}
+            storeLogoUrl={storeLogoUrl}
             emailFont={emailFont}
             copy={copy}
             vars={vars}
@@ -122,6 +128,7 @@ export default function EmailLayoutPreview({
           <AlertExpire
             theme={theme}
             storeName={storeName}
+            storeLogoUrl={storeLogoUrl}
             emailFont={emailFont}
             copy={copy}
           />
@@ -202,11 +209,13 @@ function Cta({
 function QuietVerify({
   theme,
   storeName,
+  storeLogoUrl,
   emailFont,
   copy,
 }: {
   theme: EmailThemeTokens;
   storeName: string;
+  storeLogoUrl: string | null;
   emailFont: EmailFontId;
   copy: ChromeCopy;
 }) {
@@ -214,7 +223,7 @@ function QuietVerify({
     <div className="px-6 py-10 text-center sm:px-10">
       <div className="flex justify-center">
         <StoreAvatar
-          src={theme.logoUrl ?? null}
+          src={storeLogoUrl}
           alt={storeName}
           size="preview"
           brandColor={theme.brandColor}
@@ -261,12 +270,14 @@ function QuietVerify({
 function SoftExpire({
   theme,
   storeName,
+  storeLogoUrl,
   emailFont,
   copy,
   vars,
 }: {
   theme: EmailThemeTokens;
   storeName: string;
+  storeLogoUrl: string | null;
   emailFont: EmailFontId;
   copy: ChromeCopy;
   vars: PreviewVars & { storeName: string };
@@ -278,7 +289,7 @@ function SoftExpire({
     <div className="px-5 py-7 sm:px-7">
       <EmailStoreHeader
         storeName={storeName}
-        storeLogoUrl={theme.logoUrl ?? null}
+        storeLogoUrl={storeLogoUrl}
         primary={theme.brandColor}
         emailFont={emailFont}
         textColor={theme.emailTextColor}
@@ -333,11 +344,13 @@ function SoftExpire({
 function SafePause({
   theme,
   storeName,
+  storeLogoUrl,
   emailFont,
   copy,
 }: {
   theme: EmailThemeTokens;
   storeName: string;
+  storeLogoUrl: string | null;
   emailFont: EmailFontId;
   copy: ChromeCopy;
 }) {
@@ -351,7 +364,7 @@ function SafePause({
     <div className="px-5 py-7 sm:px-7">
       <EmailStoreHeader
         storeName={storeName}
-        storeLogoUrl={theme.logoUrl ?? null}
+        storeLogoUrl={storeLogoUrl}
         primary={theme.brandColor}
         emailFont={emailFont}
         textColor={theme.emailTextColor}
@@ -402,12 +415,14 @@ function SafePause({
 function SoftRenew({
   theme,
   storeName,
+  storeLogoUrl,
   emailFont,
   copy,
   vars,
 }: {
   theme: EmailThemeTokens;
   storeName: string;
+  storeLogoUrl: string | null;
   emailFont: EmailFontId;
   copy: ChromeCopy;
   vars: PreviewVars & { storeName: string };
@@ -419,7 +434,7 @@ function SoftRenew({
     <div className="px-5 py-7 sm:px-7">
       <EmailStoreHeader
         storeName={storeName}
-        storeLogoUrl={theme.logoUrl ?? null}
+        storeLogoUrl={storeLogoUrl}
         primary={theme.brandColor}
         emailFont={emailFont}
         textColor={theme.emailTextColor}
@@ -483,11 +498,13 @@ function SoftRenew({
 function AlertExpire({
   theme,
   storeName,
+  storeLogoUrl,
   emailFont,
   copy,
 }: {
   theme: EmailThemeTokens;
   storeName: string;
+  storeLogoUrl: string | null;
   emailFont: EmailFontId;
   copy: ChromeCopy;
 }) {
@@ -497,7 +514,7 @@ function AlertExpire({
       <div className="px-5 py-7 sm:px-7">
         <EmailStoreHeader
           storeName={storeName}
-          storeLogoUrl={theme.logoUrl ?? null}
+          storeLogoUrl={storeLogoUrl}
           primary={theme.brandColor}
           emailFont={emailFont}
           textColor={theme.emailTextColor}

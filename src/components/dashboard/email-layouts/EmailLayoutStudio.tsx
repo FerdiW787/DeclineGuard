@@ -9,7 +9,13 @@ import {
   layoutPresetMeta,
   type LifecycleEmailType,
 } from "@/lib/emailLayoutPresets";
-import { resolveTheme, type EmailThemeTokens } from "@/lib/emailTheme";
+import {
+  resolveTheme,
+  type EmailThemeTokens,
+  type LayoutPresetId,
+  type StylingMode,
+} from "@/lib/emailTheme";
+import { buildLifecycleEmail } from "@/lib/lifecycleEmailTemplate";
 import { useEmailLayoutDraft } from "@/lib/useEmailLayoutDraft";
 import type { EmailFontId } from "@/lib/emailFonts";
 import { cn } from "@/lib/utils";
@@ -35,6 +41,14 @@ type Props = {
   storeLogoUrl: string | null;
   configured: Partial<EmailThemeTokens>;
   onConfiguredChange?: (patch: ConfiguredPatch) => void;
+  onPersistTheme?: (patch: {
+    stylingMode?: StylingMode;
+    layoutPresetId?: string;
+  }) => void;
+  serverTheme?: {
+    stylingMode?: string | null;
+    layoutPresetId?: string | null;
+  } | null;
   emailFont?: EmailFontId;
   footerSupport?: string;
   showDeclineGuardBadge?: boolean;
@@ -62,20 +76,21 @@ export default function EmailLayoutStudio({
   storeLogoUrl,
   configured,
   onConfiguredChange,
+  onPersistTheme,
+  serverTheme,
   emailFont,
   footerSupport,
   showDeclineGuardBadge = false,
   previewVars,
   className,
 }: Props) {
-  const [draft, setDraft] = useEmailLayoutDraft();
+  const [draft, setDraft] = useEmailLayoutDraft(serverTheme);
   const [emailType, setEmailType] = useState<LifecycleEmailType>(
     DEFAULT_LIFECYCLE_EMAIL_TYPE,
   );
 
   const mergedConfigured: Partial<EmailThemeTokens> = {
     ...configured,
-    logoUrl: configured.logoUrl ?? storeLogoUrl,
     emailFont: configured.emailFont ?? emailFont,
     emailBackgroundColor:
       draft.shellOverrides.emailBackgroundColor ??
@@ -87,10 +102,21 @@ export default function EmailLayoutStudio({
       configured.pageTextColor,
   };
 
-  const theme = resolveTheme({
+  const resolved = resolveTheme({
     stylingMode: draft.stylingMode,
     layoutPresetId: draft.layoutPresetId,
     configured: mergedConfigured,
+  });
+  const theme = resolved.tokens;
+  const built = buildLifecycleEmail({
+    emailType,
+    storeName,
+    productName: previewVars?.product ?? "your subscription",
+    amountLabel: previewVars?.amount ?? "your plan",
+    customerName: previewVars?.firstName ?? null,
+    ctaUrl: "#",
+    supportEmail: footerSupport ?? null,
+    theme: resolved,
   });
 
   const meta = layoutPresetMeta(draft.layoutPresetId);
@@ -145,9 +171,10 @@ export default function EmailLayoutStudio({
         <SegmentedControl
           options={STYLING_OPTIONS}
           value={draft.stylingMode}
-          onChange={(next) =>
-            setDraft((prev) => ({ ...prev, stylingMode: next }))
-          }
+          onChange={(next) => {
+            setDraft((prev) => ({ ...prev, stylingMode: next }));
+            onPersistTheme?.({ stylingMode: next });
+          }}
           ariaLabel="Styling source"
           idPrefix="email-styling"
         />
@@ -155,9 +182,10 @@ export default function EmailLayoutStudio({
 
       <LayoutPresetPicker
         value={draft.layoutPresetId}
-        onChange={(id) =>
-          setDraft((prev) => ({ ...prev, layoutPresetId: id }))
-        }
+        onChange={(id: LayoutPresetId) => {
+          setDraft((prev) => ({ ...prev, layoutPresetId: id }));
+          onPersistTheme?.({ layoutPresetId: id });
+        }}
         className="mt-4"
       />
 
@@ -189,14 +217,18 @@ export default function EmailLayoutStudio({
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8a8f98]">
               Preview · {LIFECYCLE_EMAIL_META[emailType].label}
             </p>
+            <p className="mt-0.5 truncate text-[11px] text-[#6b6f76]">
+              {built.subject}
+            </p>
           </div>
           <EmailLayoutPreview
             layoutPresetId={draft.layoutPresetId}
             emailType={emailType}
             theme={theme}
             storeName={storeName}
+            storeLogoUrl={storeLogoUrl}
             copyOverride={copyOverride}
-            emailFont={emailFont}
+            emailFont={theme.emailFont}
             footerSupport={footerSupport}
             previewVars={previewVars}
             showDeclineGuardBadge={showDeclineGuardBadge}

@@ -1,71 +1,46 @@
 /**
- * Catalog + lifecycle types. IDs come from the Riley contract
- * (`src/lib/emailLayoutContract.ts` → `convex/lib` when that tips).
+ * Picker labels + lifecycle display. IDs/tokens live in `emailTheme.ts`
+ * (Riley public API mirror).
  */
 
 export {
   DEFAULT_LAYOUT_PRESET_ID,
+  DEFAULT_LIFECYCLE_EMAIL_TYPE,
   DEFAULT_STYLING_MODE,
   LAYOUT_PRESET_IDS,
+  LIFECYCLE_EMAIL_TYPES,
   isLayoutPresetId,
+  isLifecycleEmailType,
   isStylingMode,
   resolveLayoutPresetId,
   type LayoutPresetId,
+  type LifecycleEmailType,
   type RecoverySettingsLayoutFields,
   type StylingMode,
-} from "./emailLayoutContract";
+} from "./emailTheme";
 
 import {
-  DEFAULT_LAYOUT_PRESET_ID,
+  LAYOUT_PRESET_CATALOG,
+  LAYOUT_PRESET_IDS,
   type LayoutPresetId,
-} from "./emailLayoutContract";
-
-export const LIFECYCLE_EMAIL_TYPES = [
-  "verify",
-  "decline_pause",
-  "trial_ended",
-  "renewal",
-  "expiry",
-] as const;
-
-export type LifecycleEmailType = (typeof LIFECYCLE_EMAIL_TYPES)[number];
-
-export const DEFAULT_LIFECYCLE_EMAIL_TYPE: LifecycleEmailType = "verify";
+  type LifecycleEmailType,
+} from "./emailTheme";
 
 export type LayoutPresetMeta = {
   id: LayoutPresetId;
   label: string;
-  /** One-line structure hint — not third-party attribution. */
   structure: string;
 };
 
-export const LAYOUT_PRESET_CATALOG: readonly LayoutPresetMeta[] = [
-  {
-    id: "quiet-verify",
-    label: "Quiet Verify",
-    structure: "Centered check, one action, lots of air",
-  },
-  {
-    id: "soft-expire",
-    label: "Soft Expire",
-    structure: "What’s ending, then a calm restore",
-  },
-  {
-    id: "safe-pause",
-    label: "Safe Pause",
-    structure: "Paused — data stays, resume when ready",
-  },
-  {
-    id: "soft-renew",
-    label: "Soft Renew",
-    structure: "Upcoming renewal, what’s included",
-  },
-  {
-    id: "alert-expire",
-    label: "Alert Expire",
-    structure: "Accent bar, what happens next",
-  },
-] as const;
+export const LAYOUT_PRESET_META: readonly LayoutPresetMeta[] =
+  LAYOUT_PRESET_IDS.map((id) => {
+    const preset = LAYOUT_PRESET_CATALOG[id]!;
+    return {
+      id,
+      label: preset.name,
+      structure: preset.description,
+    };
+  });
 
 export const LIFECYCLE_EMAIL_META: Record<
   LifecycleEmailType,
@@ -78,17 +53,7 @@ export const LIFECYCLE_EMAIL_META: Record<
   expiry: { label: "Expiry", hint: "Access is ending" },
 };
 
-export function isLifecycleEmailType(
-  value: string,
-): value is LifecycleEmailType {
-  return (LIFECYCLE_EMAIL_TYPES as readonly string[]).includes(value);
-}
-
-export function layoutPresetMeta(id: LayoutPresetId): LayoutPresetMeta {
-  const found = LAYOUT_PRESET_CATALOG.find((item) => item.id === id);
-  if (found) return found;
-  return (
-    LAYOUT_PRESET_CATALOG.find((item) => item.id === DEFAULT_LAYOUT_PRESET_ID) ??
-    LAYOUT_PRESET_CATALOG[0]!
-  );
+export function layoutPresetMeta(id: string): LayoutPresetMeta {
+  const found = LAYOUT_PRESET_META.find((item) => item.id === id);
+  return found ?? LAYOUT_PRESET_META[0]!;
 }
