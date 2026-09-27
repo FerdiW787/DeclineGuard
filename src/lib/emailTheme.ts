@@ -1,17 +1,15 @@
 /**
  * FE email theme + recovery-layout catalog.
  *
- * Token / resolveTheme contract still mirrors Riley (`convex/lib/emailTheme.ts`).
- * `layoutPresetId` on the FE is a **recovery-layout template id** (structure),
- * not a lifecycle email type. Riley’s catalog currently only accepts
- * `quiet-verify` — map through `toBackendLayoutPresetId` before Convex writes.
+ * Locked catalog IDs (CoS + Riley, `cursor/lifecycle-email-theme-2f33`):
+ *   sonos              → refs/sonos.png              (01-sonos-verify-your-email)
+ *   avocode            → refs/avocode.png            (03-avocode-trial-ended)
+ *   benchmark          → refs/benchmark.png          (05-benchmark-dont-worry)
+ *   fontbase           → refs/fontbase.png           (04-fontbase-upcoming-renewal)
+ *   nordvpn-structure  → refs/nordvpn-structure.png  (02-nordvpn-your-account-has-expired)
  *
- * Recovery-layout id ↔ reference structure (visual only; no third-party brands):
- *   calm-verify       → 01-sonos-verify-your-email.png
- *   account-expired   → 02-nordvpn-your-account-has-expired.png
- *   trial-ended       → 03-avocode-trial-ended.png
- *   upcoming-renewal  → 04-fontbase-upcoming-renewal.png
- *   data-safe         → 05-benchmark-dont-worry-your-data-is-safe.png
+ * Default: sonos + stylingMode preset. Legacy: quiet-verify → sonos.
+ * `layoutPresetId` is a recovery-layout template id, not a lifecycle email type.
  */
 
 import {
@@ -23,28 +21,19 @@ import {
 export const STYLING_MODES = ["preset", "configured"] as const;
 export type StylingMode = (typeof STYLING_MODES)[number];
 
-/**
- * Only id Riley’s `assertKnownLayoutPresetId` accepts today.
- * Do not show this string as product language.
- */
-export const BE_LAYOUT_PRESET_ID = "quiet-verify";
-
-/** @deprecated BE-only id. Use CALM_VERIFY_LAYOUT_ID in product UI. */
-export const QUIET_VERIFY_LAYOUT_ID = BE_LAYOUT_PRESET_ID;
-
-export const CALM_VERIFY_LAYOUT_ID = "calm-verify";
+export const SONOS_LAYOUT_ID = "sonos";
 
 export const LAYOUT_PRESET_IDS = [
-  "calm-verify",
-  "account-expired",
-  "trial-ended",
-  "upcoming-renewal",
-  "data-safe",
+  "sonos",
+  "avocode",
+  "benchmark",
+  "fontbase",
+  "nordvpn-structure",
 ] as const;
 
 export type LayoutPresetId = (typeof LAYOUT_PRESET_IDS)[number];
 
-export const DEFAULT_LAYOUT_PRESET_ID: LayoutPresetId = CALM_VERIFY_LAYOUT_ID;
+export const DEFAULT_LAYOUT_PRESET_ID: LayoutPresetId = SONOS_LAYOUT_ID;
 export const DEFAULT_STYLING_MODE: StylingMode = "preset";
 
 /**
@@ -95,8 +84,8 @@ function layoutTokens(
   };
 }
 
-/** Default recovery-layout tokens (calm-verify / Sonos-structure). */
-export const CALM_VERIFY_TOKENS: EmailThemeTokens = layoutTokens({
+/** Default recovery-layout tokens (`sonos`). */
+export const SONOS_TOKENS: EmailThemeTokens = layoutTokens({
   brandColor: "#0c0c0c",
   secondaryColor: "#6b6b70",
   mutedTextColor: "#6b6b70",
@@ -110,9 +99,6 @@ export const CALM_VERIFY_TOKENS: EmailThemeTokens = layoutTokens({
   ctaBorderRadiusPx: 999,
 });
 
-/** Alias for older FE imports — same tokens as calm-verify. */
-export const QUIET_VERIFY_TOKENS = CALM_VERIFY_TOKENS;
-
 export type LayoutPreset = {
   id: string;
   name: string;
@@ -121,33 +107,15 @@ export type LayoutPreset = {
 };
 
 export const LAYOUT_PRESET_CATALOG: Record<string, LayoutPreset> = {
-  "calm-verify": {
-    id: "calm-verify",
-    name: "Calm verify",
+  sonos: {
+    id: "sonos",
+    name: "Sonos layout",
     description: "Centered wordmark, hero, pill CTA.",
-    tokens: CALM_VERIFY_TOKENS,
+    tokens: SONOS_TOKENS,
   },
-  "account-expired": {
-    id: "account-expired",
-    name: "Account expired",
-    description: "Header bar, dark hero, rounded CTA.",
-    tokens: layoutTokens({
-      brandColor: "#0c0c0c",
-      secondaryColor: "#6b6b70",
-      mutedTextColor: "#5c5c5c",
-      linkColor: "#0c0c0c",
-      pageBackgroundColor: "#f4f4f4",
-      pageTextColor: "#0c0c0c",
-      emailBackgroundColor: "#ffffff",
-      emailTextColor: "#0c0c0c",
-      ctaBackgroundColor: "#ff5a6a",
-      ctaTextColor: "#ffffff",
-      ctaBorderRadiusPx: 24,
-    }),
-  },
-  "trial-ended": {
-    id: "trial-ended",
-    name: "Trial ended",
+  avocode: {
+    id: "avocode",
+    name: "Avocode layout",
     description: "Centered icon, compact card, pill CTA.",
     tokens: layoutTokens({
       brandColor: "#2563eb",
@@ -163,9 +131,27 @@ export const LAYOUT_PRESET_CATALOG: Record<string, LayoutPreset> = {
       ctaBorderRadiusPx: 999,
     }),
   },
-  "upcoming-renewal": {
-    id: "upcoming-renewal",
-    name: "Upcoming renewal",
+  benchmark: {
+    id: "benchmark",
+    name: "Benchmark layout",
+    description: "Greeting, two help cards, P.S.",
+    tokens: layoutTokens({
+      brandColor: "#2563eb",
+      secondaryColor: "#6b7280",
+      mutedTextColor: "#52525b",
+      linkColor: "#2563eb",
+      pageBackgroundColor: "#ffffff",
+      pageTextColor: "#0c0c0c",
+      emailBackgroundColor: "#ffffff",
+      emailTextColor: "#0c0c0c",
+      ctaBackgroundColor: "#2563eb",
+      ctaTextColor: "#ffffff",
+      ctaBorderRadiusPx: 8,
+    }),
+  },
+  fontbase: {
+    id: "fontbase",
+    name: "Fontbase layout",
     description: "Dark frame, date lockup, centered type.",
     tokens: layoutTokens({
       brandColor: "#0c0c0c",
@@ -181,22 +167,22 @@ export const LAYOUT_PRESET_CATALOG: Record<string, LayoutPreset> = {
       ctaBorderRadiusPx: 8,
     }),
   },
-  "data-safe": {
-    id: "data-safe",
-    name: "Data safe",
-    description: "Greeting, two help cards, P.S.",
+  "nordvpn-structure": {
+    id: "nordvpn-structure",
+    name: "NordVPN layout",
+    description: "Header bar, dark hero, rounded CTA.",
     tokens: layoutTokens({
-      brandColor: "#2563eb",
-      secondaryColor: "#6b7280",
-      mutedTextColor: "#52525b",
-      linkColor: "#2563eb",
-      pageBackgroundColor: "#ffffff",
+      brandColor: "#0c0c0c",
+      secondaryColor: "#6b6b70",
+      mutedTextColor: "#5c5c5c",
+      linkColor: "#0c0c0c",
+      pageBackgroundColor: "#f4f4f4",
       pageTextColor: "#0c0c0c",
       emailBackgroundColor: "#ffffff",
       emailTextColor: "#0c0c0c",
-      ctaBackgroundColor: "#2563eb",
+      ctaBackgroundColor: "#ff5a6a",
       ctaTextColor: "#ffffff",
-      ctaBorderRadiusPx: 8,
+      ctaBorderRadiusPx: 24,
     }),
   },
 };
@@ -224,43 +210,38 @@ export type RecoverySettingsLayoutFields = {
 };
 
 /**
- * Old FE catalog + snake_case drafts → recovery-layout ids.
- * `quiet-verify` is also the current BE write target.
+ * Legacy drafts / Riley quiet-verify rows → locked catalog ids.
  */
 const LEGACY_LAYOUT_PRESET_IDS: Record<string, LayoutPresetId> = {
-  "quiet-verify": "calm-verify",
-  quiet_verify: "calm-verify",
-  "soft-expire": "account-expired",
-  soft_expire: "account-expired",
-  "safe-pause": "data-safe",
-  safe_pause: "data-safe",
-  "soft-renew": "upcoming-renewal",
-  soft_renew: "upcoming-renewal",
-  "alert-expire": "trial-ended",
-  alert_expire: "trial-ended",
+  "quiet-verify": "sonos",
+  quiet_verify: "sonos",
+  "calm-verify": "sonos",
+  "account-expired": "nordvpn-structure",
+  "trial-ended": "avocode",
+  "upcoming-renewal": "fontbase",
+  "data-safe": "benchmark",
+  soft_expire: "nordvpn-structure",
+  "soft-expire": "nordvpn-structure",
+  safe_pause: "benchmark",
+  "safe-pause": "benchmark",
+  soft_renew: "fontbase",
+  "soft-renew": "fontbase",
+  alert_expire: "avocode",
+  "alert-expire": "avocode",
 };
 
-/** Persist any FE recovery-layout id as the only BE-known catalog id. */
+/** Normalize any stored/API id onto the locked catalog. */
 export function toBackendLayoutPresetId(
-  _layoutPresetId: string | null | undefined,
+  layoutPresetId: string | null | undefined,
 ): string {
-  return BE_LAYOUT_PRESET_ID;
+  return resolveLayoutPresetId(layoutPresetId ?? DEFAULT_LAYOUT_PRESET_ID);
 }
 
-/**
- * Read a BE/local id into a FE recovery-layout id.
- * When BE returns only `quiet-verify`, keep a valid local FE selection.
- */
 export function fromBackendLayoutPresetId(
   backendId: string | null | undefined,
-  localFeId?: string | null,
+  _localFeId?: string | null,
 ): LayoutPresetId {
-  const local = localFeId ? resolveLayoutPresetId(localFeId) : null;
-  const raw = backendId?.trim() ?? "";
-  if (!raw || raw === BE_LAYOUT_PRESET_ID || raw === "quiet-verify") {
-    return local ?? DEFAULT_LAYOUT_PRESET_ID;
-  }
-  return resolveLayoutPresetId(raw);
+  return resolveLayoutPresetId(backendId ?? DEFAULT_LAYOUT_PRESET_ID);
 }
 
 export function isStylingMode(value: unknown): value is StylingMode {
@@ -523,11 +504,14 @@ export function listLayoutPresets(): Array<{
   name: string;
   description: string;
 }> {
-  return Object.values(LAYOUT_PRESET_CATALOG).map((preset) => ({
-    id: preset.id,
-    name: preset.name,
-    description: preset.description,
-  }));
+  return LAYOUT_PRESET_IDS.map((id) => {
+    const preset = LAYOUT_PRESET_CATALOG[id]!;
+    return {
+      id: preset.id,
+      name: preset.name,
+      description: preset.description,
+    };
+  });
 }
 
 /** Convenience map for picker thumbs — same tokens as the catalog. */

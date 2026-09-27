@@ -2,12 +2,12 @@
  * Picker labels + recovery-day preview meta.
  * IDs/tokens live in `emailTheme.ts`.
  *
- * Recovery-layout id ↔ reference structure:
- *   calm-verify       → 01-sonos-verify-your-email.png
- *   account-expired   → 02-nordvpn-your-account-has-expired.png
- *   trial-ended       → 03-avocode-trial-ended.png
- *   upcoming-renewal  → 04-fontbase-upcoming-renewal.png
- *   data-safe         → 05-benchmark-dont-worry-your-data-is-safe.png
+ * Locked catalog id ↔ reference:
+ *   sonos              → refs/sonos.png
+ *   avocode            → refs/avocode.png
+ *   benchmark          → refs/benchmark.png
+ *   fontbase           → refs/fontbase.png
+ *   nordvpn-structure  → refs/nordvpn-structure.png
  */
 
 export {

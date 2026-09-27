@@ -15,9 +15,9 @@ const STORAGE_KEY = "dg.emailLayoutDraft.v2";
 
 /**
  * FE draft for the global recovery-layout pick.
- * `stylingMode` + BE-mapped `layoutPresetId` persist via
- * `setStylingMode` / `setLayoutPresetId`. Riley currently only
- * accepts `quiet-verify` — see `toBackendLayoutPresetId`.
+ * `stylingMode` + locked `layoutPresetId` persist via
+ * `setStylingMode` / `setLayoutPresetId` (sonos | avocode | benchmark |
+ * fontbase | nordvpn-structure). Legacy quiet-verify → sonos.
  */
 export type EmailLayoutDraft = {
   stylingMode: StylingMode;
@@ -167,7 +167,7 @@ export function persistEmailLayoutSettings(input: {
       shellOverrides: input.draft.shellOverrides,
     },
     convexGap: [
-      "layoutPresetId (FE recovery-layout id; BE only accepts quiet-verify)",
+      "layoutPresetId (locked: sonos | avocode | benchmark | fontbase | nordvpn-structure)",
       "stylingMode",
       "copyOverrides (recovery Day 0 / 2 / 5 short copy)",
       "emailBackgroundColor",

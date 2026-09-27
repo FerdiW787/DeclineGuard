@@ -2,7 +2,7 @@ import {
   LAYOUT_PRESET_META,
   type LayoutPresetId,
 } from "@/lib/emailLayoutPresets";
-import { CALM_VERIFY_TOKENS, PRESET_THEMES } from "@/lib/emailTheme";
+import { PRESET_THEMES, SONOS_TOKENS } from "@/lib/emailTheme";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -27,7 +27,7 @@ export default function LayoutPresetPicker({
     >
       {LAYOUT_PRESET_META.map((preset) => {
         const active = preset.id === value;
-        const theme = PRESET_THEMES[preset.id] ?? CALM_VERIFY_TOKENS;
+        const theme = PRESET_THEMES[preset.id] ?? SONOS_TOKENS;
         return (
           <button
             key={preset.id}
@@ -60,9 +60,9 @@ export default function LayoutPresetPicker({
 }
 
 function LayoutThumb({ id }: { id: LayoutPresetId }) {
-  const theme = PRESET_THEMES[id] ?? CALM_VERIFY_TOKENS;
+  const theme = PRESET_THEMES[id] ?? SONOS_TOKENS;
   switch (id) {
-    case "calm-verify":
+    case "sonos":
       return (
         <div
           className="flex h-16 flex-col overflow-hidden rounded-lg"
@@ -81,7 +81,7 @@ function LayoutThumb({ id }: { id: LayoutPresetId }) {
           </div>
         </div>
       );
-    case "account-expired":
+    case "nordvpn-structure":
       return (
         <div
           className="flex h-16 flex-col justify-center gap-1 rounded-lg px-2"
@@ -95,7 +95,7 @@ function LayoutThumb({ id }: { id: LayoutPresetId }) {
           />
         </div>
       );
-    case "trial-ended":
+    case "avocode":
       return (
         <div
           className="flex h-16 flex-col items-center justify-center gap-1 rounded-lg"
@@ -111,7 +111,7 @@ function LayoutThumb({ id }: { id: LayoutPresetId }) {
           />
         </div>
       );
-    case "upcoming-renewal":
+    case "fontbase":
       return (
         <div
           className="flex h-16 flex-col items-center justify-center rounded-lg px-2"
@@ -126,7 +126,7 @@ function LayoutThumb({ id }: { id: LayoutPresetId }) {
           </div>
         </div>
       );
-    case "data-safe":
+    case "benchmark":
       return (
         <div
           className="flex h-16 flex-col justify-center gap-1 rounded-lg px-2.5"

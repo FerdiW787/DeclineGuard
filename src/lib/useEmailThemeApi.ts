@@ -76,7 +76,6 @@ export function useSetLayoutPresetId() {
       const ref = emailThemeRefs.setLayoutPresetId();
       if (!ref) return null;
       try {
-        // Riley catalog currently only accepts quiet-verify.
         return await convex.mutation(ref, {
           layoutPresetId: toBackendLayoutPresetId(layoutPresetId),
         });

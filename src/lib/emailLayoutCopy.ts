@@ -78,19 +78,13 @@ const LAYOUT_CHROME: Record<
   LayoutPresetId,
   Partial<Record<RecoveryDayId, Partial<EmailLayoutCopy>>>
 > = {
-  "calm-verify": {
+  sonos: {
     gentle: {
       eyebrow: "A quick update",
     },
   },
-  "account-expired": {
-    urgent: {
-      status: "Access may pause soon",
-    },
-  },
-  "trial-ended": {},
-  "upcoming-renewal": {},
-  "data-safe": {
+  avocode: {},
+  benchmark: {
     gentle: {
       status: "Your data is safe",
     },
@@ -99,6 +93,12 @@ const LAYOUT_CHROME: Record<
     },
     urgent: {
       status: "Your data is still safe",
+    },
+  },
+  fontbase: {},
+  "nordvpn-structure": {
+    urgent: {
+      status: "Access may pause soon",
     },
   },
 };

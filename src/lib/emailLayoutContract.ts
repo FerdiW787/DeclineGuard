@@ -1,7 +1,6 @@
 /**
- * Compatibility barrel — Riley token/resolveTheme API is mirrored in
- * `emailTheme.ts`. FE `layoutPresetId` is a recovery-layout template id;
- * BE writes still map to `quiet-verify` via `toBackendLayoutPresetId`.
+ * Compatibility barrel — token/resolveTheme + locked recovery-layout ids
+ * (`sonos` | `avocode` | `benchmark` | `fontbase` | `nordvpn-structure`).
  */
 
 export {
@@ -11,11 +10,8 @@ export {
   LAYOUT_PRESET_IDS,
   LIFECYCLE_EMAIL_TYPES,
   NEW_MERCHANT_THEME_DEFAULTS,
-  BE_LAYOUT_PRESET_ID,
-  CALM_VERIFY_LAYOUT_ID,
-  CALM_VERIFY_TOKENS,
-  QUIET_VERIFY_LAYOUT_ID,
-  QUIET_VERIFY_TOKENS,
+  SONOS_LAYOUT_ID,
+  SONOS_TOKENS,
   fromBackendLayoutPresetId,
   toBackendLayoutPresetId,
   assertKnownLayoutPresetId,

@@ -220,7 +220,6 @@ export default function EmailLayoutStudio({
             storeName={storeName}
             storeLogoUrl={storeLogoUrl}
             copyOverride={copyOverride}
-            emailFont={theme.emailFont}
             footerSupport={footerSupport}
             previewVars={previewVars}
             showDeclineGuardBadge={showDeclineGuardBadge}

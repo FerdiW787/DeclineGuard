@@ -33,7 +33,6 @@ export function useEmailLayoutDraft(server?: EmailLayoutServerTheme | null) {
           ? {
               layoutPresetId: fromBackendLayoutPresetId(
                 server.layoutPresetId,
-                prev.layoutPresetId,
               ),
             }
           : {}),
