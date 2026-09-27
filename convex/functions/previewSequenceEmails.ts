@@ -111,6 +111,7 @@ async function runPreviewStep(
 
   const email = buildRecoveryEmail({
     templateId,
+    layoutPresetId: theme.layoutPresetId,
     primaryColor: colors.primaryColor,
     secondaryColor: colors.secondaryColor,
     storeName: payload.storeName,

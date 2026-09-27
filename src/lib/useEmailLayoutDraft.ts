@@ -15,7 +15,7 @@ export type EmailLayoutServerTheme = {
   layoutPresetId?: string | null;
 };
 
-/** Shared FE draft — one global layout + styling mode for all lifecycle emails. */
+/** Shared FE draft — one global layout for recovery Day 0 / Day 2 / Day 5. */
 export function useEmailLayoutDraft(server?: EmailLayoutServerTheme | null) {
   const [draft, setDraftState] = useState(loadEmailLayoutDraft);
   const hydratedRef = useRef(false);

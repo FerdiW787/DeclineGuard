@@ -1,20 +1,19 @@
 /**
- * Picker labels + lifecycle display. IDs/tokens live in `emailTheme.ts`
- * (Riley public API mirror).
+ * Picker labels + recovery-step display. IDs/tokens live in `emailTheme.ts`.
  */
 
 export {
   DEFAULT_LAYOUT_PRESET_ID,
-  DEFAULT_LIFECYCLE_EMAIL_TYPE,
+  DEFAULT_RECOVERY_SEQUENCE_STEP,
   DEFAULT_STYLING_MODE,
   LAYOUT_PRESET_IDS,
-  LIFECYCLE_EMAIL_TYPES,
+  RECOVERY_SEQUENCE_STEPS,
   isLayoutPresetId,
-  isLifecycleEmailType,
+  isRecoverySequenceStep,
   isStylingMode,
   resolveLayoutPresetId,
   type LayoutPresetId,
-  type LifecycleEmailType,
+  type RecoverySequenceStep,
   type RecoverySettingsLayoutFields,
   type StylingMode,
 } from "./emailTheme";
@@ -23,7 +22,7 @@ import {
   LAYOUT_PRESET_CATALOG,
   LAYOUT_PRESET_IDS,
   type LayoutPresetId,
-  type LifecycleEmailType,
+  type RecoverySequenceStep,
 } from "./emailTheme";
 
 export type LayoutPresetMeta = {
@@ -34,7 +33,7 @@ export type LayoutPresetMeta = {
 
 export const LAYOUT_PRESET_META: readonly LayoutPresetMeta[] =
   LAYOUT_PRESET_IDS.map((id) => {
-    const preset = LAYOUT_PRESET_CATALOG[id]!;
+    const preset = LAYOUT_PRESET_CATALOG[id];
     return {
       id,
       label: preset.name,
@@ -42,18 +41,23 @@ export const LAYOUT_PRESET_META: readonly LayoutPresetMeta[] =
     };
   });
 
-export const LIFECYCLE_EMAIL_META: Record<
-  LifecycleEmailType,
+export const RECOVERY_STEP_META: Record<
+  RecoverySequenceStep,
   { label: string; hint: string }
 > = {
-  verify: { label: "Verify", hint: "Confirm the address" },
-  decline_pause: { label: "Decline / pause", hint: "Payment failed or paused" },
-  trial_ended: { label: "Trial ended", hint: "Trial wrapped up" },
-  renewal: { label: "Renewal", hint: "Upcoming or due" },
-  expiry: { label: "Expiry", hint: "Access is ending" },
+  day0: { label: "Day 0", hint: "Gentle — first notice" },
+  day2: { label: "Day 2", hint: "Direct — second notice" },
+  day5: { label: "Day 5", hint: "Urgent — final notice" },
 };
 
 export function layoutPresetMeta(id: string): LayoutPresetMeta {
   const found = LAYOUT_PRESET_META.find((item) => item.id === id);
   return found ?? LAYOUT_PRESET_META[0]!;
+}
+
+export function recoveryStepMeta(step: RecoverySequenceStep): {
+  label: string;
+  hint: string;
+} {
+  return RECOVERY_STEP_META[step];
 }

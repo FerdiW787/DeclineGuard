@@ -695,14 +695,14 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
             : "Add your domain",
       body:
         brandPhase === "ready" || brandPhase === "saving"
-          ? "Confirm the kit — next you’ll pick a layout for every lifecycle email."
+          ? "Confirm the kit — next you’ll pick a layout for Day 0, Day 2, and Day 5."
           : brandPhase === "scanning"
             ? `Capturing ${brandDomain.trim() || "your site"} and shaping Day 0.`
             : "We’ll match colors, CTA, and fonts from your marketing site.",
     },
     layout: {
       title: "Choose an email layout",
-      body: "One layout for verify, decline, trial ended, renewal, and expiry. You can change this later.",
+      body: "One layout for recovery Day 0, Day 2, and Day 5. You can change this later.",
     },
   };
 

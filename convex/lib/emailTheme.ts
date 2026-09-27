@@ -34,6 +34,7 @@ export type LayoutPresetId = (typeof LAYOUT_PRESET_IDS)[number];
 
 export const SONOS_LAYOUT_ID: LayoutPresetId = "sonos";
 export const DEFAULT_LAYOUT_PRESET_ID: LayoutPresetId = SONOS_LAYOUT_ID;
+export const DEFAULT_STYLING_MODE: StylingMode = "preset";
 
 /** Recovery sequence only — the sole themed email surface. */
 export const RECOVERY_SEQUENCE_STEPS = ["day0", "day2", "day5"] as const;
@@ -224,10 +225,23 @@ export const LAYOUT_PRESET_CATALOG: Record<LayoutPresetId, LayoutPreset> = {
   },
 };
 
-/** Legacy Quiet Verify rows / writes map onto Sonos. */
+/** Writes + asserts: Quiet Verify is the only accepted legacy alias. */
 const LEGACY_LAYOUT_PRESET_IDS: Record<string, LayoutPresetId> = {
   "quiet-verify": "sonos",
   quiet_verify: "sonos",
+};
+
+/** Read-path remaps for leftover Jules product-email ids (dropped from picker). */
+const READ_LAYOUT_ALIASES: Record<string, LayoutPresetId> = {
+  ...LEGACY_LAYOUT_PRESET_IDS,
+  "soft-expire": "fontbase",
+  soft_expire: "fontbase",
+  "safe-pause": "benchmark",
+  safe_pause: "benchmark",
+  "soft-renew": "avocode",
+  soft_renew: "avocode",
+  "alert-expire": "nordvpn-structure",
+  alert_expire: "nordvpn-structure",
 };
 
 export const NEW_MERCHANT_THEME_DEFAULTS = {
@@ -278,9 +292,13 @@ export function normalizeLayoutPresetId(
   value: string | null | undefined,
 ): LayoutPresetId {
   const raw = value?.trim() ?? "";
-  const mapped = LEGACY_LAYOUT_PRESET_IDS[raw] ?? raw;
+  const mapped = READ_LAYOUT_ALIASES[raw] ?? raw;
   if (isLayoutPresetId(mapped)) return mapped;
   return DEFAULT_LAYOUT_PRESET_ID;
+}
+
+export function resolveLayoutPresetId(id: string): LayoutPresetId {
+  return normalizeLayoutPresetId(id);
 }
 
 export function getLayoutPreset(layoutPresetId: string): LayoutPreset {

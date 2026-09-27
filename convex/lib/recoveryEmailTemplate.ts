@@ -14,6 +14,8 @@ import {
   normalizeEmailFont,
   type EmailFontId,
 } from "./emailFonts";
+import { normalizeLayoutPresetId } from "./emailTheme";
+import { renderRecoveryLayoutHtml } from "./recoveryLayoutHtml";
 
 export type RecoveryTemplateId = "gentle" | "direct" | "urgent";
 
@@ -62,7 +64,7 @@ export type EmailCopyOverrides = Partial<
 
 /**
  * Copy tuned from industry dunning patterns.
- * Layout inspired by Mobbin transactional emails.
+ * HTML structure is selected by layoutPresetId (five recovery layouts).
  */
 const TEMPLATES: Record<RecoveryTemplateId, TemplateCopy> = {
   gentle: {
@@ -95,6 +97,11 @@ const TEMPLATES: Record<RecoveryTemplateId, TemplateCopy> = {
 
 export type RecoveryEmailVars = {
   templateId: RecoveryTemplateId;
+  /**
+   * Selects HTML structure (Sonos / Avocode / Benchmark / FontBase / NordVPN).
+   * Day step still selects copy/urgency via templateId.
+   */
+  layoutPresetId?: string | null;
   /** Primary — accents / monogram fallback (not always the CTA) */
   primaryColor: string;
   /** Secondary — muted text / links */
@@ -298,36 +305,12 @@ export function buildRecoveryEmail(input: RecoveryEmailVars): {
     input.linkColor?.trim() ||
     copy.linkColor?.trim() ||
     primary;
-  const pad = copy.emailPadding ?? 24;
-  const cardBg =
-    copy.shellBackground?.trim() ||
-    (shellBg.toLowerCase() === "#ffffff" ? "#ffffff" : shellBg);
-  const cardBorderOn = copy.shellBorder !== false;
-  const cardBorderColor =
-    copy.shellBorderColor?.trim() || primary;
-  const cardRadius =
-    typeof copy.shellRadius === "number" && Number.isFinite(copy.shellRadius)
-      ? Math.max(0, Math.min(48, Math.round(copy.shellRadius)))
-      : 0;
-  const cardBorderWidth =
-    typeof copy.shellBorderWidth === "number" &&
-    Number.isFinite(copy.shellBorderWidth)
-      ? Math.max(1, Math.min(8, Math.round(copy.shellBorderWidth)))
-      : 1;
-  const cardBox = [
-    `background:${escapeAttr(cardBg)}`,
-    cardBorderOn
-      ? `border:${cardBorderWidth}px solid ${escapeAttr(cardBorderColor)}`
-      : "border:0",
-    `border-radius:${cardRadius}px`,
-    "overflow:hidden",
-  ].join(";");
   const support = input.supportEmail?.trim() || null;
   const supportBlock = support
     ? `Questions or feedback? Drop us a line at
         <a href="mailto:${escapeAttr(support)}" style="color:${escapeAttr(linkColor)};text-decoration:underline;">${escapeHtml(support)}</a>.`
     : `Questions or feedback? Just reply to this email.`;
-  const helpHref = support ? `mailto:${escapeAttr(support)}` : escapeAttr(ctaUrl);
+  const helpHref = support ? `mailto:${support}` : ctaUrl;
   const socialHtml = socialRowHtml(input.socials, linkColor);
   const badgeHtml = input.showDeclineGuardBadge
     ? `<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid ${ruleColor};font-size:11px;line-height:1.5;color:${faintFooter};text-align:center;">
@@ -339,14 +322,6 @@ export function buildRecoveryEmail(input: RecoveryEmailVars): {
   const logoMark = logoUrl
     ? `<img src="${escapeAttr(logoUrl)}" alt="${escapeHtml(input.storeName)}" width="44" height="44" style="display:block;width:44px;height:44px;border-radius:10px;object-fit:cover;" />`
     : `<div style="display:inline-block;width:44px;height:44px;border-radius:10px;background:${escapeAttr(primary)};color:#ffffff;font-size:15px;font-weight:700;letter-spacing:-0.02em;line-height:44px;text-align:center;">${escapeHtml(initials)}</div>`;
-  const headerHtml = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 36px;">
-        <tr>
-          <td style="vertical-align:middle;padding:0 12px 0 0;">${logoMark}</td>
-          <td style="vertical-align:middle;padding:0;">
-            <p style="margin:0;font-size:17px;line-height:1.3;font-weight:600;letter-spacing:-0.01em;color:${escapeAttr(shellText)};">${escapeHtml(input.storeName)}</p>
-          </td>
-        </tr>
-      </table>`;
   const emailFont = normalizeEmailFont(input.emailFont);
   const fontFamily = emailFontStackWithRaw(emailFont, input.fontFamilyRaw);
   const fontHeadLinks = emailFontHeadLinks(emailFont);
@@ -369,79 +344,41 @@ export function buildRecoveryEmail(input: RecoveryEmailVars): {
       )
     : "";
 
-  const bodySection = useBlocks
-    ? `
-      <p style="margin:0 0 16px;font-size:18px;line-height:1.4;font-weight:600;color:${escapeAttr(shellText)};">
-        Hi ${escapeHtml(vars.first_name)},
-      </p>
-      ${blocksHtml}
-      <p style="margin:16px 0 0;font-size:13px;line-height:1.5;color:${faintFooter};">
-        ${escapeHtml(copy.ignoreNote)}
-      </p>`
-    : `
-      <p style="margin:0 0 8px;font-size:18px;line-height:1.4;font-weight:600;color:${escapeAttr(shellText)};">
-        Hi ${escapeHtml(vars.first_name)},
-      </p>
-      <p style="margin:0 0 28px;font-size:16px;line-height:1.5;color:${escapeAttr(secondary)};">
-        ${escapeHtml(headline)}
-      </p>
-
-      <p style="margin:0 0 28px;font-size:16px;line-height:1.6;color:${escapeAttr(shellText)};">
-        ${body}
-      </p>
-
-      <p style="margin:0 0 28px;">
-        <a href="${escapeAttr(ctaUrl)}"
-           style="display:inline-block;background:${escapeAttr(ctaBg)};color:${escapeAttr(ctaText)};text-decoration:none;font-size:14px;font-weight:600;padding:12px 22px;border-radius:${ctaRadiusCss};">
-          ${escapeHtml(copy.cta)}
-        </a>
-      </p>
-
-      <p style="margin:0 0 8px;font-size:14px;line-height:1.5;color:${mutedFooter};">
-        Or <a href="${escapeAttr(ctaUrl)}" style="color:${escapeAttr(linkColor)};text-decoration:underline;">open the billing page</a> to update your card.
-      </p>
-      <p style="margin:0;font-size:13px;line-height:1.5;color:${faintFooter};">
-        ${escapeHtml(copy.ignoreNote)}
-      </p>`;
-
-  const html = `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${escapeHtml(subject)}</title>
-    ${fontHeadLinks}
-  </head>
-  <body style="margin:0;padding:0;background:${escapeAttr(shellBg)};font-family:${escapeAttr(fontFamily)};color:${escapeAttr(shellText)};-webkit-font-smoothing:antialiased;">
-    <div style="max-width:480px;margin:0 auto;padding:40px ${pad}px 48px;${cardBox}">
-      ${headerHtml}
-
-      ${bodySection}
-
-      <hr style="border:none;border-top:1px solid ${ruleColor};margin:40px 0 28px;" />
-
-      <p style="margin:0 0 10px;font-size:28px;line-height:1.15;font-weight:700;letter-spacing:-0.03em;color:${escapeAttr(shellText)};">
-        ${escapeHtml(input.storeName)}
-      </p>
-      <p style="margin:0 0 20px;font-size:13px;line-height:1.5;color:${mutedFooter};">
-        ${supportBlock}
-      </p>
-
-      ${socialHtml}
-
-      <p style="margin:0 0 20px;font-size:13px;line-height:1.5;">
-        <a href="${escapeAttr(ctaUrl)}" style="color:${escapeAttr(linkColor)};text-decoration:underline;margin-right:16px;">Manage subscription</a>
-        <a href="${helpHref}" style="color:${escapeAttr(linkColor)};text-decoration:underline;">Help center</a>
-      </p>
-
-      <p style="margin:0;font-size:12px;line-height:1.5;color:${faintFooter};">
-        © ${year} ${escapeHtml(input.storeName)}. All rights reserved.
-      </p>
-
-      ${badgeHtml}
-    </div>
-  </body>
-</html>`;
+  const html = renderRecoveryLayoutHtml({
+    layoutPresetId: normalizeLayoutPresetId(input.layoutPresetId),
+    templateId: input.templateId,
+    subject,
+    headline,
+    bodyHtml: body,
+    greeting: vars.first_name,
+    ctaLabel: copy.cta,
+    ctaUrl,
+    ignoreNote: copy.ignoreNote,
+    storeName: input.storeName,
+    productName: input.productName,
+    amountLabel: input.amountLabel,
+    logoMark,
+    year,
+    fontFamily,
+    fontHeadLinks,
+    shellBg,
+    shellText,
+    secondary,
+    primary,
+    ctaBg,
+    ctaText,
+    ctaRadiusCss,
+    linkColor,
+    mutedFooter,
+    faintFooter,
+    ruleColor,
+    supportBlock,
+    helpHref,
+    socialHtml,
+    badgeHtml,
+    useBlocks: Boolean(useBlocks),
+    blocksHtml,
+  });
 
   const blockText = useBlocks
     ? applyVars(renderBlocksText(copy.blocks!, ctaUrl), vars, "text")

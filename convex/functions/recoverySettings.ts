@@ -1259,6 +1259,7 @@ function recoveryPreviewPayload(
   const colors = recoveryColorsFromTheme(theme.tokens);
   const built = buildRecoveryEmail({
     templateId: theme.templateId,
+    layoutPresetId: theme.layoutPresetId,
     primaryColor: colors.primaryColor,
     secondaryColor: colors.secondaryColor,
     storeName: preview.storeName,

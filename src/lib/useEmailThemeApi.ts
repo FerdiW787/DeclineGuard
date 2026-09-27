@@ -5,13 +5,13 @@ import {
   emailThemeRefs,
   type BrandImportResult,
   type EmailThemeSettings,
-  type LifecycleEmailPreview,
+  type RecoveryEmailPreview,
 } from "./emailThemeApi";
-import type { LifecycleEmailType, StylingMode } from "./emailTheme";
+import type { RecoverySequenceStep, StylingMode } from "./emailTheme";
 
 /**
- * Optional Convex hooks. Safe when Riley’s functions are not generated yet
- * (`useQuery` / mutations are skipped). Requires ConvexProvider.
+ * Convex hooks for recovery theme. Persist mutations throw so callers
+ * can surface errors (do not swallow to null).
  */
 
 export function useEmailThemeQuery(): EmailThemeSettings | null | undefined {
@@ -24,23 +24,23 @@ export function useEmailThemeQuery(): EmailThemeSettings | null | undefined {
   );
 }
 
-export function useLifecycleEmailThemeQuery(
-  emailType: LifecycleEmailType | null,
-): LifecycleEmailPreview | null | undefined {
-  const ref = emailThemeRefs.getLifecycleEmailTheme();
+export function useRecoveryEmailThemeQuery(
+  step: RecoverySequenceStep | null,
+): RecoveryEmailPreview | null | undefined {
+  const ref = emailThemeRefs.getRecoveryEmailTheme();
   return useQuery(
     (ref ?? api.functions.recoverySettings.getSettings) as NonNullable<
       typeof ref
     >,
-    ref && emailType ? { emailType } : "skip",
+    ref && step ? { step } : "skip",
   );
 }
 
-export function useLifecycleEmailPreviewsQuery():
-  | LifecycleEmailPreview[]
+export function useRecoveryEmailPreviewsQuery():
+  | RecoveryEmailPreview[]
   | null
   | undefined {
-  const ref = emailThemeRefs.getLifecycleEmailPreviews();
+  const ref = emailThemeRefs.getRecoveryEmailPreviews();
   return useQuery(
     (ref ?? api.functions.recoverySettings.getSettings) as NonNullable<
       typeof ref
@@ -52,14 +52,12 @@ export function useLifecycleEmailPreviewsQuery():
 export function useSetStylingMode() {
   const convex = useConvex();
   return useCallback(
-    async (stylingMode: StylingMode): Promise<EmailThemeSettings | null> => {
+    async (stylingMode: StylingMode): Promise<EmailThemeSettings> => {
       const ref = emailThemeRefs.setStylingMode();
-      if (!ref) return null;
-      try {
-        return await convex.mutation(ref, { stylingMode });
-      } catch {
-        return null;
+      if (!ref) {
+        throw new Error("setStylingMode is not available");
       }
+      return await convex.mutation(ref, { stylingMode });
     },
     [convex],
   );
@@ -68,14 +66,12 @@ export function useSetStylingMode() {
 export function useSetLayoutPresetId() {
   const convex = useConvex();
   return useCallback(
-    async (layoutPresetId: string): Promise<EmailThemeSettings | null> => {
+    async (layoutPresetId: string): Promise<EmailThemeSettings> => {
       const ref = emailThemeRefs.setLayoutPresetId();
-      if (!ref) return null;
-      try {
-        return await convex.mutation(ref, { layoutPresetId });
-      } catch {
-        return null;
+      if (!ref) {
+        throw new Error("setLayoutPresetId is not available");
       }
+      return await convex.mutation(ref, { layoutPresetId });
     },
     [convex],
   );

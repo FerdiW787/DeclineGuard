@@ -3,29 +3,23 @@ import {
   DEFAULT_STYLING_MODE,
   isStylingMode,
   resolveLayoutPresetId,
-  LIFECYCLE_EMAIL_TYPES,
+  RECOVERY_SEQUENCE_STEPS,
   type LayoutPresetId,
-  type LifecycleEmailType,
+  type RecoverySequenceStep,
   type StylingMode,
 } from "./emailLayoutPresets";
 import type { EmailCopyOverride, EmailLayoutCopyOverrides } from "./emailLayoutCopy";
 import type { EmailThemeTokens } from "./emailTheme";
 
-const STORAGE_KEY = "dg.emailLayoutDraft.v1";
+const STORAGE_KEY = "dg.emailLayoutDraft.v2";
 
 /**
- * Riley-shaped FE draft. recoverySettings will store stylingMode +
- * layoutPresetId (default quiet-verify) when Convex tips; until then
- * this stays in localStorage.
+ * FE draft — one global layout + styling mode for recovery Day 0 / 2 / 5.
  */
 export type EmailLayoutDraft = {
   stylingMode: StylingMode;
   layoutPresetId: LayoutPresetId;
   copyOverrides: EmailLayoutCopyOverrides;
-  /**
-   * Shell colors the current save mutation cannot store
-   * (`emailBackgroundColor`, `emailTextColor`).
-   */
   shellOverrides: {
     emailBackgroundColor?: string;
     emailTextColor?: string;
@@ -44,9 +38,9 @@ function sanitizeCopyOverrides(
 ): EmailLayoutCopyOverrides {
   if (!raw || typeof raw !== "object") return {};
   const out: EmailLayoutCopyOverrides = {};
-  for (const type of LIFECYCLE_EMAIL_TYPES) {
-    if (!(type in raw)) continue;
-    const entry = (raw as Record<string, unknown>)[type];
+  for (const step of RECOVERY_SEQUENCE_STEPS) {
+    if (!(step in raw)) continue;
+    const entry = (raw as Record<string, unknown>)[step];
     if (!entry || typeof entry !== "object") continue;
     const rec = entry as Record<string, unknown>;
     const next: EmailCopyOverride = {};
@@ -56,7 +50,7 @@ function sanitizeCopyOverrides(
     if (typeof rec.secondaryLink === "string") {
       next.secondaryLink = rec.secondaryLink;
     }
-    if (Object.keys(next).length > 0) out[type] = next;
+    if (Object.keys(next).length > 0) out[step] = next;
   }
   return out;
 }
@@ -115,7 +109,6 @@ export function draftsEqual(a: EmailLayoutDraft, b: EmailLayoutDraft): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-/** Brand fields `saveEmailCustomizations` already accepts. */
 export type PersistableEmailLayoutFields = {
   brandColor: string;
   secondaryColor: string;
@@ -124,14 +117,6 @@ export type PersistableEmailLayoutFields = {
   linkColor: string;
 };
 
-/**
- * Thin persist adapter.
- *
- * Writes the Riley-shaped draft to localStorage. Color fields that
- * `saveEmailCustomizations` already accepts are returned for the live
- * save path. `stylingMode` + `layoutPresetId` persist via
- * `setStylingMode` / `setLayoutPresetId` when those refs exist.
- */
 export function persistEmailLayoutSettings(input: {
   draft: EmailLayoutDraft;
   configured: Partial<EmailThemeTokens>;
@@ -166,18 +151,16 @@ export function persistEmailLayoutSettings(input: {
       shellOverrides: input.draft.shellOverrides,
     },
     convexGap: [
-      "layoutPresetId",
-      "stylingMode",
-      "copyOverrides (lifecycle short copy)",
+      "copyOverrides (recovery short copy)",
       "emailBackgroundColor",
       "emailTextColor",
     ],
   };
 }
 
-export function copyOverrideForType(
+export function copyOverrideForStep(
   draft: EmailLayoutDraft,
-  emailType: LifecycleEmailType,
+  step: RecoverySequenceStep,
 ): EmailCopyOverride | undefined {
-  return draft.copyOverrides[emailType];
+  return draft.copyOverrides[step];
 }
