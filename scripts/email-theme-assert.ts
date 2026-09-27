@@ -12,6 +12,7 @@ import {
   resolveTheme,
   resolveThemeFromSettings,
 } from "../convex/lib/emailTheme";
+import { renderBlocksHtml } from "../convex/lib/emailBlocks";
 import { buildRecoveryEmail } from "../convex/lib/recoveryEmailTemplate";
 import {
   buildRecoveryLayoutHtml,
@@ -329,6 +330,94 @@ if (!withShell.html.includes("padding:40px")) {
   throw new Error("FAIL: emailPadding must apply to layout HTML");
 }
 
+const xssBlockHtml =
+  'Go <a href="javascript:alert(1)">js</a> ' +
+  "<a href='data:text/html,pwn'>data</a> " +
+  '<a href="http://insecure.example">http</a> ' +
+  '<a href=javascript:alert(2)>unquoted</a> ' +
+  '<strong onclick="alert(1)">bold</strong> ' +
+  '<em onerror=alert(1)>emph</em> ' +
+  '<a href="https://safe.example">ok</a>';
+
+function hrefValues(html: string): string[] {
+  const values: string[] = [];
+  const re = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(html))) {
+    values.push((match[1] ?? match[2] ?? match[3] ?? "").trim());
+  }
+  return values;
+}
+
+function assertSafeHrefs(html: string, label: string): void {
+  for (const href of hrefValues(html)) {
+    if (/^(?:javascript|data|http):/i.test(href)) {
+      throw new Error(`FAIL: ${label} leaked unsafe href ${href}`);
+    }
+  }
+  if (/\son[a-z]+\s*=/i.test(html)) {
+    throw new Error(`FAIL: ${label} leaked event-handler attribute`);
+  }
+}
+
+const xssDirect = renderBlocksHtml(
+  [
+    {
+      id: "xss",
+      type: "text",
+      html: xssBlockHtml,
+      fontSize: 16,
+      color: "default",
+      align: "left",
+      marginTop: 0,
+      marginBottom: 0,
+    },
+  ],
+  {
+    primaryColor: "#112233",
+    linkColor: "#112233",
+    mutedColor: "#667788",
+    ctaUrl: "https://app.lemonsqueezy.com/my-orders",
+  },
+);
+assertSafeHrefs(xssDirect, "renderBlocksHtml");
+if (!xssDirect.includes("https://safe.example")) {
+  throw new Error("FAIL: allowlisted https href must survive sanitizer");
+}
+if (!xssDirect.includes("js") || !xssDirect.includes("bold")) {
+  throw new Error("FAIL: unsafe anchors must unwrap to text content");
+}
+
+const xssComposed = buildRecoveryEmail({
+  ...sharedColors,
+  templateId: "gentle",
+  layoutPresetId: "sonos",
+  copyOverrides: {
+    gentle: {
+      subject: "Subj",
+      headline: "Headline",
+      body: "Body",
+      cta: "CTA",
+      blocks: [
+        {
+          id: "xss",
+          type: "text",
+          html: xssBlockHtml,
+          fontSize: 16,
+          color: "default",
+          align: "left",
+          marginTop: 0,
+          marginBottom: 0,
+        },
+      ],
+    },
+  },
+});
+assertSafeHrefs(xssComposed.html, "composed send HTML");
+if (!xssComposed.html.includes("https://safe.example")) {
+  throw new Error("FAIL: composed HTML must keep allowlisted https href");
+}
+
 console.log(
-  "asserts green: configured-legacy #112233, quiet-verify→sonos, 5 layout ids, FE normalize sonos, unset→configured, D0/D2/D5, structural HTML by layoutPresetId, blocks HTML compose, shared soft-expire map, socials, ignoreNote, shell chrome",
+  "asserts green: configured-legacy #112233, quiet-verify→sonos, 5 layout ids, FE normalize sonos, unset→configured, D0/D2/D5, structural HTML by layoutPresetId, blocks HTML compose, shared soft-expire map, socials, ignoreNote, shell chrome, block href/attr sanitizer",
 );

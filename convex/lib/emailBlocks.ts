@@ -108,13 +108,60 @@ function looksLikeHtml(text: string): boolean {
   return /<\/?(?:strong|b|em|i|u|span|br|a)\b/i.test(text);
 }
 
+const EVENT_HANDLER_ATTR_RE =
+  /\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
+
+function stripEventHandlerAttrs(html: string): string {
+  return html.replace(
+    /<([a-zA-Z][\w:-]*)(\s[^>]*?)?(\s*\/?)>/g,
+    (_full, tag: string, attrs: string | undefined, close: string) => {
+      if (!attrs) return `<${tag}${close}>`;
+      const cleaned = attrs.replace(EVENT_HANDLER_ATTR_RE, "");
+      return `<${tag}${cleaned}${close}>`;
+    },
+  );
+}
+
+function hrefFromAttrs(attrs: string): string {
+  const match = attrs.match(
+    /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i,
+  );
+  return (match?.[1] ?? match?.[2] ?? match?.[3] ?? "").trim();
+}
+
+function isPaymentPlaceholderHref(href: string): boolean {
+  return href === "#update-payment" || href === "#billing";
+}
+
+function rewriteAnchors(
+  html: string,
+  replace: (attrs: string, inner: string) => string,
+): string {
+  let current = html;
+  for (let i = 0; i < 4; i += 1) {
+    const next = current.replace(
+      /<a\b([^>]*)>([\s\S]*?)<\/a>/gi,
+      (_full, attrs: string, inner: string) => replace(attrs, inner),
+    );
+    if (next === current) break;
+    current = next;
+  }
+  return current.replace(/<a\b([^>]*)>/gi, (open, attrs: string) => {
+    const raw = hrefFromAttrs(attrs);
+    if (isPaymentPlaceholderHref(raw) || allowHttpsUrl(raw)) return open;
+    return "";
+  });
+}
+
 function sanitizeStoredHtml(html: string): string {
-  return html
+  return stripEventHandlerAttrs(html)
     .replace(/<br\s*\/?>/gi, "<br />")
-    .replace(/<\/?(?:b|strong)>/gi, (m) =>
+    .replace(/<\/?(?:b|strong)(?:\s[^>]*)?>/gi, (m) =>
       m.startsWith("</") ? "</strong>" : "<strong>",
     )
-    .replace(/<\/?(?:i|em)>/gi, (m) => (m.startsWith("</") ? "</em>" : "<em>"))
+    .replace(/<\/?(?:i|em)(?:\s[^>]*)?>/gi, (m) =>
+      m.startsWith("</") ? "</em>" : "<em>",
+    )
     .replace(/<span\b([^>]*)>([\s\S]*?)<\/span>/gi, (_, attrs: string, inner: string) => {
       const style = attrs.match(/style\s*=\s*"([^"]*)"/i)?.[1] ?? "";
       let out = inner;
@@ -129,10 +176,23 @@ function sanitizeStoredHtml(html: string): string {
       if (color) out = `<span style="color:${color}">${out}</span>`;
       return out;
     })
-    .replace(
-      /<a\s+[^>]*href="((?:https:[^"]+)|#update-payment|#billing)"[^>]*>/gi,
-      '<a href="$1">',
-    )
+    .replace(/<u(?:\s[^>]*)?>/gi, "<u>")
+    .replace(/<\/u>/gi, "</u>")
+    .replace(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi, (_full, attrs: string, inner: string) => {
+      const raw = hrefFromAttrs(attrs);
+      if (isPaymentPlaceholderHref(raw)) {
+        return `<a href="${raw}">${inner}</a>`;
+      }
+      if (/^https:/i.test(raw)) {
+        return `<a href="${escapeAttr(raw)}">${inner}</a>`;
+      }
+      return inner;
+    })
+    .replace(/<a\b([^>]*)>/gi, (open, attrs: string) => {
+      const raw = hrefFromAttrs(attrs);
+      if (isPaymentPlaceholderHref(raw) || /^https:/i.test(raw)) return open;
+      return "";
+    })
     .replace(/<(?!\/?(?:strong|em|u|span|br|a)\b)[^>]+>/gi, "");
 }
 
@@ -154,16 +214,15 @@ function styleEmailAnchors(
   ctaUrl?: string,
 ): string {
   const color = linkColor.trim() || "#2563eb";
-  return ensurePaymentLinkSpacing(html).replace(/<a\b([^>]*)>/gi, (full, attrs: string) => {
-    const hrefMatch = attrs.match(/\bhref\s*=\s*"([^"]*)"/i);
-    const raw = hrefMatch?.[1] ?? "";
-    const href =
-      raw === "#update-payment" || raw === "#billing"
-        ? ctaUrl || raw
-        : allowHttpsUrl(raw);
-    if (!href) return full;
-    return `<a href="${escapeAttr(href)}" style="color:${escapeAttr(color)};text-decoration:underline">`;
+  const styled = rewriteAnchors(ensurePaymentLinkSpacing(html), (attrs, inner) => {
+    const raw = hrefFromAttrs(attrs);
+    const href = isPaymentPlaceholderHref(raw)
+      ? ctaUrl || raw
+      : allowHttpsUrl(raw);
+    if (!href) return inner;
+    return `<a href="${escapeAttr(href)}" style="color:${escapeAttr(color)};text-decoration:underline">${inner}</a>`;
   });
+  return styled;
 }
 
 /** Convert **markers** or a safe HTML subset to email HTML. */
