@@ -229,32 +229,14 @@ function declineGuardNote(linkColor: string, muted: string): string {
   return `<p style="margin:20px 0 0;font-size:11px;line-height:16px;color:${escapeAttr(muted)};">Recovery sent by <strong style="color:${escapeAttr(linkColor)};">DeclineGuard</strong></p>`;
 }
 
-const LAYOUT_STRUCTURE: Record<RecoveryLayoutId, string> = {
-  sonos: "centered-hero",
-  avocode: "compact-card",
-  benchmark: "help-cards",
-  fontbase: "dark-frame",
-  "nordvpn-structure": "header-flip",
-};
-
 function wrapDocument(
-  layoutPresetId: RecoveryLayoutId,
   theme: RecoveryLayoutTheme,
   inner: string,
 ): string {
   const fontId = normalizeEmailFont(theme.emailFont);
   const stack = emailFontStackWithRaw(fontId, theme.fontFamilyRaw);
   const links = emailFontHeadLinks(fontId);
-  const structure = LAYOUT_STRUCTURE[layoutPresetId];
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><title>Recovery email</title>${links}<style>body{margin:0;padding:0;}</style></head><body style="margin:0;padding:0;background:${escapeAttr(theme.pageBackgroundColor)};color:${escapeAttr(theme.pageTextColor)};font-family:${escapeAttr(stack)};"><div data-layout="${layoutPresetId}" data-structure="${structure}">${inner}</div></body></html>`;
-}
-
-export function layoutStructureMarker(layoutPresetId: string): {
-  layout: RecoveryLayoutId;
-  structure: string;
-} {
-  const layout = normalizeRecoveryLayoutId(layoutPresetId);
-  return { layout, structure: LAYOUT_STRUCTURE[layout] };
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><title>Recovery email</title>${links}<style>body{margin:0;padding:0;}</style></head><body style="margin:0;padding:0;background:${escapeAttr(theme.pageBackgroundColor)};color:${escapeAttr(theme.pageTextColor)};font-family:${escapeAttr(stack)};">${inner}</body></html>`;
 }
 
 function sonosHtml(
@@ -266,7 +248,6 @@ function sonosHtml(
       <div style="width:80px;height:80px;border-radius:40px;background:#d8d8d8;margin:0 auto 32px;"></div>
     </td>`;
   return wrapDocument(
-    "sonos",
     theme,
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${escapeAttr(theme.pageBackgroundColor)};">
   <tr><td align="center" style="padding:0;">
@@ -310,7 +291,6 @@ function nordvpnHtml(
   const flip = (n: string) =>
     `<td align="center" width="64" height="80" style="width:64px;height:80px;background:#1a1a1a;border-radius:6px;color:#ffffff;font-size:44px;font-weight:600;line-height:80px;">${n}</td>`;
   return wrapDocument(
-    "nordvpn-structure",
     theme,
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${escapeAttr(theme.pageBackgroundColor)};">
   <tr><td align="center" style="padding:16px 12px 8px;">
@@ -360,7 +340,6 @@ function avocodeHtml(
 ): string {
   const { theme, copy, storeName, storeLogoUrl } = input;
   return wrapDocument(
-    "avocode",
     theme,
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${escapeAttr(theme.pageBackgroundColor)};">
   <tr><td align="center" style="padding:24px 16px 8px;">${wordmarkRow(storeName, storeLogoUrl, theme.pageTextColor, "0.22em", 18)}</td></tr>
@@ -397,7 +376,6 @@ function fontbaseHtml(
     ? img
     : `<span style="display:inline-block;width:22px;height:22px;border-radius:11px;background:${escapeAttr(theme.brandColor)};"></span>`;
   return wrapDocument(
-    "fontbase",
     theme,
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${escapeAttr(theme.pageBackgroundColor)};">
   <tr><td align="center" style="padding:24px 16px 32px;">
@@ -457,7 +435,6 @@ function benchmarkHtml(
         "3. We’ll retry the payment for you",
       ];
   return wrapDocument(
-    "benchmark",
     theme,
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${escapeAttr(theme.emailBackgroundColor)};">
   <tr><td align="center" style="padding:40px 32px;">

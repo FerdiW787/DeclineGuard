@@ -2,6 +2,7 @@
  * FE contract — re-export Convex source of truth (`convex/lib/emailTheme.ts`).
  * Catalog: sonos | avocode | benchmark | fontbase | nordvpn-structure.
  * Recovery surface: Day 0 / Day 2 / Day 5 only.
+ * Locked refs: src/components/dashboard/email-layouts/refs/*.png
  */
 
 export {

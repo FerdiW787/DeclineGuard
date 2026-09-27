@@ -1,5 +1,6 @@
 /**
- * Compatibility barrel — Convex `emailTheme` + recovery send/preview builders.
+ * Compatibility barrel — Convex theme contract + recovery send/preview builders.
+ * Catalog: sonos | avocode | benchmark | fontbase | nordvpn-structure.
  */
 
 export {
@@ -14,6 +15,7 @@ export {
   SONOS_TOKENS,
   assertKnownLayoutPresetId,
   configuredTokensFromSettings,
+  fromBackendLayoutPresetId,
   getLayoutPreset,
   inferStylingMode,
   isLayoutPresetId,
@@ -25,10 +27,9 @@ export {
   recoveryColorsFromTheme,
   resolveLayoutPresetId,
   resolveRecoveryEmailTheme,
-  toBackendLayoutPresetId,
-  fromBackendLayoutPresetId,
   resolveTheme,
   resolveThemeFromSettings,
+  toBackendLayoutPresetId,
   type EmailThemeTokens,
   type LayoutPreset,
   type LayoutPresetId,

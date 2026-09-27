@@ -13,7 +13,7 @@ import {
   resolveThemeFromSettings,
 } from "../convex/lib/emailTheme";
 import { buildRecoveryEmail } from "../convex/lib/recoveryEmailTemplate";
-import { layoutStructureMarker } from "../convex/lib/recoveryLayoutHtml";
+import { buildRecoveryLayoutHtml } from "../convex/lib/recoveryLayoutHtml";
 import {
   inferStylingMode as feInferStylingMode,
   normalizeLayoutPresetId as feNormalizeLayoutPresetId,
@@ -140,63 +140,61 @@ const sharedColors = {
   linkColor: "#112233",
 } as const;
 
+const fingerprints: Record<(typeof expectedIds)[number], string> = {
+  sonos: "height:176px",
+  avocode: "width:96px;height:64px",
+  benchmark: "How to update a card",
+  fontbase: "Recovery email ·",
+  "nordvpn-structure": "width:64px;height:80px;background:#1a1a1a",
+};
+
 const structures = expectedIds.map((id) => {
   const built = buildRecoveryEmail({
     ...sharedColors,
     templateId: "gentle",
     layoutPresetId: id,
   });
-  const marker = layoutStructureMarker(id);
-  if (!built.html.includes(`data-layout="${id}"`)) {
-    throw new Error(`FAIL: ${id} HTML missing data-layout`);
+  const viaBuilder = buildRecoveryLayoutHtml({
+    layoutPresetId: id,
+    step: "day0",
+    theme: {
+      brandColor: "#112233",
+      secondaryColor: "#667788",
+      mutedTextColor: "#667788",
+      linkColor: "#112233",
+      pageBackgroundColor: "#f7f5f2",
+      pageTextColor: "#1a1a1a",
+      emailBackgroundColor: "#f7f5f2",
+      emailTextColor: "#1a1a1a",
+      ctaBackgroundColor: "#112233",
+      ctaTextColor: "#ffffff",
+      ctaBorderRadiusPx: 4,
+      emailFont: "system",
+      fontFamilyRaw: null,
+    },
+    copy: { headline: "Headline", body: "Body", cta: "CTA" },
+    storeName: "Acme",
+  });
+  if (!built.html.includes(fingerprints[id])) {
+    throw new Error(`FAIL: ${id} send HTML missing Jules structure fingerprint`);
   }
-  if (!built.html.includes(`data-structure="${marker.structure}"`)) {
-    throw new Error(
-      `FAIL: ${id} HTML missing data-structure=${marker.structure}`,
-    );
+  if (!viaBuilder.html.includes(fingerprints[id])) {
+    throw new Error(`FAIL: ${id} buildRecoveryLayoutHtml missing fingerprint`);
   }
-  return { id, structure: marker.structure, html: built.html };
+  return { id, html: built.html };
 });
 
-const uniqueStructures = new Set(structures.map((row) => row.structure));
-if (uniqueStructures.size !== expectedIds.length) {
+const uniqueHtml = new Set(structures.map((row) => row.html));
+if (uniqueHtml.size !== expectedIds.length) {
   throw new Error("FAIL: layoutPresetId must produce five distinct structures");
 }
 
-const expectedStructure: Record<(typeof expectedIds)[number], string> = {
-  sonos: "centered-hero",
-  avocode: "compact-card",
-  benchmark: "help-cards",
-  fontbase: "dark-frame",
-  "nordvpn-structure": "header-flip",
-};
-for (const row of structures) {
-  const expected = expectedStructure[row.id];
-  if (row.structure !== expected) {
-    throw new Error(`FAIL: ${row.id} structure ${row.structure} !== ${expected}`);
-  }
-}
-
 const sonosHtml = structures.find((row) => row.id === "sonos")!.html;
-const avocodeHtml = structures.find((row) => row.id === "avocode")!.html;
-if (sonosHtml.includes('data-structure="compact-card"')) {
+if (sonosHtml.includes(fingerprints.avocode)) {
   throw new Error("FAIL: sonos must not use avocode compact-card structure");
-}
-if (!avocodeHtml.includes("compact-card")) {
-  throw new Error("FAIL: avocode must use compact-card structure");
 }
 if (!structures.find((row) => row.id === "benchmark")!.html.includes("How to update a card")) {
   throw new Error("FAIL: benchmark must include help cards");
-}
-if (!structures.find((row) => row.id === "fontbase")!.html.includes('data-structure="dark-frame"')) {
-  throw new Error("FAIL: fontbase must use dark-frame structure");
-}
-if (
-  !structures
-    .find((row) => row.id === "nordvpn-structure")!
-    .html.includes('data-structure="header-flip"')
-) {
-  throw new Error("FAIL: nordvpn-structure must use header-flip structure");
 }
 
 const day0 = buildRecoveryEmail({
@@ -212,7 +210,7 @@ const day2 = buildRecoveryEmail({
 if (day0.html === day2.html) {
   throw new Error("FAIL: day step must change copy without changing layout id");
 }
-if (!day2.html.includes('data-layout="sonos"')) {
+if (!day2.html.includes(fingerprints.sonos)) {
   throw new Error("FAIL: day step must keep layout structure");
 }
 

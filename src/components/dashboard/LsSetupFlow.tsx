@@ -701,8 +701,8 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
             : "We’ll match colors, CTA, and fonts from your marketing site.",
     },
     layout: {
-      title: "Choose an email layout",
-      body: "One layout for recovery Day 0, Day 2, and Day 5. You can change this later.",
+      title: "Choose a recovery layout",
+      body: "One layout styles Day 0, Day 2, and Day 5. You can change this later.",
     },
   };
 
