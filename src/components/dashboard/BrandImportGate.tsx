@@ -319,14 +319,15 @@ export default function BrandImportGate({
           brandColor: result.brandColor,
           secondaryColor: result.secondaryColor,
           mutedTextColor: result.mutedTextColor,
-          emailBackgroundColor:
-            result.pageBackgroundColor || result.emailBackgroundColor,
-          emailTextColor: result.pageTextColor || result.emailTextColor,
+          emailBackgroundColor: result.emailBackgroundColor,
+          emailTextColor: result.emailTextColor,
+          pageBackgroundColor: result.pageBackgroundColor,
+          pageTextColor: result.pageTextColor,
           linkColor: result.linkColor,
           ctaBackgroundColor: result.ctaBackgroundColor,
           ctaTextColor: result.ctaTextColor,
           ctaBorderRadiusPx: result.ctaBorderRadiusPx,
-          brandDomain: result.domain,
+          emailFont: result.emailFont,
           logoUrl: result.storeLogoUrl,
         }),
       });
@@ -805,15 +806,17 @@ export default function BrandImportGate({
                   storeLogoUrl={previewLogo}
                   configured={configuredTokensFromSettings({
                     brandColor: previewPrimary,
-                    secondaryColor: previewSecondary,
+                    secondaryColor: result?.secondaryColor ?? previewSecondary,
                     mutedTextColor: previewSecondary,
-                    emailBackgroundColor: shellBg,
-                    emailTextColor: shellText,
+                    emailBackgroundColor: result?.emailBackgroundColor ?? shellBg,
+                    emailTextColor: result?.emailTextColor ?? shellText,
+                    pageBackgroundColor: result?.pageBackgroundColor ?? shellBg,
+                    pageTextColor: result?.pageTextColor ?? shellText,
                     linkColor: result?.linkColor,
                     ctaBackgroundColor: result?.ctaBackgroundColor,
                     ctaTextColor: result?.ctaTextColor,
                     ctaBorderRadiusPx: result?.ctaBorderRadiusPx,
-                    brandDomain: result?.domain,
+                    emailFont: previewFont,
                     logoUrl: previewLogo,
                   })}
                   emailFont={previewFont}

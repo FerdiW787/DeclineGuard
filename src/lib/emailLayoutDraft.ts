@@ -1,9 +1,8 @@
 import {
   DEFAULT_LAYOUT_PRESET_ID,
   DEFAULT_STYLING_MODE,
-  isLayoutPresetId,
-  isLifecycleEmailType,
   isStylingMode,
+  resolveLayoutPresetId,
   LIFECYCLE_EMAIL_TYPES,
   type LayoutPresetId,
   type LifecycleEmailType,
@@ -15,8 +14,9 @@ import type { EmailThemeTokens } from "./emailTheme";
 const STORAGE_KEY = "dg.emailLayoutDraft.v1";
 
 /**
- * Riley-shaped FE contract. Convex does not persist these fields yet.
- * Preview and onboarding read/write this draft locally.
+ * Riley-shaped FE draft. recoverySettings will store stylingMode +
+ * layoutPresetId (default quiet-verify) when Convex tips; until then
+ * this stays in localStorage.
  */
 export type EmailLayoutDraft = {
   stylingMode: StylingMode;
@@ -64,9 +64,9 @@ function sanitizeCopyOverrides(
 function sanitizeDraft(raw: unknown): EmailLayoutDraft {
   if (!raw || typeof raw !== "object") return { ...DEFAULT_EMAIL_LAYOUT_DRAFT };
   const rec = raw as Record<string, unknown>;
-  const layoutPresetId = isLayoutPresetId(String(rec.layoutPresetId ?? ""))
-    ? (rec.layoutPresetId as LayoutPresetId)
-    : DEFAULT_LAYOUT_PRESET_ID;
+  const layoutPresetId = resolveLayoutPresetId(
+    String(rec.layoutPresetId ?? DEFAULT_LAYOUT_PRESET_ID),
+  );
   const stylingMode = isStylingMode(String(rec.stylingMode ?? ""))
     ? (rec.stylingMode as StylingMode)
     : DEFAULT_STYLING_MODE;
@@ -128,8 +128,9 @@ export type PersistableEmailLayoutFields = {
  * Thin persist adapter.
  *
  * Writes the Riley-shaped draft to localStorage. Returns only fields the
- * live Convex mutation already accepts — `layoutPresetId`, `stylingMode`,
- * copy overrides, and shell colors are **not** sent to the API.
+ * live Convex mutation already accepts. Riley will persist
+ * `stylingMode` + `layoutPresetId` (default quiet-verify) on
+ * recoverySettings; until then those stay local-only.
  */
 export function persistEmailLayoutSettings(input: {
   draft: EmailLayoutDraft;
@@ -146,7 +147,9 @@ export function persistEmailLayoutSettings(input: {
       ? {
           brandColor: brand,
           secondaryColor:
-            input.configured.mutedTextColor?.trim() || "#6b6b70",
+            input.configured.secondaryColor?.trim() ||
+            input.configured.mutedTextColor?.trim() ||
+            "#6b6b70",
           ctaBackgroundColor:
             input.configured.ctaBackgroundColor?.trim() || brand,
           ctaTextColor: input.configured.ctaTextColor?.trim() || "#ffffff",

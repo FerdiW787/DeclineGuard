@@ -69,9 +69,7 @@ export default function EmailLayoutPreview({
   const dark = isDarkHex(theme.emailBackgroundColor);
   const rule = dark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)";
   const faint = dark ? "rgba(255,255,255,0.32)" : "rgba(0,0,0,0.32)";
-  const support =
-    footerSupport?.trim() ||
-    (theme.brandDomain ? `support@${theme.brandDomain}` : "support@yourstore.com");
+  const support = footerSupport?.trim() || "support@yourstore.com";
 
   const shell: CSSProperties = {
     fontFamily: emailFontFamily(emailFont),
@@ -81,7 +79,7 @@ export default function EmailLayoutPreview({
 
   const inner = (() => {
     switch (layoutPresetId) {
-      case "quiet_verify":
+      case "quiet-verify":
         return (
           <QuietVerify
             theme={theme}
@@ -90,7 +88,7 @@ export default function EmailLayoutPreview({
             copy={copy}
           />
         );
-      case "soft_expire":
+      case "soft-expire":
         return (
           <SoftExpire
             theme={theme}
@@ -100,7 +98,7 @@ export default function EmailLayoutPreview({
             vars={vars}
           />
         );
-      case "safe_pause":
+      case "safe-pause":
         return (
           <SafePause
             theme={theme}
@@ -109,7 +107,7 @@ export default function EmailLayoutPreview({
             copy={copy}
           />
         );
-      case "soft_renew":
+      case "soft-renew":
         return (
           <SoftRenew
             theme={theme}
@@ -119,7 +117,7 @@ export default function EmailLayoutPreview({
             vars={vars}
           />
         );
-      case "alert_expire":
+      case "alert-expire":
         return (
           <AlertExpire
             theme={theme}
@@ -216,7 +214,7 @@ function QuietVerify({
     <div className="px-6 py-10 text-center sm:px-10">
       <div className="flex justify-center">
         <StoreAvatar
-          src={theme.logoUrl}
+          src={theme.logoUrl ?? null}
           alt={storeName}
           size="preview"
           brandColor={theme.brandColor}
@@ -280,7 +278,7 @@ function SoftExpire({
     <div className="px-5 py-7 sm:px-7">
       <EmailStoreHeader
         storeName={storeName}
-        storeLogoUrl={theme.logoUrl}
+        storeLogoUrl={theme.logoUrl ?? null}
         primary={theme.brandColor}
         emailFont={emailFont}
         textColor={theme.emailTextColor}
@@ -353,7 +351,7 @@ function SafePause({
     <div className="px-5 py-7 sm:px-7">
       <EmailStoreHeader
         storeName={storeName}
-        storeLogoUrl={theme.logoUrl}
+        storeLogoUrl={theme.logoUrl ?? null}
         primary={theme.brandColor}
         emailFont={emailFont}
         textColor={theme.emailTextColor}
@@ -421,7 +419,7 @@ function SoftRenew({
     <div className="px-5 py-7 sm:px-7">
       <EmailStoreHeader
         storeName={storeName}
-        storeLogoUrl={theme.logoUrl}
+        storeLogoUrl={theme.logoUrl ?? null}
         primary={theme.brandColor}
         emailFont={emailFont}
         textColor={theme.emailTextColor}
@@ -499,7 +497,7 @@ function AlertExpire({
       <div className="px-5 py-7 sm:px-7">
         <EmailStoreHeader
           storeName={storeName}
-          storeLogoUrl={theme.logoUrl}
+          storeLogoUrl={theme.logoUrl ?? null}
           primary={theme.brandColor}
           emailFont={emailFont}
           textColor={theme.emailTextColor}

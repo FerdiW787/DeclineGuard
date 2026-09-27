@@ -97,13 +97,13 @@ const LAYOUT_CHROME: Record<
   LayoutPresetId,
   Partial<Record<LifecycleEmailType, Partial<EmailLayoutCopy>>>
 > = {
-  quiet_verify: {
+  "quiet-verify": {
     verify: {
       eyebrow: "Just to be sure",
       headline: "One tap to confirm",
     },
   },
-  soft_expire: {
+  "soft-expire": {
     expiry: {
       eyebrow: "A quiet heads-up",
       headline: "This access is winding down",
@@ -112,7 +112,7 @@ const LAYOUT_CHROME: Record<
       eyebrow: "Billing needs a moment",
     },
   },
-  safe_pause: {
+  "safe-pause": {
     decline_pause: {
       status: "Paused — your data is safe",
       headline: "We’ve paused access, not your work",
@@ -125,13 +125,13 @@ const LAYOUT_CHROME: Record<
       status: "Ending — your data is safe",
     },
   },
-  soft_renew: {
+  "soft-renew": {
     renewal: {
       eyebrow: "A few days out",
       headline: "Renewal is on the calendar",
     },
   },
-  alert_expire: {
+  "alert-expire": {
     expiry: {
       eyebrow: "Before access stops",
       headline: "Update billing to stay on",

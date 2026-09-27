@@ -460,13 +460,16 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
           configured: configuredTokensFromSettings({
             brandColor: current.brandColor,
             secondaryColor: current.secondaryColor,
+            mutedTextColor: current.secondaryColor,
             emailBackgroundColor,
             emailTextColor,
+            pageBackgroundColor: emailBackgroundColor,
+            pageTextColor: emailTextColor,
             linkColor: current.linkColor,
             ctaBackgroundColor: current.ctaBackgroundColor,
             ctaTextColor: current.ctaTextColor,
             ctaBorderRadiusPx,
-            brandDomain,
+            emailFont: current.emailFont,
             logoUrl: storeLogoUrl,
           }),
         });
@@ -544,13 +547,16 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
               configured={configuredTokensFromSettings({
                 brandColor: live.brandColor,
                 secondaryColor: live.secondaryColor,
+                mutedTextColor: live.secondaryColor,
                 emailBackgroundColor,
                 emailTextColor,
+                pageBackgroundColor: emailBackgroundColor,
+                pageTextColor: emailTextColor,
                 linkColor: live.linkColor,
                 ctaBackgroundColor: live.ctaBackgroundColor,
                 ctaTextColor: live.ctaTextColor,
                 ctaBorderRadiusPx,
-                brandDomain,
+                emailFont: live.emailFont,
                 logoUrl: storeLogoUrl,
               })}
               onConfiguredChange={(patch) => {

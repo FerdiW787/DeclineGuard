@@ -76,11 +76,15 @@ export default function EmailLayoutStudio({
   const mergedConfigured: Partial<EmailThemeTokens> = {
     ...configured,
     logoUrl: configured.logoUrl ?? storeLogoUrl,
+    emailFont: configured.emailFont ?? emailFont,
     emailBackgroundColor:
       draft.shellOverrides.emailBackgroundColor ??
-      configured.emailBackgroundColor,
+      configured.emailBackgroundColor ??
+      configured.pageBackgroundColor,
     emailTextColor:
-      draft.shellOverrides.emailTextColor ?? configured.emailTextColor,
+      draft.shellOverrides.emailTextColor ??
+      configured.emailTextColor ??
+      configured.pageTextColor,
   };
 
   const theme = resolveTheme({

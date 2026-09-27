@@ -471,14 +471,15 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
         brandColor: brandKit.brandColor,
         secondaryColor: brandKit.secondaryColor,
         mutedTextColor: brandKit.mutedTextColor,
-        emailBackgroundColor:
-          brandKit.pageBackgroundColor || brandKit.emailBackgroundColor,
-        emailTextColor: brandKit.pageTextColor || brandKit.emailTextColor,
+        emailBackgroundColor: brandKit.emailBackgroundColor,
+        emailTextColor: brandKit.emailTextColor,
+        pageBackgroundColor: brandKit.pageBackgroundColor,
+        pageTextColor: brandKit.pageTextColor,
         linkColor: brandKit.linkColor,
         ctaBackgroundColor: brandKit.ctaBackgroundColor,
         ctaTextColor: brandKit.ctaTextColor,
         ctaBorderRadiusPx: brandKit.ctaBorderRadiusPx,
-        brandDomain: brandKit.domain,
+        emailFont: brandKit.emailFont,
         logoUrl: brandKit.storeLogoUrl,
       });
       if (preview) {
