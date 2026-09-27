@@ -7,48 +7,65 @@ import {
 } from "./emailFonts";
 
 /**
- * Shared email theme contract for Jules + send paths.
+ * Shared recovery-email theme contract for Jules + send paths.
  *
  * Import:
  *   import { resolveTheme, type EmailThemeTokens } from "../../convex/lib/emailTheme";
  *
- * One global `layoutPresetId` selects layout structure for ALL lifecycle emails.
- * `stylingMode` only swaps token source: catalog (preset) vs merchant BrandKit
- * (configured). Token field names match recoverySettings / BrandKit — do not
- * invent a parallel primary/background alias set.
+ * One global `layoutPresetId` selects layout structure for the 3 recovery
+ * emails (Day 0 / Day 2 / Day 5). `stylingMode` only swaps token source:
+ * catalog (preset) vs merchant BrandKit (configured). Token field names match
+ * recoverySettings / BrandKit — do not invent a parallel alias set.
  */
 
 export const STYLING_MODES = ["preset", "configured"] as const;
 export type StylingMode = (typeof STYLING_MODES)[number];
 
-export const QUIET_VERIFY_LAYOUT_ID = "quiet-verify";
-
-/** MVP lifecycle emails — same layout via the single global layoutPresetId. */
-export const LIFECYCLE_EMAIL_TYPES = [
-  "verify",
-  "decline_pause",
-  "trial_ended",
-  "renewal",
-  "expiry",
+/** Five layout templates (RGE structural refs). IDs describe layout, not product emails. */
+export const LAYOUT_PRESET_IDS = [
+  "sonos",
+  "avocode",
+  "benchmark",
+  "fontbase",
+  "nordvpn-structure",
 ] as const;
 
-export type LifecycleEmailType = (typeof LIFECYCLE_EMAIL_TYPES)[number];
+export type LayoutPresetId = (typeof LAYOUT_PRESET_IDS)[number];
+
+export const SONOS_LAYOUT_ID: LayoutPresetId = "sonos";
+export const DEFAULT_LAYOUT_PRESET_ID: LayoutPresetId = SONOS_LAYOUT_ID;
+
+/** Recovery sequence only — the sole themed email surface. */
+export const RECOVERY_SEQUENCE_STEPS = ["day0", "day2", "day5"] as const;
+export type RecoverySequenceStep = (typeof RECOVERY_SEQUENCE_STEPS)[number];
+
+export const RECOVERY_STEP_TEMPLATE = {
+  day0: "gentle",
+  day2: "direct",
+  day5: "urgent",
+} as const;
 
 export const stylingModeValidator = v.union(
   v.literal("preset"),
   v.literal("configured"),
 );
 
-export const lifecycleEmailTypeValidator = v.union(
-  v.literal("verify"),
-  v.literal("decline_pause"),
-  v.literal("trial_ended"),
-  v.literal("renewal"),
-  v.literal("expiry"),
+export const layoutPresetIdValidator = v.union(
+  v.literal("sonos"),
+  v.literal("avocode"),
+  v.literal("benchmark"),
+  v.literal("fontbase"),
+  v.literal("nordvpn-structure"),
+);
+
+export const recoverySequenceStepValidator = v.union(
+  v.literal("day0"),
+  v.literal("day2"),
+  v.literal("day5"),
 );
 
 /**
- * Visual tokens applied to lifecycle + recovery emails.
+ * Visual tokens applied to recovery emails.
  * Field names match persisted BrandKit / recoverySettings columns.
  */
 export type EmailThemeTokens = {
@@ -83,43 +100,139 @@ export const emailThemeTokensValidator = v.object({
   fontFamilyRaw: v.union(v.string(), v.null()),
 });
 
-/** Quiet Verify — muted, trustworthy verify aesthetic. */
-export const QUIET_VERIFY_TOKENS: EmailThemeTokens = {
-  brandColor: "#3d5248",
-  secondaryColor: "#7a756c",
-  mutedTextColor: "#7a756c",
-  linkColor: "#3d5248",
-  pageBackgroundColor: "#f6f4f0",
-  pageTextColor: "#2c2a26",
-  emailBackgroundColor: "#f6f4f0",
-  emailTextColor: "#2c2a26",
-  ctaBackgroundColor: "#3d5248",
-  ctaTextColor: "#f7f6f3",
-  ctaBorderRadiusPx: 8,
+function layoutTokens(
+  partial: Omit<EmailThemeTokens, "fontFamilyRaw"> & {
+    fontFamilyRaw?: string | null;
+  },
+): EmailThemeTokens {
+  return {
+    ...partial,
+    fontFamilyRaw: partial.fontFamilyRaw ?? null,
+  };
+}
+
+/** Sonos — warm, quiet, editorial whitespace. */
+export const SONOS_TOKENS: EmailThemeTokens = layoutTokens({
+  brandColor: "#1a1a1a",
+  secondaryColor: "#6f6b66",
+  mutedTextColor: "#6f6b66",
+  linkColor: "#1a1a1a",
+  pageBackgroundColor: "#f7f5f2",
+  pageTextColor: "#1a1a1a",
+  emailBackgroundColor: "#f7f5f2",
+  emailTextColor: "#1a1a1a",
+  ctaBackgroundColor: "#1a1a1a",
+  ctaTextColor: "#f7f5f2",
+  ctaBorderRadiusPx: 4,
   emailFont: "georgia",
-  fontFamilyRaw: null,
-};
+});
 
 export type LayoutPreset = {
-  id: string;
+  id: LayoutPresetId;
   name: string;
   description: string;
   tokens: EmailThemeTokens;
 };
 
-export const LAYOUT_PRESET_CATALOG: Record<string, LayoutPreset> = {
-  [QUIET_VERIFY_LAYOUT_ID]: {
-    id: QUIET_VERIFY_LAYOUT_ID,
-    name: "Quiet Verify",
+export const LAYOUT_PRESET_CATALOG: Record<LayoutPresetId, LayoutPreset> = {
+  sonos: {
+    id: "sonos",
+    name: "Sonos",
     description:
-      "Muted, trustworthy verify layout for all lifecycle emails (verify, decline/pause, trial ended, renewal, expiry).",
-    tokens: QUIET_VERIFY_TOKENS,
+      "Sonos-structure recovery layout: warm paper, quiet type, Day 0/2/5.",
+    tokens: SONOS_TOKENS,
   },
+  avocode: {
+    id: "avocode",
+    name: "Avocode",
+    description:
+      "Avocode-structure recovery layout: cool product chrome, compact CTA.",
+    tokens: layoutTokens({
+      brandColor: "#2b4c7e",
+      secondaryColor: "#6b7380",
+      mutedTextColor: "#6b7380",
+      linkColor: "#2b4c7e",
+      pageBackgroundColor: "#f4f6f8",
+      pageTextColor: "#1c2430",
+      emailBackgroundColor: "#f4f6f8",
+      emailTextColor: "#1c2430",
+      ctaBackgroundColor: "#2b4c7e",
+      ctaTextColor: "#f4f6f8",
+      ctaBorderRadiusPx: 6,
+      emailFont: "inter",
+    }),
+  },
+  benchmark: {
+    id: "benchmark",
+    name: "Benchmark",
+    description:
+      "Benchmark-structure recovery layout: newsletter block, teal accent.",
+    tokens: layoutTokens({
+      brandColor: "#1f6f5b",
+      secondaryColor: "#5f6f68",
+      mutedTextColor: "#5f6f68",
+      linkColor: "#1f6f5b",
+      pageBackgroundColor: "#f3f7f5",
+      pageTextColor: "#1a2a24",
+      emailBackgroundColor: "#f3f7f5",
+      emailTextColor: "#1a2a24",
+      ctaBackgroundColor: "#1f6f5b",
+      ctaTextColor: "#f3f7f5",
+      ctaBorderRadiusPx: 8,
+      emailFont: "system",
+    }),
+  },
+  fontbase: {
+    id: "fontbase",
+    name: "FontBase",
+    description:
+      "FontBase-structure recovery layout: cream page, typographic ink.",
+    tokens: layoutTokens({
+      brandColor: "#2c241c",
+      secondaryColor: "#7a7268",
+      mutedTextColor: "#7a7268",
+      linkColor: "#2c241c",
+      pageBackgroundColor: "#f3efe6",
+      pageTextColor: "#2c241c",
+      emailBackgroundColor: "#f3efe6",
+      emailTextColor: "#2c241c",
+      ctaBackgroundColor: "#2c241c",
+      ctaTextColor: "#f3efe6",
+      ctaBorderRadiusPx: 2,
+      emailFont: "merriweather",
+    }),
+  },
+  "nordvpn-structure": {
+    id: "nordvpn-structure",
+    name: "NordVPN structure",
+    description:
+      "NordVPN-structure recovery layout: cool navy stack, structured sections.",
+    tokens: layoutTokens({
+      brandColor: "#1b2332",
+      secondaryColor: "#5c6573",
+      mutedTextColor: "#5c6573",
+      linkColor: "#3d6df2",
+      pageBackgroundColor: "#eef1f6",
+      pageTextColor: "#1b2332",
+      emailBackgroundColor: "#eef1f6",
+      emailTextColor: "#1b2332",
+      ctaBackgroundColor: "#1b2332",
+      ctaTextColor: "#eef1f6",
+      ctaBorderRadiusPx: 10,
+      emailFont: "dm-sans",
+    }),
+  },
+};
+
+/** Legacy Quiet Verify rows / writes map onto Sonos. */
+const LEGACY_LAYOUT_PRESET_IDS: Record<string, LayoutPresetId> = {
+  "quiet-verify": "sonos",
+  quiet_verify: "sonos",
 };
 
 export const NEW_MERCHANT_THEME_DEFAULTS = {
   stylingMode: "preset" as const,
-  layoutPresetId: QUIET_VERIFY_LAYOUT_ID,
+  layoutPresetId: DEFAULT_LAYOUT_PRESET_ID,
 };
 
 export type ResolveThemeInput = {
@@ -138,12 +251,19 @@ export function isStylingMode(value: unknown): value is StylingMode {
   return value === "preset" || value === "configured";
 }
 
-export function isLifecycleEmailType(
-  value: unknown,
-): value is LifecycleEmailType {
+export function isLayoutPresetId(value: unknown): value is LayoutPresetId {
   return (
     typeof value === "string" &&
-    (LIFECYCLE_EMAIL_TYPES as readonly string[]).includes(value)
+    (LAYOUT_PRESET_IDS as readonly string[]).includes(value)
+  );
+}
+
+export function isRecoverySequenceStep(
+  value: unknown,
+): value is RecoverySequenceStep {
+  return (
+    typeof value === "string" &&
+    (RECOVERY_SEQUENCE_STEPS as readonly string[]).includes(value)
   );
 }
 
@@ -156,25 +276,27 @@ export function normalizeStylingMode(
 
 export function normalizeLayoutPresetId(
   value: string | null | undefined,
-): string {
-  const id = value?.trim();
-  if (id && LAYOUT_PRESET_CATALOG[id]) return id;
-  return QUIET_VERIFY_LAYOUT_ID;
+): LayoutPresetId {
+  const raw = value?.trim() ?? "";
+  const mapped = LEGACY_LAYOUT_PRESET_IDS[raw] ?? raw;
+  if (isLayoutPresetId(mapped)) return mapped;
+  return DEFAULT_LAYOUT_PRESET_ID;
 }
 
 export function getLayoutPreset(layoutPresetId: string): LayoutPreset {
   const id = normalizeLayoutPresetId(layoutPresetId);
-  return LAYOUT_PRESET_CATALOG[id] ?? LAYOUT_PRESET_CATALOG[QUIET_VERIFY_LAYOUT_ID]!;
+  return LAYOUT_PRESET_CATALOG[id];
 }
 
-export function assertKnownLayoutPresetId(value: string): string {
-  const id = value.trim();
-  if (!id || !LAYOUT_PRESET_CATALOG[id]) {
+export function assertKnownLayoutPresetId(value: string): LayoutPresetId {
+  const raw = value.trim();
+  const mapped = LEGACY_LAYOUT_PRESET_IDS[raw] ?? raw;
+  if (!isLayoutPresetId(mapped)) {
     throw new Error(
-      `Unknown layout preset. Valid ids: ${Object.keys(LAYOUT_PRESET_CATALOG).join(", ")}`,
+      `Unknown layout preset. Valid ids: ${LAYOUT_PRESET_IDS.join(", ")}`,
     );
   }
-  return id;
+  return mapped;
 }
 
 function pickToken(
@@ -230,7 +352,7 @@ function mergeConfiguredTokens(
 }
 
 /**
- * Resolve tokens for send + preview.
+ * Resolve tokens for recovery send + preview.
  * Layout id always selects structure; stylingMode only swaps token source.
  */
 export function resolveTheme(input: ResolveThemeInput): ResolvedEmailTheme {
@@ -255,9 +377,7 @@ export function resolveTheme(input: ResolveThemeInput): ResolvedEmailTheme {
 
 /**
  * Infer mode for rows created before stylingMode existed.
- * Unset → configured (legacy preserve: saveEmailColors / customizations
- * without brand import must keep BrandKit tokens, not Quiet Verify).
- * New merchants write explicit stylingMode: "preset" on insert.
+ * Unset → configured (legacy preserve). New merchants write explicit preset.
  */
 export function inferStylingMode(row: {
   stylingMode?: string | null;
@@ -343,19 +463,23 @@ export function resolveThemeFromSettings(settings: {
   });
 }
 
-/**
- * All five MVP lifecycle types share one global theme.
- * Stubs until dedicated send paths exist — call this from those hooks.
- */
-export function resolveLifecycleEmailTheme(
-  emailType: LifecycleEmailType,
+/** Theme + recovery step. Same tokens for Day 0 / 2 / 5; layout from layoutPresetId. */
+export function resolveRecoveryEmailTheme(
+  step: RecoverySequenceStep,
   input: ResolveThemeInput,
-): ResolvedEmailTheme & { emailType: LifecycleEmailType } {
-  if (!isLifecycleEmailType(emailType)) {
-    throw new Error("Unknown lifecycle email type");
+): ResolvedEmailTheme & {
+  step: RecoverySequenceStep;
+  templateId: (typeof RECOVERY_STEP_TEMPLATE)[RecoverySequenceStep];
+} {
+  if (!isRecoverySequenceStep(step)) {
+    throw new Error("Unknown recovery sequence step");
   }
   const theme = resolveTheme(input);
-  return { emailType, ...theme };
+  return {
+    ...theme,
+    step,
+    templateId: RECOVERY_STEP_TEMPLATE[step],
+  };
 }
 
 /** Map resolved tokens onto buildRecoveryEmail color inputs. */
@@ -398,11 +522,14 @@ export function listLayoutPresets(): Array<{
   name: string;
   description: string;
 }> {
-  return Object.values(LAYOUT_PRESET_CATALOG).map((preset) => ({
-    id: preset.id,
-    name: preset.name,
-    description: preset.description,
-  }));
+  return LAYOUT_PRESET_IDS.map((id) => {
+    const preset = LAYOUT_PRESET_CATALOG[id];
+    return {
+      id: preset.id,
+      name: preset.name,
+      description: preset.description,
+    };
+  });
 }
 
 export const resolvedEmailThemeValidator = v.object({

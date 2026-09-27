@@ -33,23 +33,24 @@ import {
 } from "../lib/brandImport/brandKit";
 import {
   NEW_MERCHANT_THEME_DEFAULTS,
-  QUIET_VERIFY_LAYOUT_ID,
+  RECOVERY_SEQUENCE_STEPS,
   assertKnownLayoutPresetId,
   configuredTokensFromSettings,
   inferStylingMode,
   listLayoutPresets,
-  resolveLifecycleEmailTheme,
+  normalizeLayoutPresetId,
+  recoveryColorsFromTheme,
+  recoverySequenceStepValidator,
+  resolveRecoveryEmailTheme,
   resolveTheme,
   resolveThemeFromSettings,
   catalogSummaryValidator,
   emailThemeTokensValidator,
-  isLifecycleEmailType,
-  lifecycleEmailTypeValidator,
+  isRecoverySequenceStep,
   resolvedEmailThemeValidator,
   stylingModeValidator,
-  LIFECYCLE_EMAIL_TYPES,
 } from "../lib/emailTheme";
-import { buildLifecycleEmail } from "../lib/lifecycleEmailTemplate";
+import { buildRecoveryEmail } from "../lib/recoveryEmailTemplate";
 import { requireStaff } from "../lib/admin";
 import { consumeRateLimit } from "../lib/rateLimit";
 import { assertStorageOwnedByUser } from "../lib/storageOwnership";
@@ -504,7 +505,7 @@ function mapSettings(row: Doc<"recoverySettings">) {
     lastBrandImportAt: row.lastBrandImportAt ?? null,
     brandImportBonusCredits: Math.max(0, row.brandImportBonusCredits ?? 0),
     stylingMode: inferStylingMode(row),
-    layoutPresetId: row.layoutPresetId?.trim() || QUIET_VERIFY_LAYOUT_ID,
+    layoutPresetId: normalizeLayoutPresetId(row.layoutPresetId),
     updatedAt: row.updatedAt,
   };
 }
@@ -1115,7 +1116,7 @@ const emailThemeSettingsValidator = v.object({
   layoutPresetId: v.string(),
   resolved: resolvedEmailThemeValidator,
   catalog: catalogSummaryValidator,
-  lifecycleEmailTypes: v.array(lifecycleEmailTypeValidator),
+  recoverySequenceSteps: v.array(recoverySequenceStepValidator),
   storefrontDomain: v.union(v.string(), v.null()),
   crawlDomain: v.union(v.string(), v.null()),
   brandDomain: v.union(v.string(), v.null()),
@@ -1147,7 +1148,7 @@ function themeSettingsPayload(
     layoutPresetId: resolved.layoutPresetId,
     resolved,
     catalog: listLayoutPresets(),
-    lifecycleEmailTypes: [...LIFECYCLE_EMAIL_TYPES],
+    recoverySequenceSteps: [...RECOVERY_SEQUENCE_STEPS],
     storefrontDomain,
     crawlDomain: storefrontDomain,
     brandDomain: mapped?.brandDomain ?? null,
@@ -1171,7 +1172,7 @@ async function storefrontDomainForUser(
 
 /**
  * Jules: current theme settings + resolved tokens + storefront crawl default.
- * Layout is one global preset for all lifecycle email types.
+ * One global layout themes recovery Day 0 / Day 2 / Day 5.
  */
 export const getEmailTheme = query({
   args: {},
@@ -1190,12 +1191,13 @@ export const getEmailTheme = query({
   },
 });
 
-/**
- * Jules: resolve the shared theme for one MVP lifecycle type.
- * Same layout + tokens as getEmailTheme — type is for bind/preview only.
- */
-const lifecycleEmailPreviewValidator = v.object({
-  emailType: lifecycleEmailTypeValidator,
+const recoveryEmailPreviewValidator = v.object({
+  step: recoverySequenceStepValidator,
+  templateId: v.union(
+    v.literal("gentle"),
+    v.literal("direct"),
+    v.literal("urgent"),
+  ),
   stylingMode: stylingModeValidator,
   layoutPresetId: v.string(),
   tokens: emailThemeTokensValidator,
@@ -1204,7 +1206,7 @@ const lifecycleEmailPreviewValidator = v.object({
   text: v.string(),
 });
 
-async function lifecyclePreviewContext(
+async function recoveryPreviewContext(
   ctx: QueryCtx,
   userId: Doc<"users">["_id"],
 ) {
@@ -1221,6 +1223,10 @@ async function lifecyclePreviewContext(
     connection && !isSoftDeleted(connection)
       ? connection.storeName
       : mapped?.fromName?.trim() || "Your store";
+  const storeLogoUrl =
+    connection && !isSoftDeleted(connection)
+      ? connection.storeAvatarUrl ?? null
+      : null;
   const themeInput = {
     stylingMode: mapped?.stylingMode,
     layoutPresetId: mapped?.layoutPresetId,
@@ -1229,16 +1235,19 @@ async function lifecyclePreviewContext(
   return {
     mapped,
     storeName,
+    storeLogoUrl,
     themeInput,
     supportEmail: mapped?.supportEmail ?? mapped?.replyToEmail ?? null,
   };
 }
 
-function lifecyclePreviewPayload(
-  emailType: (typeof LIFECYCLE_EMAIL_TYPES)[number],
-  ctx: {
+function recoveryPreviewPayload(
+  step: (typeof RECOVERY_SEQUENCE_STEPS)[number],
+  preview: {
     storeName: string;
+    storeLogoUrl: string | null;
     supportEmail: string | null;
+    mapped: ReturnType<typeof mapSettings> | null;
     themeInput: {
       stylingMode?: string | null;
       layoutPresetId?: string | null;
@@ -1246,19 +1255,40 @@ function lifecyclePreviewPayload(
     };
   },
 ) {
-  const theme = resolveLifecycleEmailTheme(emailType, ctx.themeInput);
-  const built = buildLifecycleEmail({
-    emailType,
-    storeName: ctx.storeName,
-    productName: "your subscription",
-    amountLabel: "your plan",
-    customerName: null,
-    ctaUrl: "#",
-    supportEmail: ctx.supportEmail,
-    theme,
+  const theme = resolveRecoveryEmailTheme(step, preview.themeInput);
+  const colors = recoveryColorsFromTheme(theme.tokens);
+  const built = buildRecoveryEmail({
+    templateId: theme.templateId,
+    primaryColor: colors.primaryColor,
+    secondaryColor: colors.secondaryColor,
+    storeName: preview.storeName,
+    storeLogoUrl: preview.storeLogoUrl,
+    customerName: "Maya",
+    customerEmail: "preview@merchant.test",
+    productName: "Pro Monthly",
+    amountLabel: "€29.00",
+    updatePaymentUrl: "https://app.lemonsqueezy.com/my-orders",
+    supportEmail: preview.supportEmail,
+    socials: {
+      x: preview.mapped?.socialX,
+      linkedin: preview.mapped?.socialLinkedin,
+      youtube: preview.mapped?.socialYoutube,
+      instagram: preview.mapped?.socialInstagram,
+    },
+    showDeclineGuardBadge: true,
+    copyOverrides: preview.mapped?.emailCopy ?? null,
+    emailFont: colors.emailFont,
+    ctaBackgroundColor: colors.ctaBackgroundColor,
+    ctaTextColor: colors.ctaTextColor,
+    ctaBorderRadiusPx: colors.ctaBorderRadiusPx,
+    emailBackgroundColor: colors.emailBackgroundColor,
+    emailTextColor: colors.emailTextColor,
+    linkColor: colors.linkColor,
+    fontFamilyRaw: colors.fontFamilyRaw,
   });
   return {
-    emailType: theme.emailType,
+    step: theme.step,
+    templateId: theme.templateId,
     stylingMode: theme.stylingMode,
     layoutPresetId: theme.layoutPresetId,
     tokens: theme.tokens,
@@ -1268,30 +1298,31 @@ function lifecyclePreviewPayload(
   };
 }
 
-export const getLifecycleEmailTheme = query({
-  args: { emailType: lifecycleEmailTypeValidator },
-  returns: v.union(lifecycleEmailPreviewValidator, v.null()),
+/** Jules: themed recovery Day 0 / 2 / 5 preview (same path as send). */
+export const getRecoveryEmailTheme = query({
+  args: { step: recoverySequenceStepValidator },
+  returns: v.union(recoveryEmailPreviewValidator, v.null()),
   handler: async (ctx, args) => {
-    if (!isLifecycleEmailType(args.emailType)) {
-      throw new Error("Unknown lifecycle email type");
+    if (!isRecoverySequenceStep(args.step)) {
+      throw new Error("Unknown recovery sequence step");
     }
     const user = await resolveProductUserOrNull(ctx);
     if (!user) return null;
-    const previewCtx = await lifecyclePreviewContext(ctx, user._id);
-    return lifecyclePreviewPayload(args.emailType, previewCtx);
+    const previewCtx = await recoveryPreviewContext(ctx, user._id);
+    return recoveryPreviewPayload(args.step, previewCtx);
   },
 });
 
-/** Jules: all five MVP lifecycle types, same global theme + stub send bodies. */
-export const getLifecycleEmailPreviews = query({
+/** Jules: all three recovery steps, one global layout + resolveTheme tokens. */
+export const getRecoveryEmailPreviews = query({
   args: {},
-  returns: v.union(v.array(lifecycleEmailPreviewValidator), v.null()),
+  returns: v.union(v.array(recoveryEmailPreviewValidator), v.null()),
   handler: async (ctx) => {
     const user = await resolveProductUserOrNull(ctx);
     if (!user) return null;
-    const previewCtx = await lifecyclePreviewContext(ctx, user._id);
-    return LIFECYCLE_EMAIL_TYPES.map((emailType) =>
-      lifecyclePreviewPayload(emailType, previewCtx),
+    const previewCtx = await recoveryPreviewContext(ctx, user._id);
+    return RECOVERY_SEQUENCE_STEPS.map((step) =>
+      recoveryPreviewPayload(step, previewCtx),
     );
   },
 });
@@ -1353,7 +1384,7 @@ export const setStylingMode = mutation({
   },
 });
 
-/** Jules: one global layout for every lifecycle email type. */
+/** Jules: one global layout for recovery Day 0 / Day 2 / Day 5. */
 export const setLayoutPresetId = mutation({
   args: { layoutPresetId: v.string() },
   returns: emailThemeSettingsValidator,
