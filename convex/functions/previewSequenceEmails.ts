@@ -8,6 +8,11 @@ import {
   buildRecoveryEmail,
   type RecoveryTemplateId,
 } from "../lib/recoveryEmailTemplate";
+import {
+  NEW_MERCHANT_THEME_DEFAULTS,
+  recoveryColorsFromTheme,
+  resolveThemeFromSettings,
+} from "../lib/emailTheme";
 import { resolveFromAddress } from "../lib/recoveryEmailFrom";
 import { isResendQuotaError, parseResendError } from "../lib/resendErrors";
 
@@ -90,8 +95,10 @@ async function runPreviewStep(
   );
 
   const templateId = STEP_TEMPLATE[step];
-  const primaryColor = settings?.brandColor ?? "#0c0c0c";
-  const secondaryColor = settings?.secondaryColor ?? "#6b6b70";
+  const theme = resolveThemeFromSettings(
+    settings ?? NEW_MERCHANT_THEME_DEFAULTS,
+  );
+  const colors = recoveryColorsFromTheme(theme.tokens);
   const amountLabel = formatMoney(
     PREVIEW_SAMPLE.amountCents,
     PREVIEW_SAMPLE.currency,
@@ -104,8 +111,8 @@ async function runPreviewStep(
 
   const email = buildRecoveryEmail({
     templateId,
-    primaryColor,
-    secondaryColor,
+    primaryColor: colors.primaryColor,
+    secondaryColor: colors.secondaryColor,
     storeName: payload.storeName,
     storeLogoUrl: payload.storeAvatarUrl,
     customerName: PREVIEW_SAMPLE.customerName,
@@ -122,15 +129,14 @@ async function runPreviewStep(
     },
     showDeclineGuardBadge: true,
     copyOverrides: settings?.emailCopy ?? null,
-    emailFont: settings?.emailFont,
-    ctaBackgroundColor: settings?.ctaBackgroundColor,
-    ctaTextColor: settings?.ctaTextColor,
-    ctaBorderRadiusPx: settings?.ctaBorderRadiusPx,
-    emailBackgroundColor:
-      settings?.pageBackgroundColor ?? settings?.emailBackgroundColor,
-    emailTextColor: settings?.pageTextColor ?? settings?.emailTextColor,
-    linkColor: settings?.linkColor,
-    fontFamilyRaw: settings?.fontFamilyRaw,
+    emailFont: colors.emailFont,
+    ctaBackgroundColor: colors.ctaBackgroundColor,
+    ctaTextColor: colors.ctaTextColor,
+    ctaBorderRadiusPx: colors.ctaBorderRadiusPx,
+    emailBackgroundColor: colors.emailBackgroundColor,
+    emailTextColor: colors.emailTextColor,
+    linkColor: colors.linkColor,
+    fontFamilyRaw: colors.fontFamilyRaw,
   });
 
   const displayName =

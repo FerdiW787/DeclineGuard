@@ -23,11 +23,33 @@ import {
   emailFontValidator,
   normalizeEmailFont,
 } from "../lib/emailFonts";
-import { validateDomainInput } from "../lib/brandImport/domain";
+import {
+  lemonStorefrontDomain,
+  validateDomainInput,
+} from "../lib/brandImport/domain";
 import {
   evaluateBrandImportQuota,
   type BrandImportQuota,
 } from "../lib/brandImport/brandKit";
+import {
+  NEW_MERCHANT_THEME_DEFAULTS,
+  QUIET_VERIFY_LAYOUT_ID,
+  assertKnownLayoutPresetId,
+  configuredTokensFromSettings,
+  inferStylingMode,
+  listLayoutPresets,
+  resolveLifecycleEmailTheme,
+  resolveTheme,
+  resolveThemeFromSettings,
+  catalogSummaryValidator,
+  emailThemeTokensValidator,
+  isLifecycleEmailType,
+  lifecycleEmailTypeValidator,
+  resolvedEmailThemeValidator,
+  stylingModeValidator,
+  LIFECYCLE_EMAIL_TYPES,
+} from "../lib/emailTheme";
+import { buildLifecycleEmail } from "../lib/lifecycleEmailTemplate";
 import { requireStaff } from "../lib/admin";
 import { consumeRateLimit } from "../lib/rateLimit";
 import { assertStorageOwnedByUser } from "../lib/storageOwnership";
@@ -72,6 +94,8 @@ const settingsValidator = v.object({
   brandCaptureMethod: v.union(brandCaptureMethodValidator, v.null()),
   lastBrandImportAt: v.union(v.number(), v.null()),
   brandImportBonusCredits: v.number(),
+  stylingMode: stylingModeValidator,
+  layoutPresetId: v.string(),
   updatedAt: v.number(),
 });
 
@@ -479,6 +503,8 @@ function mapSettings(row: Doc<"recoverySettings">) {
     brandCaptureMethod: row.brandCaptureMethod ?? null,
     lastBrandImportAt: row.lastBrandImportAt ?? null,
     brandImportBonusCredits: Math.max(0, row.brandImportBonusCredits ?? 0),
+    stylingMode: inferStylingMode(row),
+    layoutPresetId: row.layoutPresetId?.trim() || QUIET_VERIFY_LAYOUT_ID,
     updatedAt: row.updatedAt,
   };
 }
@@ -607,6 +633,7 @@ export const saveSettings = mutation({
         secondaryColor: "#6b6b70",
         templateId: args.templateId,
         ...senderPatch,
+        ...NEW_MERCHANT_THEME_DEFAULTS,
         updatedAt: now,
       });
     }
@@ -646,6 +673,7 @@ export const saveSenderSettings = mutation({
         templateId: "gentle",
         fromName,
         replyToEmail,
+        ...NEW_MERCHANT_THEME_DEFAULTS,
         updatedAt: now,
       });
     }
@@ -686,6 +714,7 @@ export const saveEmailColors = mutation({
         mutedTextColor: secondaryColor,
         templateId: "gentle",
         emailFont: DEFAULT_EMAIL_FONT,
+        ...NEW_MERCHANT_THEME_DEFAULTS,
         updatedAt: now,
       });
     }
@@ -786,6 +815,7 @@ export const saveEmailCustomizations = mutation({
         brandColor,
         secondaryColor,
         mutedTextColor: secondaryColor,
+        ...NEW_MERCHANT_THEME_DEFAULTS,
         updatedAt: now,
       };
       for (const [key, value] of Object.entries(optionalPatch)) {
@@ -877,6 +907,7 @@ export const grantBrandImportBonus = mutation({
         secondaryColor: "#6b6b70",
         templateId: "gentle",
         brandImportBonusCredits: add,
+        ...NEW_MERCHANT_THEME_DEFAULTS,
         updatedAt: now,
       });
       return { brandImportBonusCredits: add };
@@ -1006,6 +1037,7 @@ export const completeBrandImport = mutation({
       pageTextColor,
       emailBackgroundColor,
       emailTextColor,
+      stylingMode: "configured" as const,
       ...(fontFamilyRaw ? { fontFamilyRaw } : {}),
       updatedAt: now,
       ...(fromName ? { fromName } : {}),
@@ -1021,6 +1053,7 @@ export const completeBrandImport = mutation({
       await ctx.db.insert("recoverySettings", {
         userId: user._id,
         templateId: "gentle",
+        ...NEW_MERCHANT_THEME_DEFAULTS,
         ...patch,
       });
     }
@@ -1050,6 +1083,7 @@ export const getBrandImportContext = internalQuery({
       storeName: v.string(),
       storeLogoUrl: v.union(v.string(), v.null()),
       storeSlug: v.string(),
+      storefrontDomain: v.union(v.string(), v.null()),
     }),
     v.null(),
   ),
@@ -1071,7 +1105,271 @@ export const getBrandImportContext = internalQuery({
       storeName: connection.storeName,
       storeLogoUrl: connection.storeAvatarUrl ?? null,
       storeSlug: connection.storeSlug,
+      storefrontDomain: lemonStorefrontDomain(connection.storeSlug),
     };
+  },
+});
+
+const emailThemeSettingsValidator = v.object({
+  stylingMode: stylingModeValidator,
+  layoutPresetId: v.string(),
+  resolved: resolvedEmailThemeValidator,
+  catalog: catalogSummaryValidator,
+  lifecycleEmailTypes: v.array(lifecycleEmailTypeValidator),
+  storefrontDomain: v.union(v.string(), v.null()),
+  crawlDomain: v.union(v.string(), v.null()),
+  brandDomain: v.union(v.string(), v.null()),
+  brandImportCompletedAt: v.union(v.number(), v.null()),
+  configuredTokens: emailThemeTokensValidator,
+  quota: brandImportQuotaValidator,
+});
+
+function themeSettingsPayload(
+  row: Doc<"recoverySettings"> | null,
+  storefrontDomain: string | null,
+  now: number,
+) {
+  const mapped = row ? mapSettings(row) : null;
+  const resolved = resolveThemeFromSettings(
+    mapped ?? {
+      stylingMode: NEW_MERCHANT_THEME_DEFAULTS.stylingMode,
+      layoutPresetId: NEW_MERCHANT_THEME_DEFAULTS.layoutPresetId,
+    },
+  );
+  const configured = resolveTheme({
+    stylingMode: "configured",
+    layoutPresetId: resolved.layoutPresetId,
+    configured: configuredTokensFromSettings(mapped),
+  });
+
+  return {
+    stylingMode: resolved.stylingMode,
+    layoutPresetId: resolved.layoutPresetId,
+    resolved,
+    catalog: listLayoutPresets(),
+    lifecycleEmailTypes: [...LIFECYCLE_EMAIL_TYPES],
+    storefrontDomain,
+    crawlDomain: storefrontDomain,
+    brandDomain: mapped?.brandDomain ?? null,
+    brandImportCompletedAt: mapped?.brandImportCompletedAt ?? null,
+    configuredTokens: configured.tokens,
+    quota: quotaFromSettings(row, now),
+  };
+}
+
+async function storefrontDomainForUser(
+  ctx: QueryCtx | MutationCtx,
+  userId: Doc<"users">["_id"],
+): Promise<string | null> {
+  const connection = await ctx.db
+    .query("lemonConnections")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
+  if (!connection || isSoftDeleted(connection)) return null;
+  return lemonStorefrontDomain(connection.storeSlug);
+}
+
+/**
+ * Jules: current theme settings + resolved tokens + storefront crawl default.
+ * Layout is one global preset for all lifecycle email types.
+ */
+export const getEmailTheme = query({
+  args: {},
+  returns: v.union(emailThemeSettingsValidator, v.null()),
+  handler: async (ctx) => {
+    const user = await resolveProductUserOrNull(ctx);
+    if (!user) return null;
+
+    const row = await ctx.db
+      .query("recoverySettings")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+    const active = row && !isSoftDeleted(row) ? row : null;
+    const storefrontDomain = await storefrontDomainForUser(ctx, user._id);
+    return themeSettingsPayload(active, storefrontDomain, Date.now());
+  },
+});
+
+/**
+ * Jules: resolve the shared theme for one MVP lifecycle type.
+ * Same layout + tokens as getEmailTheme — type is for bind/preview only.
+ */
+const lifecycleEmailPreviewValidator = v.object({
+  emailType: lifecycleEmailTypeValidator,
+  stylingMode: stylingModeValidator,
+  layoutPresetId: v.string(),
+  tokens: emailThemeTokensValidator,
+  subject: v.string(),
+  html: v.string(),
+  text: v.string(),
+});
+
+async function lifecyclePreviewContext(
+  ctx: QueryCtx,
+  userId: Doc<"users">["_id"],
+) {
+  const row = await ctx.db
+    .query("recoverySettings")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
+  const mapped = row && !isSoftDeleted(row) ? mapSettings(row) : null;
+  const connection = await ctx.db
+    .query("lemonConnections")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
+  const storeName =
+    connection && !isSoftDeleted(connection)
+      ? connection.storeName
+      : mapped?.fromName?.trim() || "Your store";
+  const themeInput = {
+    stylingMode: mapped?.stylingMode,
+    layoutPresetId: mapped?.layoutPresetId,
+    configured: configuredTokensFromSettings(mapped),
+  };
+  return {
+    mapped,
+    storeName,
+    themeInput,
+    supportEmail: mapped?.supportEmail ?? mapped?.replyToEmail ?? null,
+  };
+}
+
+function lifecyclePreviewPayload(
+  emailType: (typeof LIFECYCLE_EMAIL_TYPES)[number],
+  ctx: {
+    storeName: string;
+    supportEmail: string | null;
+    themeInput: {
+      stylingMode?: string | null;
+      layoutPresetId?: string | null;
+      configured: ReturnType<typeof configuredTokensFromSettings>;
+    };
+  },
+) {
+  const theme = resolveLifecycleEmailTheme(emailType, ctx.themeInput);
+  const built = buildLifecycleEmail({
+    emailType,
+    storeName: ctx.storeName,
+    productName: "your subscription",
+    amountLabel: "your plan",
+    customerName: null,
+    ctaUrl: "#",
+    supportEmail: ctx.supportEmail,
+    theme,
+  });
+  return {
+    emailType: theme.emailType,
+    stylingMode: theme.stylingMode,
+    layoutPresetId: theme.layoutPresetId,
+    tokens: theme.tokens,
+    subject: built.subject,
+    html: built.html,
+    text: built.text,
+  };
+}
+
+export const getLifecycleEmailTheme = query({
+  args: { emailType: lifecycleEmailTypeValidator },
+  returns: v.union(lifecycleEmailPreviewValidator, v.null()),
+  handler: async (ctx, args) => {
+    if (!isLifecycleEmailType(args.emailType)) {
+      throw new Error("Unknown lifecycle email type");
+    }
+    const user = await resolveProductUserOrNull(ctx);
+    if (!user) return null;
+    const previewCtx = await lifecyclePreviewContext(ctx, user._id);
+    return lifecyclePreviewPayload(args.emailType, previewCtx);
+  },
+});
+
+/** Jules: all five MVP lifecycle types, same global theme + stub send bodies. */
+export const getLifecycleEmailPreviews = query({
+  args: {},
+  returns: v.union(v.array(lifecycleEmailPreviewValidator), v.null()),
+  handler: async (ctx) => {
+    const user = await resolveProductUserOrNull(ctx);
+    if (!user) return null;
+    const previewCtx = await lifecyclePreviewContext(ctx, user._id);
+    return LIFECYCLE_EMAIL_TYPES.map((emailType) =>
+      lifecyclePreviewPayload(emailType, previewCtx),
+    );
+  },
+});
+
+async function ensureThemeSettingsRow(
+  ctx: MutationCtx,
+  userId: Doc<"users">["_id"],
+): Promise<Doc<"recoverySettings">> {
+  const existing = await ctx.db
+    .query("recoverySettings")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
+  if (existing && !isSoftDeleted(existing)) return existing;
+
+  const now = Date.now();
+  if (existing) {
+    await ctx.db.patch(existing._id, {
+      deletedAt: undefined,
+      deletedBy: undefined,
+      stylingMode: existing.stylingMode ?? NEW_MERCHANT_THEME_DEFAULTS.stylingMode,
+      layoutPresetId:
+        existing.layoutPresetId ?? NEW_MERCHANT_THEME_DEFAULTS.layoutPresetId,
+      updatedAt: now,
+    });
+    const restored = await ctx.db.get(existing._id);
+    if (!restored) throw new Error("Recovery settings not found");
+    return restored;
+  }
+
+  const id = await ctx.db.insert("recoverySettings", {
+    userId,
+    brandColor: "#0c0c0c",
+    secondaryColor: "#6b6b70",
+    templateId: "gentle",
+    ...NEW_MERCHANT_THEME_DEFAULTS,
+    updatedAt: now,
+  });
+  const created = await ctx.db.get(id);
+  if (!created) throw new Error("Recovery settings not found");
+  return created;
+}
+
+/** Jules: preset vs configured token source. Layout id is unchanged. */
+export const setStylingMode = mutation({
+  args: { stylingMode: stylingModeValidator },
+  returns: emailThemeSettingsValidator,
+  handler: async (ctx, args) => {
+    const user = await requireWriteUser(ctx, "email_theme");
+    const row = await ensureThemeSettingsRow(ctx, user._id);
+    const now = Date.now();
+    await ctx.db.patch(row._id, {
+      stylingMode: args.stylingMode,
+      updatedAt: now,
+    });
+    const next = await ctx.db.get(row._id);
+    if (!next) throw new Error("Recovery settings not found");
+    const storefrontDomain = await storefrontDomainForUser(ctx, user._id);
+    return themeSettingsPayload(next, storefrontDomain, now);
+  },
+});
+
+/** Jules: one global layout for every lifecycle email type. */
+export const setLayoutPresetId = mutation({
+  args: { layoutPresetId: v.string() },
+  returns: emailThemeSettingsValidator,
+  handler: async (ctx, args) => {
+    const user = await requireWriteUser(ctx, "email_theme");
+    const layoutPresetId = assertKnownLayoutPresetId(args.layoutPresetId);
+    const row = await ensureThemeSettingsRow(ctx, user._id);
+    const now = Date.now();
+    await ctx.db.patch(row._id, {
+      layoutPresetId,
+      updatedAt: now,
+    });
+    const next = await ctx.db.get(row._id);
+    if (!next) throw new Error("Recovery settings not found");
+    const storefrontDomain = await storefrontDomainForUser(ctx, user._id);
+    return themeSettingsPayload(next, storefrontDomain, now);
   },
 });
 

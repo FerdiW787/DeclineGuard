@@ -8,6 +8,11 @@ import {
   buildRecoveryEmail,
   type RecoveryTemplateId,
 } from "../lib/recoveryEmailTemplate";
+import {
+  NEW_MERCHANT_THEME_DEFAULTS,
+  recoveryColorsFromTheme,
+  resolveThemeFromSettings,
+} from "../lib/emailTheme";
 import { resolveFromAddress } from "../lib/recoveryEmailFrom";
 import { isResendQuotaError, parseResendError } from "../lib/resendErrors";
 import { safePaymentUpdateUrl } from "../lib/safeUrl";
@@ -214,8 +219,10 @@ async function runSequenceStep(
   const finalUpdatePaymentUrl = safePaymentUpdateUrl(updatePaymentUrl);
 
   const templateId = STEP_TEMPLATE[step];
-  const primaryColor = settings?.brandColor ?? "#0c0c0c";
-  const secondaryColor = settings?.secondaryColor ?? "#6b6b70";
+  const theme = resolveThemeFromSettings(
+    settings ?? NEW_MERCHANT_THEME_DEFAULTS,
+  );
+  const colors = recoveryColorsFromTheme(theme.tokens);
   const amountLabel = formatMoney(payload.amountCents, payload.currency);
 
   const replyTo = settings?.replyToEmail?.trim() || undefined;
@@ -226,8 +233,8 @@ async function runSequenceStep(
 
   const email = buildRecoveryEmail({
     templateId,
-    primaryColor,
-    secondaryColor,
+    primaryColor: colors.primaryColor,
+    secondaryColor: colors.secondaryColor,
     storeName: payload.storeName,
     storeLogoUrl: payload.storeAvatarUrl,
     customerName: payload.customerName,
@@ -244,15 +251,14 @@ async function runSequenceStep(
     },
     showDeclineGuardBadge,
     copyOverrides: settings?.emailCopy ?? null,
-    emailFont: settings?.emailFont,
-    ctaBackgroundColor: settings?.ctaBackgroundColor,
-    ctaTextColor: settings?.ctaTextColor,
-    ctaBorderRadiusPx: settings?.ctaBorderRadiusPx,
-    emailBackgroundColor:
-      settings?.pageBackgroundColor ?? settings?.emailBackgroundColor,
-    emailTextColor: settings?.pageTextColor ?? settings?.emailTextColor,
-    linkColor: settings?.linkColor,
-    fontFamilyRaw: settings?.fontFamilyRaw,
+    emailFont: colors.emailFont,
+    ctaBackgroundColor: colors.ctaBackgroundColor,
+    ctaTextColor: colors.ctaTextColor,
+    ctaBorderRadiusPx: colors.ctaBorderRadiusPx,
+    emailBackgroundColor: colors.emailBackgroundColor,
+    emailTextColor: colors.emailTextColor,
+    linkColor: colors.linkColor,
+    fontFamilyRaw: colors.fontFamilyRaw,
   });
 
   const displayName =
