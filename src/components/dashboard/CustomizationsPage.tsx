@@ -42,6 +42,12 @@ import {
 } from "@/lib/emailFonts";
 import { cn } from "@/lib/utils";
 import { formatMoneyAmount, type OpenFailureRow } from "./dashboardUi";
+import EmailLayoutStudio from "./email-layouts/EmailLayoutStudio";
+import { configuredTokensFromSettings } from "@/lib/emailTheme";
+import {
+  loadEmailLayoutDraft,
+  persistEmailLayoutSettings,
+} from "@/lib/emailLayoutDraft";
 
 const TEMPLATE_ORDER: RecoveryTemplateId[] = ["gentle", "direct", "urgent"];
 
@@ -174,6 +180,7 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
       showDeclineGuardBadge,
       openFailures,
       fromAddressHint,
+      brandDomain,
       onSave,
       onDirtyChange,
       onUploadImage,
@@ -448,6 +455,21 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
       }
       let ok = false;
       try {
+        persistEmailLayoutSettings({
+          draft: loadEmailLayoutDraft(),
+          configured: configuredTokensFromSettings({
+            brandColor: current.brandColor,
+            secondaryColor: current.secondaryColor,
+            emailBackgroundColor,
+            emailTextColor,
+            linkColor: current.linkColor,
+            ctaBackgroundColor: current.ctaBackgroundColor,
+            ctaTextColor: current.ctaTextColor,
+            ctaBorderRadiusPx,
+            brandDomain,
+            logoUrl: storeLogoUrl,
+          }),
+        });
         await onSaveRef.current(current);
         ok = true;
       } catch (err: unknown) {
@@ -513,6 +535,57 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
           focusMode ? "bg-white" : "bg-[#f7f8f8]",
         )}
       >
+        {!focusMode ? (
+          <div className="mx-auto w-full max-w-[72rem] px-4 pb-2 pt-5 md:px-6">
+            <EmailLayoutStudio
+              variant="page"
+              storeName={storeName}
+              storeLogoUrl={storeLogoUrl}
+              configured={configuredTokensFromSettings({
+                brandColor: live.brandColor,
+                secondaryColor: live.secondaryColor,
+                emailBackgroundColor,
+                emailTextColor,
+                linkColor: live.linkColor,
+                ctaBackgroundColor: live.ctaBackgroundColor,
+                ctaTextColor: live.ctaTextColor,
+                ctaBorderRadiusPx,
+                brandDomain,
+                logoUrl: storeLogoUrl,
+              })}
+              onConfiguredChange={(patch) => {
+                setLive((prev) => ({
+                  ...prev,
+                  ...(patch.brandColor
+                    ? { brandColor: patch.brandColor }
+                    : {}),
+                  ...(patch.mutedTextColor
+                    ? { secondaryColor: patch.mutedTextColor }
+                    : {}),
+                  ...(patch.ctaBackgroundColor
+                    ? { ctaBackgroundColor: patch.ctaBackgroundColor }
+                    : {}),
+                  ...(patch.ctaTextColor
+                    ? { ctaTextColor: patch.ctaTextColor }
+                    : {}),
+                  ...(patch.linkColor ? { linkColor: patch.linkColor } : {}),
+                }));
+              }}
+              emailFont={live.emailFont}
+              footerSupport={footerSupport}
+              showDeclineGuardBadge={showDeclineGuardBadge}
+              previewVars={copyVars}
+            />
+            <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8a8f98]">
+              Recovery sequence
+            </p>
+            <p className="mt-1 text-[13px] text-[#6b6f76]">
+              Gentle, Direct, and Urgent still send on day 0, 2, and 5. Layout
+              above is shared by every lifecycle email.
+            </p>
+          </div>
+        ) : null}
+
         <EmailCoverflow
           templates={TEMPLATE_ORDER}
           selected={previewTemplate}
