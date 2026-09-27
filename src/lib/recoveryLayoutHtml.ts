@@ -9,6 +9,8 @@ export {
   type BuiltRecoveryLayoutHtml,
   type RecoveryLayoutCopy,
   type RecoveryLayoutId,
+  type RecoveryLayoutShell,
   type RecoveryLayoutStep,
   type RecoveryLayoutTheme,
+  type RecoverySocialLinks,
 } from "../../convex/lib/recoveryLayoutHtml";

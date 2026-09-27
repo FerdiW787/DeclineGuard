@@ -231,9 +231,14 @@ const LEGACY_LAYOUT_PRESET_IDS: Record<string, LayoutPresetId> = {
   quiet_verify: "sonos",
 };
 
-/** Read-path remaps for leftover Jules product-email ids (dropped from picker). */
-const READ_LAYOUT_ALIASES: Record<string, LayoutPresetId> = {
+/**
+ * Shared read-path remaps for leftover ids. Both `normalizeLayoutPresetId`
+ * and `normalizeRecoveryLayoutId` must use this table so send + preview
+ * pick the same layout (e.g. soft-expire → fontbase, not sonos).
+ */
+export const LEGACY_LAYOUT_PRESET_ID_MAP: Record<string, LayoutPresetId> = {
   ...LEGACY_LAYOUT_PRESET_IDS,
+  "calm-verify": "sonos",
   "soft-expire": "fontbase",
   soft_expire: "fontbase",
   "safe-pause": "benchmark",
@@ -242,7 +247,14 @@ const READ_LAYOUT_ALIASES: Record<string, LayoutPresetId> = {
   soft_renew: "avocode",
   "alert-expire": "nordvpn-structure",
   alert_expire: "nordvpn-structure",
+  "account-expired": "nordvpn-structure",
+  "trial-ended": "avocode",
+  "upcoming-renewal": "fontbase",
+  "data-safe": "benchmark",
 };
+
+/** @deprecated Use LEGACY_LAYOUT_PRESET_ID_MAP — same table. */
+const READ_LAYOUT_ALIASES = LEGACY_LAYOUT_PRESET_ID_MAP;
 
 export const NEW_MERCHANT_THEME_DEFAULTS = {
   stylingMode: "preset" as const,

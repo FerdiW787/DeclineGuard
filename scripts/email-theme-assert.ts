@@ -13,7 +13,10 @@ import {
   resolveThemeFromSettings,
 } from "../convex/lib/emailTheme";
 import { buildRecoveryEmail } from "../convex/lib/recoveryEmailTemplate";
-import { buildRecoveryLayoutHtml } from "../convex/lib/recoveryLayoutHtml";
+import {
+  buildRecoveryLayoutHtml,
+  normalizeRecoveryLayoutId,
+} from "../convex/lib/recoveryLayoutHtml";
 import {
   inferStylingMode as feInferStylingMode,
   normalizeLayoutPresetId as feNormalizeLayoutPresetId,
@@ -214,6 +217,118 @@ if (!day2.html.includes(fingerprints.sonos)) {
   throw new Error("FAIL: day step must keep layout structure");
 }
 
+const softExpireTheme = normalizeLayoutPresetId("soft-expire");
+const softExpireLayout = normalizeRecoveryLayoutId("soft-expire");
+if (softExpireTheme !== softExpireLayout) {
+  throw new Error(
+    `FAIL: shared legacy map — soft-expire must resolve to the same id (theme=${softExpireTheme} layout=${softExpireLayout})`,
+  );
+}
+if (softExpireTheme !== "fontbase") {
+  throw new Error(
+    `FAIL: soft-expire must map to fontbase, got ${softExpireTheme}`,
+  );
+}
+
+if (!day0.html.includes("data-ignore-note") || !day0.html.includes("already updated")) {
+  throw new Error("FAIL: ignoreNote must appear in layout HTML");
+}
+
+const withSocials = buildRecoveryEmail({
+  ...sharedColors,
+  templateId: "gentle",
+  layoutPresetId: "sonos",
+  socials: { x: "https://x.com/acme" },
+});
+if (!withSocials.html.includes("https://x.com/acme")) {
+  throw new Error("FAIL: merchant socials must appear in layout HTML");
+}
+
+const withBlocks = buildRecoveryEmail({
+  ...sharedColors,
+  templateId: "gentle",
+  layoutPresetId: "sonos",
+  copyOverrides: {
+    gentle: {
+      subject: "Subj",
+      headline: "Headline",
+      body: "plain body that must not flatten blocks",
+      cta: "CTA",
+      blocks: [
+        {
+          id: "b1",
+          type: "text",
+          html: "Merchant <strong>block</strong> body {{product}}",
+          fontSize: 16,
+          color: "default",
+          align: "left",
+          marginTop: 0,
+          marginBottom: 8,
+        },
+      ],
+    },
+  },
+});
+if (!withBlocks.html.includes('data-compose="blocks"')) {
+  throw new Error("FAIL: blocks path must mark data-compose=blocks");
+}
+if (!withBlocks.html.includes("<strong>block</strong>")) {
+  throw new Error("FAIL: blocks must compose as HTML inside layout chrome");
+}
+if (withBlocks.html.includes("&lt;strong&gt;block&lt;/strong&gt;")) {
+  throw new Error("FAIL: blocks HTML must not be escaped as plain text");
+}
+if (!withBlocks.html.includes("Pro Monthly")) {
+  throw new Error("FAIL: block placeholders must apply");
+}
+if (!withBlocks.html.includes(fingerprints.sonos)) {
+  throw new Error("FAIL: blocks compose must keep layout chrome");
+}
+
+const withoutBlocks = buildRecoveryEmail({
+  ...sharedColors,
+  templateId: "gentle",
+  layoutPresetId: "sonos",
+});
+if (!withoutBlocks.html.includes('data-compose="copy"')) {
+  throw new Error("FAIL: no-blocks path must keep layout copy/body");
+}
+if (!withoutBlocks.html.includes(fingerprints.sonos)) {
+  throw new Error("FAIL: no-blocks path must keep layout chrome");
+}
+
+const withShell = buildRecoveryEmail({
+  ...sharedColors,
+  templateId: "gentle",
+  layoutPresetId: "sonos",
+  copyOverrides: {
+    gentle: {
+      subject: "Subj",
+      headline: "Headline",
+      body: "Body",
+      cta: "CTA",
+      shellBackground: "#abcdef",
+      shellRadius: 16,
+      shellBorder: true,
+      shellBorderColor: "#112233",
+      shellBorderWidth: 2,
+      emailPadding: 40,
+    },
+  },
+});
+if (!withShell.html.includes("#abcdef")) {
+  throw new Error("FAIL: shellBackground must apply to layout HTML");
+}
+if (!withShell.html.includes("border-radius:16px")) {
+  throw new Error("FAIL: shellRadius must apply to layout HTML");
+}
+if (!withShell.html.includes("border:2px solid #112233")) {
+  throw new Error("FAIL: shell border must apply to layout HTML");
+}
+if (!withShell.html.includes("padding:40px")) {
+  throw new Error("FAIL: emailPadding must apply to layout HTML");
+}
+
 console.log(
-  "asserts green: configured-legacy #112233, quiet-verify→sonos, 5 layout ids, FE normalize sonos, unset→configured, D0/D2/D5, structural HTML by layoutPresetId",
+  "asserts green: configured-legacy #112233, quiet-verify→sonos, 5 layout ids, FE normalize sonos, unset→configured, D0/D2/D5, structural HTML by layoutPresetId, blocks HTML compose, shared soft-expire map, socials, ignoreNote, shell chrome",
 );

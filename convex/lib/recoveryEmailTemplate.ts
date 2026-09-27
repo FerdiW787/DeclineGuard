@@ -1,4 +1,5 @@
 import {
+  renderBlocksHtml,
   renderBlocksText,
   type EmailBlock,
 } from "./emailBlocks";
@@ -11,16 +12,14 @@ import {
   normalizeEmailFont,
   type EmailFontId,
 } from "./emailFonts";
-import { buildRecoveryLayoutHtml } from "./recoveryLayoutHtml";
+import {
+  buildRecoveryLayoutHtml,
+  type RecoverySocialLinks,
+} from "./recoveryLayoutHtml";
 
 export type RecoveryTemplateId = "gentle" | "direct" | "urgent";
 
-export type RecoverySocialLinks = {
-  x?: string | null;
-  linkedin?: string | null;
-  youtube?: string | null;
-  instagram?: string | null;
-};
+export type { RecoverySocialLinks };
 
 type TemplateCopy = {
   subject: string;
@@ -274,10 +273,34 @@ export function buildRecoveryEmail(input: RecoveryEmailVars): {
   const support = input.supportEmail?.trim() || null;
   const emailFont = normalizeEmailFont(input.emailFont);
 
-  const useBlocks = copy.blocks && copy.blocks.length > 0;
+  const useBlocks = Boolean(copy.blocks && copy.blocks.length > 0);
   const blockText = useBlocks
     ? applyVars(renderBlocksText(copy.blocks!, ctaUrl), vars, "text")
     : bodyText;
+  const blocksHtml = useBlocks
+    ? applyVars(
+        renderBlocksHtml(copy.blocks!, {
+          primaryColor: primary,
+          linkColor,
+          mutedColor: secondary,
+          ctaUrl,
+          ctaBackgroundColor: ctaBg,
+          ctaTextColor: ctaText,
+          ctaBorderRadiusPx: ctaRadius,
+          bodyTextColor: shellText,
+        }),
+        vars,
+        "html",
+      )
+    : undefined;
+
+  const hasShell =
+    copy.emailPadding !== undefined ||
+    Boolean(copy.shellBackground) ||
+    copy.shellBorder !== undefined ||
+    copy.shellBorderColor !== undefined ||
+    copy.shellBorderWidth !== undefined ||
+    copy.shellRadius !== undefined;
 
   const built = buildRecoveryLayoutHtml({
     layoutPresetId: input.layoutPresetId ?? "sonos",
@@ -299,9 +322,22 @@ export function buildRecoveryEmail(input: RecoveryEmailVars): {
     },
     copy: {
       headline,
-      body: blockText,
+      body: useBlocks ? blockText : bodyText,
       cta: copy.cta,
     },
+    bodyHtml: blocksHtml,
+    ignoreNote: copy.ignoreNote,
+    socials: input.socials,
+    shell: hasShell
+      ? {
+          emailPadding: copy.emailPadding,
+          shellBackground: copy.shellBackground,
+          shellBorderColor: copy.shellBorderColor,
+          shellBorder: copy.shellBorder,
+          shellBorderWidth: copy.shellBorderWidth,
+          shellRadius: copy.shellRadius,
+        }
+      : undefined,
     storeName: input.storeName,
     storeLogoUrl: input.storeLogoUrl,
     supportEmail: support,
@@ -341,8 +377,4 @@ function escapeHtml(value: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
-}
-
-function escapeAttr(value: string): string {
-  return escapeHtml(value).replace(/'/g, "&#39;");
 }

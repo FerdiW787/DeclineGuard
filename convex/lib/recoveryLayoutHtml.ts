@@ -12,6 +12,7 @@
  * no third-party logos or cloned marketing copy.
  */
 
+import { LEGACY_LAYOUT_PRESET_ID_MAP } from "./emailTheme";
 import {
   emailFontHeadLinks,
   emailFontStackWithRaw,
@@ -59,6 +60,23 @@ export type RecoveryLayoutCopy = {
   support?: readonly string[];
 };
 
+export type RecoverySocialLinks = {
+  x?: string | null;
+  linkedin?: string | null;
+  youtube?: string | null;
+  instagram?: string | null;
+};
+
+/** Customizations shell chrome — applied to the inner layout card. */
+export type RecoveryLayoutShell = {
+  emailPadding?: number;
+  shellBackground?: string;
+  shellBorderColor?: string;
+  shellBorder?: boolean;
+  shellBorderWidth?: number;
+  shellRadius?: number;
+};
+
 export type BuildRecoveryLayoutHtmlInput = {
   layoutPresetId: string;
   step: RecoveryLayoutStep | "gentle" | "direct" | "urgent";
@@ -73,22 +91,20 @@ export type BuildRecoveryLayoutHtmlInput = {
   ctaUrl?: string | null;
   showDeclineGuardBadge?: boolean;
   copyrightYear?: number;
+  /**
+   * Pre-rendered merchant-block HTML. When set, replaces the escaped
+   * `copy.body` paragraph (layout chrome stays around this slot).
+   */
+  bodyHtml?: string;
+  ignoreNote?: string | null;
+  socials?: RecoverySocialLinks | null;
+  shell?: RecoveryLayoutShell | null;
 };
 
 export type BuiltRecoveryLayoutHtml = {
   layoutPresetId: RecoveryLayoutId;
   step: RecoveryLayoutStep;
   html: string;
-};
-
-const LEGACY_LAYOUT_IDS: Record<string, RecoveryLayoutId> = {
-  "quiet-verify": "sonos",
-  quiet_verify: "sonos",
-  "calm-verify": "sonos",
-  "account-expired": "nordvpn-structure",
-  "trial-ended": "avocode",
-  "upcoming-renewal": "fontbase",
-  "data-safe": "benchmark",
 };
 
 export function isRecoveryLayoutId(value: string): value is RecoveryLayoutId {
@@ -99,7 +115,7 @@ export function normalizeRecoveryLayoutId(
   value: string | null | undefined,
 ): RecoveryLayoutId {
   const raw = value?.trim() ?? "";
-  const mapped = LEGACY_LAYOUT_IDS[raw] ?? raw;
+  const mapped = LEGACY_LAYOUT_PRESET_ID_MAP[raw] ?? raw;
   return isRecoveryLayoutId(mapped) ? mapped : "sonos";
 }
 
@@ -214,7 +230,30 @@ function ctaButton(
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" ${opts?.fullWidth ? 'width="100%"' : ""}><tr><td align="${opts?.fullWidth ? "center" : "left"}" style="${width}"><a href="${escapeAttr(href)}" style="display:${opts?.fullWidth ? "block" : "inline-block"};${width}box-sizing:border-box;background:${escapeAttr(theme.ctaBackgroundColor)};color:${escapeAttr(theme.ctaTextColor)};text-decoration:none;font-size:13px;font-weight:600;line-height:20px;padding:12px 24px;border-radius:${pillRadius(theme.ctaBorderRadiusPx)};text-align:center;letter-spacing:${opts?.uppercase ? "0.04em" : "0"};">${escapeHtml(text)}</a></td></tr></table>`;
 }
 
-function socialRow(color: string): string {
+function socialRow(
+  color: string,
+  socials?: RecoverySocialLinks | null,
+): string {
+  const items: Array<{ label: string; href: string }> = [];
+  const push = (label: string, href: string | null | undefined) => {
+    const safe = allowHttpsUrl(href);
+    if (safe) items.push({ label, href: safe });
+  };
+  push("X", socials?.x);
+  push("LinkedIn", socials?.linkedin);
+  push("YouTube", socials?.youtube);
+  push("Instagram", socials?.instagram);
+
+  if (items.length > 0) {
+    const cells = items
+      .map(
+        (item) =>
+          `<td align="center" style="padding:0 10px;font-size:13px;font-weight:600;"><a href="${escapeAttr(item.href)}" style="color:${escapeAttr(color)};text-decoration:none;">${escapeHtml(item.label)}</a></td>`,
+      )
+      .join("");
+    return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr>${cells}</tr></table>`;
+  }
+
   const marks = ["f", "o", "x", "▶"];
   const cells = marks
     .map(
@@ -225,6 +264,60 @@ function socialRow(color: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr>${cells}</tr></table>`;
 }
 
+function ignoreNoteBlock(note: string | null | undefined, color: string): string {
+  const trimmed = note?.trim();
+  if (!trimmed) return "";
+  return `<p data-ignore-note="true" style="margin:8px 0 0;font-size:11px;line-height:16px;color:${escapeAttr(color)};">${escapeHtml(trimmed)}</p>`;
+}
+
+function bodyInner(
+  copy: RecoveryLayoutCopy,
+  bodyHtml: string | undefined,
+): string {
+  const html = bodyHtml?.trim();
+  return html ? html : escapeHtml(copy.body);
+}
+
+function bodySlot(
+  copy: RecoveryLayoutCopy,
+  bodyHtml: string | undefined,
+  style: string,
+): string {
+  const html = bodyHtml?.trim();
+  if (html) {
+    return `<div data-body-slot="blocks" style="${style}">${html}</div>`;
+  }
+  return `<p data-body-slot="copy" style="${style}">${escapeHtml(copy.body)}</p>`;
+}
+
+function resolveShellChrome(
+  theme: RecoveryLayoutTheme,
+  shell?: RecoveryLayoutShell | null,
+): { cardStyle: string; pagePad: string } {
+  const bg = shell?.shellBackground?.trim() || theme.emailBackgroundColor;
+  const parts = [`background:${escapeAttr(bg)}`];
+  if (typeof shell?.shellRadius === "number" && Number.isFinite(shell.shellRadius)) {
+    const radius = Math.max(0, Math.min(48, Math.round(shell.shellRadius)));
+    parts.push(`border-radius:${radius}px`, "overflow:hidden");
+  }
+  if (shell?.shellBorder === false) {
+    parts.push("border:0");
+  } else if (shell?.shellBorder === true) {
+    const width =
+      typeof shell.shellBorderWidth === "number" &&
+      Number.isFinite(shell.shellBorderWidth)
+        ? Math.max(1, Math.min(8, Math.round(shell.shellBorderWidth)))
+        : 1;
+    const color = shell.shellBorderColor?.trim() || theme.brandColor;
+    parts.push(`border:${width}px solid ${escapeAttr(color)}`);
+  }
+  const pagePad =
+    typeof shell?.emailPadding === "number" && Number.isFinite(shell.emailPadding)
+      ? `padding:${Math.max(0, Math.min(80, Math.round(shell.emailPadding)))}px;`
+      : "";
+  return { cardStyle: parts.join(";"), pagePad };
+}
+
 function declineGuardNote(linkColor: string, muted: string): string {
   return `<p style="margin:20px 0 0;font-size:11px;line-height:16px;color:${escapeAttr(muted)};">Recovery sent by <strong style="color:${escapeAttr(linkColor)};">DeclineGuard</strong></p>`;
 }
@@ -232,11 +325,12 @@ function declineGuardNote(linkColor: string, muted: string): string {
 function wrapDocument(
   theme: RecoveryLayoutTheme,
   inner: string,
+  ctx: RenderCtx,
 ): string {
   const fontId = normalizeEmailFont(theme.emailFont);
   const stack = emailFontStackWithRaw(fontId, theme.fontFamilyRaw);
   const links = emailFontHeadLinks(fontId);
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><title>Recovery email</title>${links}<style>body{margin:0;padding:0;}</style></head><body style="margin:0;padding:0;background:${escapeAttr(theme.pageBackgroundColor)};color:${escapeAttr(theme.pageTextColor)};font-family:${escapeAttr(stack)};">${inner}</body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><title>Recovery email</title>${links}<style>body{margin:0;padding:0;}</style></head><body data-layout="${escapeAttr(ctx.layoutPresetId)}" data-compose="${ctx.compose}" style="margin:0;padding:0;background:${escapeAttr(theme.pageBackgroundColor)};color:${escapeAttr(theme.pageTextColor)};font-family:${escapeAttr(stack)};">${inner}</body></html>`;
 }
 
 function sonosHtml(
@@ -250,16 +344,16 @@ function sonosHtml(
   return wrapDocument(
     theme,
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${escapeAttr(theme.pageBackgroundColor)};">
-  <tr><td align="center" style="padding:0;">
-    <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:480px;background:${escapeAttr(theme.emailBackgroundColor)};">
+  <tr><td align="center" style="${ctx.pagePad || "padding:0;"}">
+    <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:480px;${ctx.cardStyle}">
       <tr><td align="center" style="padding:40px 32px 24px;">${wordmarkRow(storeName, storeLogoUrl, theme.emailTextColor, "0.24em", 22)}</td></tr>
       <tr>${hero}</tr>
       <tr><td align="center" style="padding:40px 32px 0;">
         <h1 style="margin:0;font-size:26px;line-height:32px;font-weight:600;letter-spacing:-0.03em;color:${escapeAttr(theme.emailTextColor)};">${escapeHtml(copy.headline)}</h1>
-        <p style="margin:16px auto 0;max-width:352px;font-size:14px;line-height:22px;color:${escapeAttr(theme.mutedTextColor)};">${escapeHtml(copy.body)}</p>
+        ${bodySlot(copy, ctx.bodyHtml, `margin:16px auto 0;max-width:352px;font-size:14px;line-height:22px;color:${escapeAttr(theme.mutedTextColor)};`)}
         <div style="margin:32px 0 0;">${ctaButton(theme, copy.cta, ctx.ctaUrl, { fullWidth: true })}</div>
       </td></tr>
-      <tr><td align="center" style="padding:32px 32px 16px;">${socialRow(theme.emailTextColor)}</td></tr>
+      <tr><td align="center" style="padding:32px 32px 16px;">${socialRow(theme.emailTextColor, input.socials)}</td></tr>
       <tr><td style="padding:0 32px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid rgba(0,0,0,0.08);border-bottom:1px solid rgba(0,0,0,0.08);">
           <tr>
@@ -271,12 +365,14 @@ function sonosHtml(
       <tr><td align="center" style="padding:24px 32px 32px;">
         <p style="margin:0;font-size:11px;line-height:16px;color:rgba(12,12,12,0.38);">© ${ctx.year} ${escapeHtml(storeName)}. All rights reserved.</p>
         <p style="margin:8px 0 0;font-size:11px;line-height:16px;color:rgba(12,12,12,0.38);">This email was sent to a customer of ${escapeHtml(storeName)}. Please do not reply.</p>
+        ${ignoreNoteBlock(input.ignoreNote, "rgba(12,12,12,0.38)")}
         <p style="margin:12px 0 0;font-size:11px;color:rgba(12,12,12,0.38);">Privacy statement · Terms</p>
         ${ctx.showBadge ? declineGuardNote(theme.linkColor, "rgba(12,12,12,0.38)") : ""}
       </td></tr>
     </table>
   </td></tr>
 </table>`,
+    ctx,
   );
 }
 
@@ -293,7 +389,7 @@ function nordvpnHtml(
   return wrapDocument(
     theme,
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${escapeAttr(theme.pageBackgroundColor)};">
-  <tr><td align="center" style="padding:16px 12px 8px;">
+  <tr><td align="center" style="${ctx.pagePad || "padding:16px 12px 8px;"}">
     <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:480px;">
       <tr>
         <td style="padding:0 4px 12px;">
@@ -305,7 +401,7 @@ function nordvpnHtml(
         </td>
         <td align="right" style="padding:0 4px 12px;font-size:10px;line-height:14px;color:${escapeAttr(theme.mutedTextColor)};">Payment recovery. Keep access.</td>
       </tr>
-      <tr><td colspan="2" style="background:${escapeAttr(theme.emailBackgroundColor)};padding:32px 24px;">
+      <tr><td colspan="2" style="${ctx.cardStyle};padding:32px 24px;">
         <h1 style="margin:0;font-size:28px;line-height:34px;font-weight:600;letter-spacing:-0.03em;color:${escapeAttr(theme.emailTextColor)};">${escapeHtml(copy.headline)}</h1>
         <p style="margin:12px 0 0;font-size:14px;color:${escapeAttr(theme.mutedTextColor)};">${escapeHtml(copy.status || copy.eyebrow || ctx.stepLabel)}</p>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 0;background:#111111;">
@@ -313,14 +409,15 @@ function nordvpnHtml(
             <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>${flip(tens)}<td width="12"></td>${flip(ones)}</tr></table>
           </td></tr>
         </table>
-        <p style="margin:24px 0 0;font-size:14px;line-height:22px;color:${escapeAttr(theme.emailTextColor)};">${escapeHtml(copy.body)}</p>
+        ${bodySlot(copy, ctx.bodyHtml, `margin:24px 0 0;font-size:14px;line-height:22px;color:${escapeAttr(theme.emailTextColor)};`)}
         <p style="margin:12px 0 0;font-size:13px;color:${escapeAttr(theme.mutedTextColor)};">${escapeHtml(ctx.product)} · ${escapeHtml(ctx.amount)}</p>
         <div style="margin:28px 0 0;">${ctaButton(theme, copy.cta, ctx.ctaUrl)}</div>
         <p style="margin:32px 0 0;font-size:13px;line-height:20px;color:${escapeAttr(theme.emailTextColor)};">Best regards,<br />The ${escapeHtml(storeName)} team</p>
       </td></tr>
-      <tr><td colspan="2" align="center" style="padding:20px 8px 8px;">${socialRow(theme.mutedTextColor)}</td></tr>
+      <tr><td colspan="2" align="center" style="padding:20px 8px 8px;">${socialRow(theme.mutedTextColor, input.socials)}</td></tr>
       <tr><td colspan="2" align="center" style="padding:8px 8px 24px;">
         <p style="margin:0;font-size:11px;line-height:16px;color:rgba(12,12,12,0.4);">${escapeHtml(storeName)} sends this recovery email after a failed payment.</p>
+        ${ignoreNoteBlock(input.ignoreNote, "rgba(12,12,12,0.4)")}
         ${
           copy.secondaryLink
             ? `<p style="margin:8px 0 0;font-size:11px;"><a href="${escapeAttr(ctx.ctaUrl)}" style="color:${escapeAttr(theme.linkColor)};">${escapeHtml(copy.secondaryLink)}</a></p>`
@@ -331,6 +428,7 @@ function nordvpnHtml(
     </table>
   </td></tr>
 </table>`,
+    ctx,
   );
 }
 
@@ -342,16 +440,16 @@ function avocodeHtml(
   return wrapDocument(
     theme,
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${escapeAttr(theme.pageBackgroundColor)};">
-  <tr><td align="center" style="padding:24px 16px 8px;">${wordmarkRow(storeName, storeLogoUrl, theme.pageTextColor, "0.22em", 18)}</td></tr>
+  <tr><td align="center" style="${ctx.pagePad || "padding:24px 16px 8px;"}">${wordmarkRow(storeName, storeLogoUrl, theme.pageTextColor, "0.22em", 18)}</td></tr>
   <tr><td align="center" style="padding:0 16px;">
-    <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:480px;background:${escapeAttr(theme.emailBackgroundColor)};">
+    <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:480px;${ctx.cardStyle}">
       <tr><td align="center" style="padding:48px 32px 0;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border:1px solid rgba(0,0,0,0.08);background:#ffffff;">
           <tr><td height="12" style="height:12px;background:#f3f4f6;font-size:0;line-height:0;">&nbsp;</td></tr>
           <tr><td align="center" width="96" height="64" style="width:96px;height:64px;font-size:32px;font-weight:600;color:${escapeAttr(theme.ctaBackgroundColor)};">${ctx.day}</td></tr>
         </table>
         <h1 style="margin:32px 0 0;font-size:26px;line-height:32px;font-weight:600;letter-spacing:-0.03em;color:${escapeAttr(theme.emailTextColor)};">${escapeHtml(copy.headline)}</h1>
-        <p style="margin:16px auto 0;max-width:352px;font-size:14px;line-height:22px;color:${escapeAttr(theme.mutedTextColor)};">${escapeHtml(copy.body)}</p>
+        ${bodySlot(copy, ctx.bodyHtml, `margin:16px auto 0;max-width:352px;font-size:14px;line-height:22px;color:${escapeAttr(theme.mutedTextColor)};`)}
         <div style="margin:32px 0 40px;">${ctaButton(theme, copy.cta, ctx.ctaUrl, { uppercase: true })}</div>
       </td></tr>
       <tr><td align="center" style="padding:20px 24px;border-top:1px solid rgba(0,0,0,0.06);font-size:13px;color:${escapeAttr(theme.mutedTextColor)};">
@@ -360,9 +458,11 @@ function avocodeHtml(
     </table>
   </td></tr>
   <tr><td align="center" style="padding:16px 24px 24px;font-size:11px;color:rgba(17,24,39,0.4);">News about our product · Updates
+    ${ignoreNoteBlock(input.ignoreNote, "rgba(17,24,39,0.4)")}
     ${ctx.showBadge ? declineGuardNote(theme.linkColor, "rgba(17,24,39,0.4)") : ""}
   </td></tr>
 </table>`,
+    ctx,
   );
 }
 
@@ -378,14 +478,14 @@ function fontbaseHtml(
   return wrapDocument(
     theme,
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${escapeAttr(theme.pageBackgroundColor)};">
-  <tr><td align="center" style="padding:24px 16px 32px;">
+  <tr><td align="center" style="${ctx.pagePad || "padding:24px 16px 32px;"}">
     <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:480px;">
       <tr><td align="center" style="padding-bottom:0;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" width="48" height="48" style="width:48px;height:48px;border-radius:24px;background:${escapeAttr(theme.emailBackgroundColor)};">${mark}</td></tr></table>
       </td></tr>
-      <tr><td style="background:${escapeAttr(theme.emailBackgroundColor)};padding:40px 32px 48px;margin-top:-24px;">
+      <tr><td style="${ctx.cardStyle};padding:40px 32px 48px;margin-top:-24px;">
         <h1 style="margin:16px 0 0;text-align:center;font-size:28px;line-height:34px;font-weight:600;letter-spacing:-0.03em;color:${escapeAttr(theme.emailTextColor)};">${escapeHtml(copy.headline)}</h1>
-        <p style="margin:20px auto 0;max-width:352px;text-align:center;font-size:14px;line-height:22px;color:${escapeAttr(theme.mutedTextColor)};">${escapeHtml(copy.body)}</p>
+        ${bodySlot(copy, ctx.bodyHtml, `margin:20px auto 0;max-width:352px;text-align:center;font-size:14px;line-height:22px;color:${escapeAttr(theme.mutedTextColor)};`)}
         <p style="margin:32px 0 0;text-align:center;font-size:32px;line-height:38px;font-weight:600;letter-spacing:-0.03em;color:${escapeAttr(theme.emailTextColor)};">${escapeHtml(ctx.stepLabel)}</p>
         <p style="margin:24px auto 0;max-width:352px;text-align:center;font-size:14px;line-height:22px;color:${escapeAttr(theme.mutedTextColor)};">You can always update billing or manage your subscription from the dashboard.${
           copy.secondaryLink
@@ -395,11 +495,13 @@ function fontbaseHtml(
         <div style="margin:32px 0 0;text-align:center;">${ctaButton(theme, copy.cta, ctx.ctaUrl)}</div>
       </td></tr>
       <tr><td align="center" style="padding:24px 16px 0;font-size:11px;line-height:16px;color:rgba(250,250,250,0.55);">${escapeHtml(storeName)}<br />Recovery email · ${escapeHtml(ctx.support)}
+        ${ignoreNoteBlock(input.ignoreNote, "rgba(250,250,250,0.55)")}
         ${ctx.showBadge ? declineGuardNote(theme.linkColor, "rgba(250,250,250,0.55)") : ""}
       </td></tr>
     </table>
   </td></tr>
 </table>`,
+    ctx,
   );
 }
 
@@ -436,12 +538,12 @@ function benchmarkHtml(
       ];
   return wrapDocument(
     theme,
-    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${escapeAttr(theme.emailBackgroundColor)};">
-  <tr><td align="center" style="padding:40px 32px;">
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="${ctx.cardStyle}">
+  <tr><td align="center" style="${ctx.pagePad || "padding:40px 32px;"}">
     <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:480px;">
       <tr><td align="center" style="padding-bottom:32px;">${wordmarkRow(storeName, storeLogoUrl, theme.emailTextColor, "0.24em", 22)}</td></tr>
       <tr><td style="font-size:16px;color:${escapeAttr(theme.emailTextColor)};">Hi ${escapeHtml(first)},</td></tr>
-      <tr><td style="padding-top:16px;font-size:14px;line-height:22px;color:${escapeAttr(theme.mutedTextColor)};">${escapeHtml(copy.body)}</td></tr>
+      <tr><td style="padding-top:16px;font-size:14px;line-height:22px;color:${escapeAttr(theme.mutedTextColor)};">${bodyInner(copy, ctx.bodyHtml)}</td></tr>
       <tr><td style="padding-top:24px;">${ctaButton(theme, copy.cta, ctx.ctaUrl)}</td></tr>
       <tr><td>${card("How to update a card", howTo, cardIcon)}</td></tr>
       <tr><td>${card("Other payment methods", [`Contact ${storeName} support and they’ll help get the account current.`], noteIcon)}</td></tr>
@@ -449,16 +551,23 @@ function benchmarkHtml(
       <tr><td style="padding-top:24px;font-size:13px;line-height:20px;color:${escapeAttr(theme.mutedTextColor)};">P.S. Questions?<br />Please give us the opportunity to help. <a href="mailto:${escapeAttr(ctx.support)}" style="color:${escapeAttr(theme.linkColor)};">Contact our support team →</a></td></tr>
       <tr><td align="center" style="padding-top:40px;">
         <p style="margin:0 0 12px;font-size:10px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:rgba(12,12,12,0.4);">Find us on social</p>
-        ${socialRow(theme.mutedTextColor)}
+        ${socialRow(theme.mutedTextColor, input.socials)}
+        ${ignoreNoteBlock(input.ignoreNote, "rgba(12,12,12,0.4)")}
         ${ctx.showBadge ? declineGuardNote(theme.linkColor, "rgba(12,12,12,0.4)") : ""}
       </td></tr>
     </table>
   </td></tr>
 </table>`,
+    ctx,
   );
 }
 
 type RenderCtx = {
+  layoutPresetId: RecoveryLayoutId;
+  compose: "blocks" | "copy";
+  bodyHtml: string | undefined;
+  cardStyle: string;
+  pagePad: string;
   day: 0 | 2 | 5;
   stepLabel: string;
   ctaUrl: string;
@@ -478,7 +587,14 @@ export function buildRecoveryLayoutHtml(
 ): BuiltRecoveryLayoutHtml {
   const layoutPresetId = normalizeRecoveryLayoutId(input.layoutPresetId);
   const step = normalizeRecoveryStep(input.step);
+  const shell = resolveShellChrome(input.theme, input.shell);
+  const bodyHtml = input.bodyHtml?.trim() || undefined;
   const ctx: RenderCtx = {
+    layoutPresetId,
+    compose: bodyHtml ? "blocks" : "copy",
+    bodyHtml,
+    cardStyle: shell.cardStyle,
+    pagePad: shell.pagePad,
     day: recoveryStepDayNumber(step),
     stepLabel: recoveryStepLabel(step),
     ctaUrl: allowHttpsUrl(input.ctaUrl ?? null) ?? "#",
