@@ -32,6 +32,26 @@ export function isBlockedHostname(hostname: string): boolean {
   return false;
 }
 
+/**
+ * Default crawl host for a connected Lemon storefront.
+ * Custom domains stored as slug (contain a dot) are used as-is;
+ * otherwise `{slug}.lemonsqueezy.com`.
+ */
+export function lemonStorefrontDomain(
+  storeSlug: string | null | undefined,
+): string | null {
+  const raw = storeSlug?.trim().toLowerCase() ?? "";
+  if (!raw) return null;
+  const host = raw.includes(".")
+    ? raw.replace(/^www\./, "")
+    : `${raw}.lemonsqueezy.com`;
+  try {
+    return validateDomainInput(host).domain;
+  } catch {
+    return null;
+  }
+}
+
 export function validateDomainInput(raw: string): {
   domain: string;
   url: string;
