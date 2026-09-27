@@ -509,6 +509,8 @@ export function recoveryColorsFromTheme(tokens: EmailThemeTokens): {
   ctaBorderRadiusPx: number;
   emailBackgroundColor: string;
   emailTextColor: string;
+  pageBackgroundColor: string;
+  pageTextColor: string;
   linkColor: string;
   emailFont: EmailFontId;
   fontFamilyRaw: string | null;
@@ -521,6 +523,8 @@ export function recoveryColorsFromTheme(tokens: EmailThemeTokens): {
     ctaBorderRadiusPx: tokens.ctaBorderRadiusPx,
     emailBackgroundColor: tokens.emailBackgroundColor,
     emailTextColor: tokens.emailTextColor,
+    pageBackgroundColor: tokens.pageBackgroundColor,
+    pageTextColor: tokens.pageTextColor,
     linkColor: tokens.linkColor,
     emailFont: tokens.emailFont,
     fontFamilyRaw: tokens.fontFamilyRaw,

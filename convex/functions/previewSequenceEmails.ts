@@ -136,6 +136,8 @@ async function runPreviewStep(
     ctaBorderRadiusPx: colors.ctaBorderRadiusPx,
     emailBackgroundColor: colors.emailBackgroundColor,
     emailTextColor: colors.emailTextColor,
+    pageBackgroundColor: colors.pageBackgroundColor,
+    pageTextColor: colors.pageTextColor,
     linkColor: colors.linkColor,
     fontFamilyRaw: colors.fontFamilyRaw,
   });

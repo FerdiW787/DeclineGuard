@@ -1,433 +1,165 @@
-import {
-  normalizeLayoutPresetId,
-  type LayoutPresetId,
-} from "./emailTheme";
-import type { RecoveryTemplateId } from "./recoveryEmailTemplate";
-
 /**
- * Structural HTML for recovery send + preview.
- * `layoutPresetId` selects DOM structure; tokens and day-step copy are applied on top.
- * These are not token-only skins — each id has a distinct header/hero/CTA/footer pattern.
+ * Shared table-based recovery-layout HTML.
+ *
+ * Locked catalog IDs (CoS + Riley):
+ *   sonos              → src/components/dashboard/email-layouts/refs/sonos.png
+ *   avocode            → src/components/dashboard/email-layouts/refs/avocode.png
+ *   benchmark          → src/components/dashboard/email-layouts/refs/benchmark.png
+ *   fontbase           → src/components/dashboard/email-layouts/refs/fontbase.png
+ *   nordvpn-structure  → src/components/dashboard/email-layouts/refs/nordvpn-structure.png
+ *
+ * Keyed by layoutPresetId × day0|day2|day5. Merchant branding only —
+ * no third-party logos or cloned marketing copy.
  */
 
-export type RecoveryLayoutModel = {
-  layoutPresetId: string;
-  templateId: RecoveryTemplateId;
-  subject: string;
-  headline: string;
-  bodyHtml: string;
-  greeting: string;
-  ctaLabel: string;
-  ctaUrl: string;
-  ignoreNote: string;
-  storeName: string;
-  productName: string;
-  amountLabel: string;
-  logoMark: string;
-  year: number;
-  fontFamily: string;
-  fontHeadLinks: string;
-  shellBg: string;
-  shellText: string;
-  secondary: string;
-  primary: string;
-  ctaBg: string;
-  ctaText: string;
-  ctaRadiusCss: string;
+import {
+  emailFontHeadLinks,
+  emailFontStackWithRaw,
+  normalizeEmailFont,
+  type EmailFontId,
+} from "./emailFonts";
+import { allowHttpsUrl } from "./safeUrl";
+
+export const RECOVERY_LAYOUT_IDS = [
+  "sonos",
+  "avocode",
+  "benchmark",
+  "fontbase",
+  "nordvpn-structure",
+] as const;
+
+export type RecoveryLayoutId = (typeof RECOVERY_LAYOUT_IDS)[number];
+
+export const RECOVERY_LAYOUT_STEPS = ["day0", "day2", "day5"] as const;
+export type RecoveryLayoutStep = (typeof RECOVERY_LAYOUT_STEPS)[number];
+
+export type RecoveryLayoutTheme = {
+  brandColor: string;
+  secondaryColor: string;
+  mutedTextColor: string;
   linkColor: string;
-  mutedFooter: string;
-  faintFooter: string;
-  ruleColor: string;
-  supportBlock: string;
-  helpHref: string;
-  socialHtml: string;
-  badgeHtml: string;
-  useBlocks: boolean;
-  blocksHtml: string;
+  pageBackgroundColor: string;
+  pageTextColor: string;
+  emailBackgroundColor: string;
+  emailTextColor: string;
+  ctaBackgroundColor: string;
+  ctaTextColor: string;
+  ctaBorderRadiusPx: number;
+  emailFont: EmailFontId | string;
+  fontFamilyRaw: string | null;
 };
 
-const STEP_LABEL: Record<RecoveryTemplateId, string> = {
-  gentle: "Day 0",
-  direct: "Day 2",
-  urgent: "Day 5",
+export type RecoveryLayoutCopy = {
+  headline: string;
+  body: string;
+  cta: string;
+  secondaryLink?: string;
+  eyebrow?: string;
+  status?: string;
+  support?: readonly string[];
 };
 
-export function renderRecoveryLayoutHtml(model: RecoveryLayoutModel): string {
-  const layoutId = normalizeLayoutPresetId(model.layoutPresetId);
-  switch (layoutId) {
-    case "sonos":
-      return wrapDocument(model, renderSonos(model));
-    case "avocode":
-      return wrapDocument(model, renderAvocode(model));
-    case "benchmark":
-      return wrapDocument(model, renderBenchmark(model));
-    case "fontbase":
-      return wrapDocument(model, renderFontbase(model));
-    case "nordvpn-structure":
-      return wrapDocument(model, renderNordvpn(model));
+export type BuildRecoveryLayoutHtmlInput = {
+  layoutPresetId: string;
+  step: RecoveryLayoutStep | "gentle" | "direct" | "urgent";
+  theme: RecoveryLayoutTheme;
+  copy: RecoveryLayoutCopy;
+  storeName: string;
+  storeLogoUrl?: string | null;
+  supportEmail?: string | null;
+  firstName?: string | null;
+  productName?: string | null;
+  amountLabel?: string | null;
+  ctaUrl?: string | null;
+  showDeclineGuardBadge?: boolean;
+  copyrightYear?: number;
+};
+
+export type BuiltRecoveryLayoutHtml = {
+  layoutPresetId: RecoveryLayoutId;
+  step: RecoveryLayoutStep;
+  html: string;
+};
+
+const LEGACY_LAYOUT_IDS: Record<string, RecoveryLayoutId> = {
+  "quiet-verify": "sonos",
+  quiet_verify: "sonos",
+  "calm-verify": "sonos",
+  "account-expired": "nordvpn-structure",
+  "trial-ended": "avocode",
+  "upcoming-renewal": "fontbase",
+  "data-safe": "benchmark",
+};
+
+export function isRecoveryLayoutId(value: string): value is RecoveryLayoutId {
+  return (RECOVERY_LAYOUT_IDS as readonly string[]).includes(value);
+}
+
+export function normalizeRecoveryLayoutId(
+  value: string | null | undefined,
+): RecoveryLayoutId {
+  const raw = value?.trim() ?? "";
+  const mapped = LEGACY_LAYOUT_IDS[raw] ?? raw;
+  return isRecoveryLayoutId(mapped) ? mapped : "sonos";
+}
+
+export function recoveryStepFromTemplate(
+  id: "gentle" | "direct" | "urgent",
+): RecoveryLayoutStep {
+  switch (id) {
+    case "gentle":
+      return "day0";
+    case "direct":
+      return "day2";
+    case "urgent":
+      return "day5";
     default: {
-      const _exhaustive: never = layoutId;
+      const _exhaustive: never = id;
       return _exhaustive;
     }
   }
 }
 
-function wrapDocument(model: RecoveryLayoutModel, inner: string): string {
-  return `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${escapeHtml(model.subject)}</title>
-    ${model.fontHeadLinks}
-  </head>
-  <body style="margin:0;padding:0;background:${escapeAttr(model.shellBg)};font-family:${escapeAttr(model.fontFamily)};color:${escapeAttr(model.shellText)};-webkit-font-smoothing:antialiased;">
-    ${inner}
-  </body>
-</html>`;
-}
-
-/** Sonos — centered editorial paper, no card chrome. */
-function renderSonos(model: RecoveryLayoutModel): string {
-  const step = STEP_LABEL[model.templateId];
-  return `<table role="presentation" data-layout="sonos" data-structure="centered-editorial" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${escapeAttr(model.shellBg)};">
-  <tr>
-    <td align="center" style="padding:48px 24px 56px;">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:520px;">
-        <tr>
-          <td align="center" data-region="sonos-mark" style="padding:0 0 28px;">
-            ${model.logoMark}
-            <p style="margin:14px 0 0;font-size:13px;letter-spacing:0.18em;text-transform:uppercase;color:${escapeAttr(model.secondary)};">${escapeHtml(model.storeName)}</p>
-          </td>
-        </tr>
-        <tr>
-          <td align="center">
-            <p data-kicker="sonos" style="margin:0 0 18px;font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:${escapeAttr(model.secondary)};">${escapeHtml(step)}</p>
-            ${contentStack(model, {
-              align: "center",
-              greetingSize: "16px",
-              headlineSize: "28px",
-              headlineWeight: "500",
-              headlineTracking: "-0.03em",
-              ctaDisplay: "inline-block",
-            })}
-          </td>
-        </tr>
-        <tr>
-          <td align="center" data-region="sonos-colophon" style="padding:40px 0 0;">
-            <p style="margin:0;font-size:12px;letter-spacing:0.04em;color:${escapeAttr(model.faintFooter)};">${escapeHtml(model.storeName)} · ${model.year}</p>
-            <p style="margin:12px 0 0;font-size:12px;line-height:1.5;color:${escapeAttr(model.mutedFooter)};">${model.supportBlock}</p>
-            ${model.socialHtml}
-            ${model.badgeHtml}
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-</table>`;
-}
-
-/** Avocode — left color rail + compact product chrome. */
-function renderAvocode(model: RecoveryLayoutModel): string {
-  const step = STEP_LABEL[model.templateId];
-  return `<table role="presentation" data-layout="avocode" data-structure="left-rail" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${escapeAttr(model.shellBg)};">
-  <tr>
-    <td align="center" style="padding:32px 16px 40px;">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;background:#ffffff;border:1px solid ${escapeAttr(model.ruleColor)};">
-        <tr>
-          <td data-rail="avocode" width="8" style="width:8px;background:${escapeAttr(model.primary)};font-size:0;line-height:0;">&nbsp;</td>
-          <td style="padding:0;">
-            <table role="presentation" data-region="avocode-chrome" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-bottom:1px solid ${escapeAttr(model.ruleColor)};">
-              <tr>
-                <td style="padding:16px 20px;vertical-align:middle;">${model.logoMark}</td>
-                <td style="padding:16px 8px;vertical-align:middle;">
-                  <p style="margin:0;font-size:14px;font-weight:600;color:${escapeAttr(model.shellText)};">${escapeHtml(model.storeName)}</p>
-                  <p style="margin:2px 0 0;font-size:11px;color:${escapeAttr(model.secondary)};">${escapeHtml(step)} · Account</p>
-                </td>
-                <td align="right" style="padding:16px 20px;vertical-align:middle;">
-                  <span style="display:inline-block;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${escapeAttr(model.primary)};border:1px solid ${escapeAttr(model.primary)};padding:4px 8px;">Billing</span>
-                </td>
-              </tr>
-            </table>
-            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-              <tr>
-                <td style="padding:24px 20px 8px;vertical-align:top;">
-                  ${contentStack(model, {
-                    align: "left",
-                    greetingSize: "14px",
-                    headlineSize: "20px",
-                    headlineWeight: "600",
-                    headlineTracking: "-0.02em",
-                    ctaDisplay: "inline-block",
-                    compactCta: true,
-                  })}
-                </td>
-              </tr>
-            </table>
-            <table role="presentation" data-region="avocode-meta" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${escapeAttr(model.shellBg)};border-top:1px solid ${escapeAttr(model.ruleColor)};">
-              <tr>
-                <td style="padding:12px 20px;font-size:12px;color:${escapeAttr(model.secondary)};">${escapeHtml(model.productName)}</td>
-                <td align="right" style="padding:12px 20px;font-size:13px;font-weight:600;color:${escapeAttr(model.shellText)};">${escapeHtml(model.amountLabel)}</td>
-              </tr>
-            </table>
-            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-              <tr>
-                <td style="padding:16px 20px 20px;">
-                  <p style="margin:0 0 8px;font-size:12px;line-height:1.5;color:${escapeAttr(model.mutedFooter)};">${model.supportBlock}</p>
-                  ${footerLinks(model)}
-                  ${model.socialHtml}
-                  ${model.badgeHtml}
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-</table>`;
-}
-
-/** Benchmark — full-width colored masthead, newsletter article, footer band. */
-function renderBenchmark(model: RecoveryLayoutModel): string {
-  const step = STEP_LABEL[model.templateId];
-  return `<table role="presentation" data-layout="benchmark" data-structure="header-band" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${escapeAttr(model.shellBg)};">
-  <tr>
-    <td align="center" style="padding:0 0 40px;">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;">
-        <tr>
-          <td data-masthead="benchmark" align="left" style="background:${escapeAttr(model.primary)};padding:22px 28px;">
-            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-              <tr>
-                <td style="vertical-align:middle;padding:0 12px 0 0;">${model.logoMark}</td>
-                <td style="vertical-align:middle;">
-                  <p style="margin:0;font-size:18px;font-weight:700;color:${escapeAttr(model.ctaText)};">${escapeHtml(model.storeName)}</p>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td data-region="benchmark-issue" style="background:${escapeAttr(model.shellBg)};padding:10px 28px;border-bottom:1px solid ${escapeAttr(model.ruleColor)};">
-            <p style="margin:0;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:${escapeAttr(model.secondary)};">Recovery · ${escapeHtml(step)}</p>
-          </td>
-        </tr>
-        <tr>
-          <td data-region="benchmark-article" style="background:#ffffff;padding:28px;">
-            ${contentStack(model, {
-              align: "left",
-              greetingSize: "16px",
-              headlineSize: "24px",
-              headlineWeight: "700",
-              headlineTracking: "-0.02em",
-              ctaDisplay: "block",
-            })}
-          </td>
-        </tr>
-        <tr>
-          <td data-mastfoot="benchmark" style="background:${escapeAttr(model.primary)};padding:20px 28px;">
-            <p style="margin:0 0 8px;font-size:12px;line-height:1.5;color:${escapeAttr(model.ctaText)};">${model.supportBlock}</p>
-            ${footerLinks(model, model.ctaText)}
-            ${model.badgeHtml}
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-</table>`;
-}
-
-/** FontBase — typographic wordmark, oversized display headline, hairline rules. */
-function renderFontbase(model: RecoveryLayoutModel): string {
-  const step = STEP_LABEL[model.templateId];
-  return `<table role="presentation" data-layout="fontbase" data-structure="typographic" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${escapeAttr(model.shellBg)};">
-  <tr>
-    <td align="center" style="padding:56px 28px 64px;">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:540px;">
-        <tr>
-          <td data-region="fontbase-wordmark">
-            <p style="margin:0;font-size:11px;letter-spacing:0.28em;text-transform:uppercase;color:${escapeAttr(model.shellText)};">${escapeHtml(model.storeName)}</p>
-            <p style="margin:8px 0 0;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:${escapeAttr(model.secondary)};">${escapeHtml(step)}</p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:20px 0 0;">
-            <hr data-rule="fontbase" style="border:none;border-top:1px solid ${escapeAttr(model.shellText)};margin:0;" />
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:28px 0;">
-            ${
-              model.useBlocks
-                ? `<p style="margin:0 0 16px;font-size:16px;color:${escapeAttr(model.shellText)};">Hi ${escapeHtml(model.greeting)},</p>${model.blocksHtml}`
-                : `<h1 data-display="fontbase" style="margin:0;font-size:40px;line-height:1.12;font-weight:400;letter-spacing:-0.04em;color:${escapeAttr(model.shellText)};">${escapeHtml(model.headline)}</h1>`
-            }
-          </td>
-        </tr>
-        <tr>
-          <td>
-            <hr style="border:none;border-top:1px solid ${escapeAttr(model.shellText)};margin:0;" />
-          </td>
-        </tr>
-        ${
-          model.useBlocks
-            ? ""
-            : `<tr>
-          <td style="padding:24px 0 0;">
-            <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:${escapeAttr(model.shellText)};">Hi ${escapeHtml(model.greeting)}, ${model.bodyHtml}</p>
-            <p style="margin:0 0 28px;">
-              <a href="${escapeAttr(model.ctaUrl)}" data-cta="fontbase" style="display:inline-block;border-bottom:1px solid ${escapeAttr(model.shellText)};color:${escapeAttr(model.shellText)};text-decoration:none;font-size:15px;font-weight:500;padding:0 0 4px;border-radius:0;">${escapeHtml(model.ctaLabel)} →</a>
-            </p>
-            <p style="margin:0;font-size:13px;color:${escapeAttr(model.faintFooter)};">${escapeHtml(model.ignoreNote)}</p>
-          </td>
-        </tr>`
-        }
-        <tr>
-          <td style="padding:36px 0 0;">
-            <p style="margin:0 0 10px;font-size:12px;line-height:1.5;color:${escapeAttr(model.mutedFooter)};">${model.supportBlock}</p>
-            ${footerLinks(model)}
-            ${model.socialHtml}
-            <p style="margin:16px 0 0;font-size:11px;color:${escapeAttr(model.faintFooter)};">© ${model.year} ${escapeHtml(model.storeName)}</p>
-            ${model.badgeHtml}
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-</table>`;
-}
-
-/** NordVPN-structure — dark top bar + stacked cards. */
-function renderNordvpn(model: RecoveryLayoutModel): string {
-  const step = STEP_LABEL[model.templateId];
-  return `<table role="presentation" data-layout="nordvpn-structure" data-structure="dark-bar-cards" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${escapeAttr(model.shellBg)};">
-  <tr>
-    <td align="center" style="padding:0 0 40px;">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;">
-        <tr>
-          <td data-topbar="nordvpn-structure" style="background:${escapeAttr(model.primary)};padding:18px 24px;">
-            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-              <tr>
-                <td style="vertical-align:middle;">${model.logoMark}</td>
-                <td style="vertical-align:middle;padding-left:12px;">
-                  <p style="margin:0;font-size:15px;font-weight:700;color:${escapeAttr(model.ctaText)};">${escapeHtml(model.storeName)}</p>
-                  <p style="margin:2px 0 0;font-size:11px;color:${escapeAttr(model.ctaText)};opacity:0.72;">Secure billing · ${escapeHtml(step)}</p>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:20px 16px 0;">
-            <table role="presentation" data-card="product" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#ffffff;border:1px solid ${escapeAttr(model.ruleColor)};border-radius:10px;">
-              <tr>
-                <td style="padding:14px 16px;">
-                  <p style="margin:0;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:${escapeAttr(model.secondary)};">Product</p>
-                  <p style="margin:6px 0 0;font-size:16px;font-weight:600;color:${escapeAttr(model.shellText)};">${escapeHtml(model.productName)}</p>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:10px 16px 0;">
-            <table role="presentation" data-card="amount" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#ffffff;border:1px solid ${escapeAttr(model.ruleColor)};border-radius:10px;">
-              <tr>
-                <td style="padding:14px 16px;">
-                  <p style="margin:0;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:${escapeAttr(model.secondary)};">Amount due</p>
-                  <p style="margin:6px 0 0;font-size:16px;font-weight:600;color:${escapeAttr(model.shellText)};">${escapeHtml(model.amountLabel)}</p>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:10px 16px 0;">
-            <table role="presentation" data-card="message" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#ffffff;border:1px solid ${escapeAttr(model.ruleColor)};border-radius:10px;">
-              <tr>
-                <td style="padding:20px 16px 22px;">
-                  ${contentStack(model, {
-                    align: "left",
-                    greetingSize: "15px",
-                    headlineSize: "22px",
-                    headlineWeight: "700",
-                    headlineTracking: "-0.02em",
-                    ctaDisplay: "block",
-                  })}
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:20px 24px 8px;">
-            <p style="margin:0 0 10px;font-size:12px;line-height:1.5;color:${escapeAttr(model.mutedFooter)};">${model.supportBlock}</p>
-            ${footerLinks(model)}
-            ${model.socialHtml}
-            <p style="margin:16px 0 0;font-size:11px;color:${escapeAttr(model.faintFooter)};">© ${model.year} ${escapeHtml(model.storeName)}</p>
-            ${model.badgeHtml}
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-</table>`;
-}
-
-function contentStack(
-  model: RecoveryLayoutModel,
-  opts: {
-    align: "left" | "center";
-    greetingSize: string;
-    headlineSize: string;
-    headlineWeight: string;
-    headlineTracking: string;
-    ctaDisplay: "inline-block" | "block";
-    compactCta?: boolean;
-  },
-): string {
-  const align = opts.align;
-  const ctaPad = opts.compactCta ? "10px 16px" : "12px 22px";
-  const ctaWidth =
-    opts.ctaDisplay === "block" ? "width:100%;text-align:center;" : "";
-  if (model.useBlocks) {
-    return `<p style="margin:0 0 16px;font-size:${opts.greetingSize};line-height:1.4;font-weight:600;color:${escapeAttr(model.shellText)};text-align:${align};">
-        Hi ${escapeHtml(model.greeting)},
-      </p>
-      ${model.blocksHtml}
-      <p style="margin:16px 0 0;font-size:13px;line-height:1.5;color:${escapeAttr(model.faintFooter)};text-align:${align};">
-        ${escapeHtml(model.ignoreNote)}
-      </p>`;
+export function normalizeRecoveryStep(
+  step: BuildRecoveryLayoutHtmlInput["step"],
+): RecoveryLayoutStep {
+  if (step === "gentle" || step === "direct" || step === "urgent") {
+    return recoveryStepFromTemplate(step);
   }
-  return `<p style="margin:0 0 8px;font-size:${opts.greetingSize};line-height:1.4;font-weight:600;color:${escapeAttr(model.shellText)};text-align:${align};">
-        Hi ${escapeHtml(model.greeting)},
-      </p>
-      <p style="margin:0 0 20px;font-size:${opts.headlineSize};line-height:1.25;font-weight:${opts.headlineWeight};letter-spacing:${opts.headlineTracking};color:${escapeAttr(model.shellText)};text-align:${align};">
-        ${escapeHtml(model.headline)}
-      </p>
-      <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:${escapeAttr(model.shellText)};text-align:${align};">
-        ${model.bodyHtml}
-      </p>
-      <p style="margin:0 0 20px;text-align:${align};">
-        <a href="${escapeAttr(model.ctaUrl)}"
-           style="display:${opts.ctaDisplay};${ctaWidth}background:${escapeAttr(model.ctaBg)};color:${escapeAttr(model.ctaText)};text-decoration:none;font-size:14px;font-weight:600;padding:${ctaPad};border-radius:${escapeAttr(model.ctaRadiusCss)};">
-          ${escapeHtml(model.ctaLabel)}
-        </a>
-      </p>
-      <p style="margin:0 0 8px;font-size:14px;line-height:1.5;color:${escapeAttr(model.mutedFooter)};text-align:${align};">
-        Or <a href="${escapeAttr(model.ctaUrl)}" style="color:${escapeAttr(model.linkColor)};text-decoration:underline;">open the billing page</a> to update your card.
-      </p>
-      <p style="margin:0;font-size:13px;line-height:1.5;color:${escapeAttr(model.faintFooter)};text-align:${align};">
-        ${escapeHtml(model.ignoreNote)}
-      </p>`;
+  if ((RECOVERY_LAYOUT_STEPS as readonly string[]).includes(step)) {
+    return step;
+  }
+  return "day0";
 }
 
-function footerLinks(model: RecoveryLayoutModel, color?: string): string {
-  const link = color ?? model.linkColor;
-  return `<p style="margin:0 0 12px;font-size:13px;line-height:1.5;">
-        <a href="${escapeAttr(model.ctaUrl)}" style="color:${escapeAttr(link)};text-decoration:underline;margin-right:16px;">Manage subscription</a>
-        <a href="${escapeAttr(model.helpHref)}" style="color:${escapeAttr(link)};text-decoration:underline;">Help center</a>
-      </p>`;
+export function recoveryStepDayNumber(step: RecoveryLayoutStep): 0 | 2 | 5 {
+  switch (step) {
+    case "day0":
+      return 0;
+    case "day2":
+      return 2;
+    case "day5":
+      return 5;
+    default: {
+      const _exhaustive: never = step;
+      return _exhaustive;
+    }
+  }
+}
+
+export function recoveryStepLabel(step: RecoveryLayoutStep): string {
+  switch (step) {
+    case "day0":
+      return "Day 0";
+    case "day2":
+      return "Day 2";
+    case "day5":
+      return "Day 5";
+    default: {
+      const _exhaustive: never = step;
+      return _exhaustive;
+    }
+  }
 }
 
 function escapeHtml(value: string): string {
@@ -442,25 +174,366 @@ function escapeAttr(value: string): string {
   return escapeHtml(value).replace(/'/g, "&#39;");
 }
 
+function pillRadius(px: number): string {
+  return `${Math.max(0, Math.min(9999, Math.round(px)))}px`;
+}
+
+function logoImg(
+  storeName: string,
+  storeLogoUrl: string | null | undefined,
+  size: number,
+): string {
+  const src = allowHttpsUrl(storeLogoUrl ?? null);
+  if (!src) return "";
+  return `<img src="${escapeAttr(src)}" alt="${escapeAttr(storeName)}" width="${size}" height="${size}" style="display:block;border:0;width:${size}px;height:${size}px;object-fit:contain;" />`;
+}
+
+function wordmarkRow(
+  storeName: string,
+  storeLogoUrl: string | null | undefined,
+  color: string,
+  tracking: string,
+  size: number,
+): string {
+  const img = logoImg(storeName, storeLogoUrl, size);
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr>${
+    img
+      ? `<td style="padding-right:8px;vertical-align:middle;">${img}</td>`
+      : ""
+  }<td style="vertical-align:middle;font-size:${size === 18 ? "11px" : "13px"};font-weight:600;letter-spacing:${tracking};text-transform:uppercase;color:${escapeAttr(color)};">${escapeHtml(storeName)}</td></tr></table>`;
+}
+
+function ctaButton(
+  theme: RecoveryLayoutTheme,
+  label: string,
+  href: string,
+  opts?: { fullWidth?: boolean; uppercase?: boolean },
+): string {
+  const text = opts?.uppercase ? label.toUpperCase() : label;
+  const width = opts?.fullWidth ? "width:100%;" : "";
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" ${opts?.fullWidth ? 'width="100%"' : ""}><tr><td align="${opts?.fullWidth ? "center" : "left"}" style="${width}"><a href="${escapeAttr(href)}" style="display:${opts?.fullWidth ? "block" : "inline-block"};${width}box-sizing:border-box;background:${escapeAttr(theme.ctaBackgroundColor)};color:${escapeAttr(theme.ctaTextColor)};text-decoration:none;font-size:13px;font-weight:600;line-height:20px;padding:12px 24px;border-radius:${pillRadius(theme.ctaBorderRadiusPx)};text-align:center;letter-spacing:${opts?.uppercase ? "0.04em" : "0"};">${escapeHtml(text)}</a></td></tr></table>`;
+}
+
+function socialRow(color: string): string {
+  const marks = ["f", "o", "x", "▶"];
+  const cells = marks
+    .map(
+      (mark) =>
+        `<td align="center" style="padding:0 10px;font-size:13px;font-weight:600;color:${escapeAttr(color)};">${mark}</td>`,
+    )
+    .join("");
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr>${cells}</tr></table>`;
+}
+
+function declineGuardNote(linkColor: string, muted: string): string {
+  return `<p style="margin:20px 0 0;font-size:11px;line-height:16px;color:${escapeAttr(muted)};">Recovery sent by <strong style="color:${escapeAttr(linkColor)};">DeclineGuard</strong></p>`;
+}
+
+const LAYOUT_STRUCTURE: Record<RecoveryLayoutId, string> = {
+  sonos: "centered-hero",
+  avocode: "compact-card",
+  benchmark: "help-cards",
+  fontbase: "dark-frame",
+  "nordvpn-structure": "header-flip",
+};
+
+function wrapDocument(
+  layoutPresetId: RecoveryLayoutId,
+  theme: RecoveryLayoutTheme,
+  inner: string,
+): string {
+  const fontId = normalizeEmailFont(theme.emailFont);
+  const stack = emailFontStackWithRaw(fontId, theme.fontFamilyRaw);
+  const links = emailFontHeadLinks(fontId);
+  const structure = LAYOUT_STRUCTURE[layoutPresetId];
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><title>Recovery email</title>${links}<style>body{margin:0;padding:0;}</style></head><body style="margin:0;padding:0;background:${escapeAttr(theme.pageBackgroundColor)};color:${escapeAttr(theme.pageTextColor)};font-family:${escapeAttr(stack)};"><div data-layout="${layoutPresetId}" data-structure="${structure}">${inner}</div></body></html>`;
+}
+
 export function layoutStructureMarker(layoutPresetId: string): {
-  layout: LayoutPresetId;
+  layout: RecoveryLayoutId;
   structure: string;
 } {
-  const layout = normalizeLayoutPresetId(layoutPresetId);
-  switch (layout) {
+  const layout = normalizeRecoveryLayoutId(layoutPresetId);
+  return { layout, structure: LAYOUT_STRUCTURE[layout] };
+}
+
+function sonosHtml(
+  input: BuildRecoveryLayoutHtmlInput,
+  ctx: RenderCtx,
+): string {
+  const { theme, copy, storeName, storeLogoUrl } = input;
+  const hero = `<td height="176" align="center" valign="bottom" style="background:#ececec;height:176px;">
+      <div style="width:80px;height:80px;border-radius:40px;background:#d8d8d8;margin:0 auto 32px;"></div>
+    </td>`;
+  return wrapDocument(
+    "sonos",
+    theme,
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${escapeAttr(theme.pageBackgroundColor)};">
+  <tr><td align="center" style="padding:0;">
+    <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:480px;background:${escapeAttr(theme.emailBackgroundColor)};">
+      <tr><td align="center" style="padding:40px 32px 24px;">${wordmarkRow(storeName, storeLogoUrl, theme.emailTextColor, "0.24em", 22)}</td></tr>
+      <tr>${hero}</tr>
+      <tr><td align="center" style="padding:40px 32px 0;">
+        <h1 style="margin:0;font-size:26px;line-height:32px;font-weight:600;letter-spacing:-0.03em;color:${escapeAttr(theme.emailTextColor)};">${escapeHtml(copy.headline)}</h1>
+        <p style="margin:16px auto 0;max-width:352px;font-size:14px;line-height:22px;color:${escapeAttr(theme.mutedTextColor)};">${escapeHtml(copy.body)}</p>
+        <div style="margin:32px 0 0;">${ctaButton(theme, copy.cta, ctx.ctaUrl, { fullWidth: true })}</div>
+      </td></tr>
+      <tr><td align="center" style="padding:32px 32px 16px;">${socialRow(theme.emailTextColor)}</td></tr>
+      <tr><td style="padding:0 32px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid rgba(0,0,0,0.08);border-bottom:1px solid rgba(0,0,0,0.08);">
+          <tr>
+            <td style="padding:16px 0;font-size:13px;color:${escapeAttr(theme.emailTextColor)};">Questions? We’re here to help.</td>
+            <td align="right" style="padding:16px 0;font-size:16px;color:${escapeAttr(theme.mutedTextColor)};">›</td>
+          </tr>
+        </table>
+      </td></tr>
+      <tr><td align="center" style="padding:24px 32px 32px;">
+        <p style="margin:0;font-size:11px;line-height:16px;color:rgba(12,12,12,0.38);">© ${ctx.year} ${escapeHtml(storeName)}. All rights reserved.</p>
+        <p style="margin:8px 0 0;font-size:11px;line-height:16px;color:rgba(12,12,12,0.38);">This email was sent to a customer of ${escapeHtml(storeName)}. Please do not reply.</p>
+        <p style="margin:12px 0 0;font-size:11px;color:rgba(12,12,12,0.38);">Privacy statement · Terms</p>
+        ${ctx.showBadge ? declineGuardNote(theme.linkColor, "rgba(12,12,12,0.38)") : ""}
+      </td></tr>
+    </table>
+  </td></tr>
+</table>`,
+  );
+}
+
+function nordvpnHtml(
+  input: BuildRecoveryLayoutHtmlInput,
+  ctx: RenderCtx,
+): string {
+  const { theme, copy, storeName, storeLogoUrl } = input;
+  const tens = String(Math.floor(ctx.day / 10));
+  const ones = String(ctx.day % 10);
+  const img = logoImg(storeName, storeLogoUrl, 22);
+  const flip = (n: string) =>
+    `<td align="center" width="64" height="80" style="width:64px;height:80px;background:#1a1a1a;border-radius:6px;color:#ffffff;font-size:44px;font-weight:600;line-height:80px;">${n}</td>`;
+  return wrapDocument(
+    "nordvpn-structure",
+    theme,
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${escapeAttr(theme.pageBackgroundColor)};">
+  <tr><td align="center" style="padding:16px 12px 8px;">
+    <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:480px;">
+      <tr>
+        <td style="padding:0 4px 12px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>${
+            img
+              ? `<td style="padding-right:8px;vertical-align:middle;">${img}</td>`
+              : ""
+          }<td style="font-size:13px;font-weight:600;color:${escapeAttr(theme.pageTextColor)};">${escapeHtml(storeName)}</td></tr></table>
+        </td>
+        <td align="right" style="padding:0 4px 12px;font-size:10px;line-height:14px;color:${escapeAttr(theme.mutedTextColor)};">Payment recovery. Keep access.</td>
+      </tr>
+      <tr><td colspan="2" style="background:${escapeAttr(theme.emailBackgroundColor)};padding:32px 24px;">
+        <h1 style="margin:0;font-size:28px;line-height:34px;font-weight:600;letter-spacing:-0.03em;color:${escapeAttr(theme.emailTextColor)};">${escapeHtml(copy.headline)}</h1>
+        <p style="margin:12px 0 0;font-size:14px;color:${escapeAttr(theme.mutedTextColor)};">${escapeHtml(copy.status || copy.eyebrow || ctx.stepLabel)}</p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 0;background:#111111;">
+          <tr><td align="center" height="144" style="height:144px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>${flip(tens)}<td width="12"></td>${flip(ones)}</tr></table>
+          </td></tr>
+        </table>
+        <p style="margin:24px 0 0;font-size:14px;line-height:22px;color:${escapeAttr(theme.emailTextColor)};">${escapeHtml(copy.body)}</p>
+        <p style="margin:12px 0 0;font-size:13px;color:${escapeAttr(theme.mutedTextColor)};">${escapeHtml(ctx.product)} · ${escapeHtml(ctx.amount)}</p>
+        <div style="margin:28px 0 0;">${ctaButton(theme, copy.cta, ctx.ctaUrl)}</div>
+        <p style="margin:32px 0 0;font-size:13px;line-height:20px;color:${escapeAttr(theme.emailTextColor)};">Best regards,<br />The ${escapeHtml(storeName)} team</p>
+      </td></tr>
+      <tr><td colspan="2" align="center" style="padding:20px 8px 8px;">${socialRow(theme.mutedTextColor)}</td></tr>
+      <tr><td colspan="2" align="center" style="padding:8px 8px 24px;">
+        <p style="margin:0;font-size:11px;line-height:16px;color:rgba(12,12,12,0.4);">${escapeHtml(storeName)} sends this recovery email after a failed payment.</p>
+        ${
+          copy.secondaryLink
+            ? `<p style="margin:8px 0 0;font-size:11px;"><a href="${escapeAttr(ctx.ctaUrl)}" style="color:${escapeAttr(theme.linkColor)};">${escapeHtml(copy.secondaryLink)}</a></p>`
+            : ""
+        }
+        ${ctx.showBadge ? declineGuardNote(theme.linkColor, "rgba(12,12,12,0.4)") : ""}
+      </td></tr>
+    </table>
+  </td></tr>
+</table>`,
+  );
+}
+
+function avocodeHtml(
+  input: BuildRecoveryLayoutHtmlInput,
+  ctx: RenderCtx,
+): string {
+  const { theme, copy, storeName, storeLogoUrl } = input;
+  return wrapDocument(
+    "avocode",
+    theme,
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${escapeAttr(theme.pageBackgroundColor)};">
+  <tr><td align="center" style="padding:24px 16px 8px;">${wordmarkRow(storeName, storeLogoUrl, theme.pageTextColor, "0.22em", 18)}</td></tr>
+  <tr><td align="center" style="padding:0 16px;">
+    <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:480px;background:${escapeAttr(theme.emailBackgroundColor)};">
+      <tr><td align="center" style="padding:48px 32px 0;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border:1px solid rgba(0,0,0,0.08);background:#ffffff;">
+          <tr><td height="12" style="height:12px;background:#f3f4f6;font-size:0;line-height:0;">&nbsp;</td></tr>
+          <tr><td align="center" width="96" height="64" style="width:96px;height:64px;font-size:32px;font-weight:600;color:${escapeAttr(theme.ctaBackgroundColor)};">${ctx.day}</td></tr>
+        </table>
+        <h1 style="margin:32px 0 0;font-size:26px;line-height:32px;font-weight:600;letter-spacing:-0.03em;color:${escapeAttr(theme.emailTextColor)};">${escapeHtml(copy.headline)}</h1>
+        <p style="margin:16px auto 0;max-width:352px;font-size:14px;line-height:22px;color:${escapeAttr(theme.mutedTextColor)};">${escapeHtml(copy.body)}</p>
+        <div style="margin:32px 0 40px;">${ctaButton(theme, copy.cta, ctx.ctaUrl, { uppercase: true })}</div>
+      </td></tr>
+      <tr><td align="center" style="padding:20px 24px;border-top:1px solid rgba(0,0,0,0.06);font-size:13px;color:${escapeAttr(theme.mutedTextColor)};">
+        Questions? Mail us at <a href="mailto:${escapeAttr(ctx.support)}" style="color:${escapeAttr(theme.emailTextColor)};text-decoration:none;">${escapeHtml(ctx.support)}</a>
+      </td></tr>
+    </table>
+  </td></tr>
+  <tr><td align="center" style="padding:16px 24px 24px;font-size:11px;color:rgba(17,24,39,0.4);">News about our product · Updates
+    ${ctx.showBadge ? declineGuardNote(theme.linkColor, "rgba(17,24,39,0.4)") : ""}
+  </td></tr>
+</table>`,
+  );
+}
+
+function fontbaseHtml(
+  input: BuildRecoveryLayoutHtmlInput,
+  ctx: RenderCtx,
+): string {
+  const { theme, copy, storeName, storeLogoUrl } = input;
+  const img = logoImg(storeName, storeLogoUrl, 22);
+  const mark = img
+    ? img
+    : `<span style="display:inline-block;width:22px;height:22px;border-radius:11px;background:${escapeAttr(theme.brandColor)};"></span>`;
+  return wrapDocument(
+    "fontbase",
+    theme,
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${escapeAttr(theme.pageBackgroundColor)};">
+  <tr><td align="center" style="padding:24px 16px 32px;">
+    <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:480px;">
+      <tr><td align="center" style="padding-bottom:0;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" width="48" height="48" style="width:48px;height:48px;border-radius:24px;background:${escapeAttr(theme.emailBackgroundColor)};">${mark}</td></tr></table>
+      </td></tr>
+      <tr><td style="background:${escapeAttr(theme.emailBackgroundColor)};padding:40px 32px 48px;margin-top:-24px;">
+        <h1 style="margin:16px 0 0;text-align:center;font-size:28px;line-height:34px;font-weight:600;letter-spacing:-0.03em;color:${escapeAttr(theme.emailTextColor)};">${escapeHtml(copy.headline)}</h1>
+        <p style="margin:20px auto 0;max-width:352px;text-align:center;font-size:14px;line-height:22px;color:${escapeAttr(theme.mutedTextColor)};">${escapeHtml(copy.body)}</p>
+        <p style="margin:32px 0 0;text-align:center;font-size:32px;line-height:38px;font-weight:600;letter-spacing:-0.03em;color:${escapeAttr(theme.emailTextColor)};">${escapeHtml(ctx.stepLabel)}</p>
+        <p style="margin:24px auto 0;max-width:352px;text-align:center;font-size:14px;line-height:22px;color:${escapeAttr(theme.mutedTextColor)};">You can always update billing or manage your subscription from the dashboard.${
+          copy.secondaryLink
+            ? ` <a href="${escapeAttr(ctx.ctaUrl)}" style="color:${escapeAttr(theme.linkColor)};">${escapeHtml(copy.secondaryLink)}</a>`
+            : ""
+        }</p>
+        <div style="margin:32px 0 0;text-align:center;">${ctaButton(theme, copy.cta, ctx.ctaUrl)}</div>
+      </td></tr>
+      <tr><td align="center" style="padding:24px 16px 0;font-size:11px;line-height:16px;color:rgba(250,250,250,0.55);">${escapeHtml(storeName)}<br />Recovery email · ${escapeHtml(ctx.support)}
+        ${ctx.showBadge ? declineGuardNote(theme.linkColor, "rgba(250,250,250,0.55)") : ""}
+      </td></tr>
+    </table>
+  </td></tr>
+</table>`,
+  );
+}
+
+function benchmarkHtml(
+  input: BuildRecoveryLayoutHtmlInput,
+  ctx: RenderCtx,
+): string {
+  const { theme, copy, storeName, storeLogoUrl } = input;
+  const first = input.firstName?.trim() || "there";
+  const card = (
+    title: string,
+    lines: readonly string[],
+    icon: string,
+  ) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 0;background:#f7f8f8;">
+      <tr><td align="center" style="padding:24px 20px;">
+        ${icon}
+        <p style="margin:12px 0 0;font-size:15px;font-weight:600;color:${escapeAttr(theme.emailTextColor)};">${escapeHtml(title)}</p>
+        ${lines
+          .map(
+            (line) =>
+              `<p style="margin:8px 0 0;font-size:13px;line-height:20px;color:${escapeAttr(theme.mutedTextColor)};">${escapeHtml(line)}</p>`,
+          )
+          .join("")}
+      </td></tr>
+    </table>`;
+  const cardIcon = `<div style="width:36px;height:24px;border:1.5px solid ${escapeAttr(theme.ctaBackgroundColor)};border-radius:3px;margin:0 auto;"></div>`;
+  const noteIcon = `<div style="width:36px;height:24px;border:1.5px solid ${escapeAttr(theme.ctaBackgroundColor)};border-radius:2px;margin:0 auto;"></div>`;
+  const howTo = copy.support?.length
+    ? copy.support
+    : [
+        "1. Open billing from the button above",
+        "2. Enter the new card and save",
+        "3. We’ll retry the payment for you",
+      ];
+  return wrapDocument(
+    "benchmark",
+    theme,
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${escapeAttr(theme.emailBackgroundColor)};">
+  <tr><td align="center" style="padding:40px 32px;">
+    <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:480px;">
+      <tr><td align="center" style="padding-bottom:32px;">${wordmarkRow(storeName, storeLogoUrl, theme.emailTextColor, "0.24em", 22)}</td></tr>
+      <tr><td style="font-size:16px;color:${escapeAttr(theme.emailTextColor)};">Hi ${escapeHtml(first)},</td></tr>
+      <tr><td style="padding-top:16px;font-size:14px;line-height:22px;color:${escapeAttr(theme.mutedTextColor)};">${escapeHtml(copy.body)}</td></tr>
+      <tr><td style="padding-top:24px;">${ctaButton(theme, copy.cta, ctx.ctaUrl)}</td></tr>
+      <tr><td>${card("How to update a card", howTo, cardIcon)}</td></tr>
+      <tr><td>${card("Other payment methods", [`Contact ${storeName} support and they’ll help get the account current.`], noteIcon)}</td></tr>
+      <tr><td style="padding-top:32px;font-size:14px;line-height:22px;color:${escapeAttr(theme.emailTextColor)};">All the best,<br />Your friends at ${escapeHtml(storeName)}</td></tr>
+      <tr><td style="padding-top:24px;font-size:13px;line-height:20px;color:${escapeAttr(theme.mutedTextColor)};">P.S. Questions?<br />Please give us the opportunity to help. <a href="mailto:${escapeAttr(ctx.support)}" style="color:${escapeAttr(theme.linkColor)};">Contact our support team →</a></td></tr>
+      <tr><td align="center" style="padding-top:40px;">
+        <p style="margin:0 0 12px;font-size:10px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:rgba(12,12,12,0.4);">Find us on social</p>
+        ${socialRow(theme.mutedTextColor)}
+        ${ctx.showBadge ? declineGuardNote(theme.linkColor, "rgba(12,12,12,0.4)") : ""}
+      </td></tr>
+    </table>
+  </td></tr>
+</table>`,
+  );
+}
+
+type RenderCtx = {
+  day: 0 | 2 | 5;
+  stepLabel: string;
+  ctaUrl: string;
+  support: string;
+  product: string;
+  amount: string;
+  year: number;
+  showBadge: boolean;
+};
+
+/**
+ * Build a full HTML document for one recovery-layout × Day 0/2/5 send.
+ * Safe for Resend and for an FE preview iframe (`srcDoc`).
+ */
+export function buildRecoveryLayoutHtml(
+  input: BuildRecoveryLayoutHtmlInput,
+): BuiltRecoveryLayoutHtml {
+  const layoutPresetId = normalizeRecoveryLayoutId(input.layoutPresetId);
+  const step = normalizeRecoveryStep(input.step);
+  const ctx: RenderCtx = {
+    day: recoveryStepDayNumber(step),
+    stepLabel: recoveryStepLabel(step),
+    ctaUrl: allowHttpsUrl(input.ctaUrl ?? null) ?? "#",
+    support: input.supportEmail?.trim() || "support@yourstore.com",
+    product: input.productName?.trim() || "your subscription",
+    amount: input.amountLabel?.trim() || "your plan",
+    year: input.copyrightYear ?? 2026,
+    showBadge: Boolean(input.showDeclineGuardBadge),
+  };
+
+  let html: string;
+  switch (layoutPresetId) {
     case "sonos":
-      return { layout, structure: "centered-editorial" };
+      html = sonosHtml(input, ctx);
+      break;
     case "avocode":
-      return { layout, structure: "left-rail" };
+      html = avocodeHtml(input, ctx);
+      break;
     case "benchmark":
-      return { layout, structure: "header-band" };
+      html = benchmarkHtml(input, ctx);
+      break;
     case "fontbase":
-      return { layout, structure: "typographic" };
+      html = fontbaseHtml(input, ctx);
+      break;
     case "nordvpn-structure":
-      return { layout, structure: "dark-bar-cards" };
+      html = nordvpnHtml(input, ctx);
+      break;
     default: {
-      const _exhaustive: never = layout;
-      return _exhaustive;
+      const _exhaustive: never = layoutPresetId;
+      html = _exhaustive;
     }
   }
+
+  return { layoutPresetId, step, html };
 }

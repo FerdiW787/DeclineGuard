@@ -3,21 +3,19 @@ import LayoutPresetPicker from "./LayoutPresetPicker";
 import EmailLayoutPreview from "./EmailLayoutPreview";
 import SegmentedControl from "../SegmentedControl";
 import {
-  DEFAULT_RECOVERY_SEQUENCE_STEP,
-  RECOVERY_SEQUENCE_STEPS,
-  RECOVERY_STEP_META,
+  DEFAULT_RECOVERY_DAY,
+  RECOVERY_DAY_META,
+  RECOVERY_DAY_OPTIONS,
   layoutPresetMeta,
-  type RecoverySequenceStep,
+  type RecoveryDayId,
 } from "@/lib/emailLayoutPresets";
 import {
-  RECOVERY_STEP_TEMPLATE,
-  recoveryColorsFromTheme,
   resolveTheme,
   type EmailThemeTokens,
   type LayoutPresetId,
   type StylingMode,
 } from "@/lib/emailTheme";
-import { buildRecoveryEmail } from "../../../../convex/lib/recoveryEmailTemplate";
+import { applyCopyVars, DEFAULT_EMAIL_COPY } from "@/lib/recoveryEmailCopy";
 import { useEmailLayoutDraft } from "@/lib/useEmailLayoutDraft";
 import type { EmailFontId } from "@/lib/emailFonts";
 import { cn } from "@/lib/utils";
@@ -62,11 +60,6 @@ type Props = {
   className?: string;
 };
 
-const STEP_OPTIONS = RECOVERY_SEQUENCE_STEPS.map((id) => ({
-  id,
-  label: RECOVERY_STEP_META[id].label,
-}));
-
 const STYLING_OPTIONS = [
   { id: "preset" as const, label: "Use preset" },
   { id: "configured" as const, label: "Configured" },
@@ -87,9 +80,8 @@ export default function EmailLayoutStudio({
   className,
 }: Props) {
   const [draft, setDraft] = useEmailLayoutDraft(serverTheme);
-  const [step, setStep] = useState<RecoverySequenceStep>(
-    DEFAULT_RECOVERY_SEQUENCE_STEP,
-  );
+  const [recoveryDay, setRecoveryDay] =
+    useState<RecoveryDayId>(DEFAULT_RECOVERY_DAY);
 
   const mergedConfigured: Partial<EmailThemeTokens> = {
     ...configured,
@@ -110,43 +102,17 @@ export default function EmailLayoutStudio({
     configured: mergedConfigured,
   });
   const theme = resolved.tokens;
-  const colors = recoveryColorsFromTheme(theme);
-  const templateId = RECOVERY_STEP_TEMPLATE[step];
-  const copyOverride = draft.copyOverrides[step];
-  const built = buildRecoveryEmail({
-    templateId,
-    layoutPresetId: resolved.layoutPresetId,
-    primaryColor: colors.primaryColor,
-    secondaryColor: colors.secondaryColor,
-    storeName,
-    storeLogoUrl,
-    customerName: previewVars?.firstName ?? "Maya",
-    customerEmail: "preview@merchant.test",
-    productName: previewVars?.product ?? "Pro Monthly",
-    amountLabel: previewVars?.amount ?? "€29.00",
-    updatePaymentUrl: "https://app.lemonsqueezy.com/my-orders",
-    supportEmail: footerSupport ?? null,
-    showDeclineGuardBadge,
-    copyOverrides: copyOverride
-      ? {
-          [templateId]: {
-            headline: copyOverride.headline,
-            body: copyOverride.body,
-            cta: copyOverride.cta,
-          },
-        }
-      : null,
-    emailFont: colors.emailFont,
-    ctaBackgroundColor: colors.ctaBackgroundColor,
-    ctaTextColor: colors.ctaTextColor,
-    ctaBorderRadiusPx: colors.ctaBorderRadiusPx,
-    emailBackgroundColor: colors.emailBackgroundColor,
-    emailTextColor: colors.emailTextColor,
-    linkColor: colors.linkColor,
-    fontFamilyRaw: colors.fontFamilyRaw,
-  });
+  const subject = applyCopyVars(
+    DEFAULT_EMAIL_COPY[recoveryDay].subject,
+    {
+      product: previewVars?.product ?? "your subscription",
+      amount: previewVars?.amount ?? "your plan",
+      firstName: previewVars?.firstName,
+    },
+  );
 
   const meta = layoutPresetMeta(draft.layoutPresetId);
+  const copyOverride = draft.copyOverrides[recoveryDay];
   const showFields = variant === "page" || variant === "onboarding";
 
   const updateCopy = (
@@ -157,8 +123,8 @@ export default function EmailLayoutStudio({
       ...prev,
       copyOverrides: {
         ...prev.copyOverrides,
-        [step]: {
-          ...prev.copyOverrides[step],
+        [recoveryDay]: {
+          ...prev.copyOverrides[recoveryDay],
           [field]: value,
         },
       },
@@ -187,11 +153,11 @@ export default function EmailLayoutStudio({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8a8f98]">
-            Email layout
+            Recovery layout
           </p>
           <p className="mt-1 text-[13px] text-[#6b6f76]">
-            {meta.label} for recovery Day 0, Day 2, and Day 5. One layout for
-            all three sends.
+            {meta.label} styles Day 0, Day 2, and Day 5. Pick one layout for
+            every recovery send.
           </p>
         </div>
         <SegmentedControl
@@ -222,11 +188,11 @@ export default function EmailLayoutStudio({
             : "Showing your store colors, buttons, and links."}
         </p>
         <SegmentedControl
-          options={STEP_OPTIONS}
-          value={step}
-          onChange={setStep}
-          ariaLabel="Recovery sequence step"
-          idPrefix="recovery-step"
+          options={RECOVERY_DAY_OPTIONS}
+          value={recoveryDay}
+          onChange={setRecoveryDay}
+          ariaLabel="Recovery day"
+          idPrefix="recovery-day"
         />
       </div>
 
@@ -241,16 +207,22 @@ export default function EmailLayoutStudio({
         <div className="overflow-hidden rounded-lg border border-black/8">
           <div className="border-b border-black/6 px-3 py-2">
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8a8f98]">
-              Preview · {RECOVERY_STEP_META[step].label}
+              Preview · {RECOVERY_DAY_META[recoveryDay].label}
             </p>
             <p className="mt-0.5 truncate text-[11px] text-[#6b6f76]">
-              {built.subject}
+              {subject}
             </p>
           </div>
           <EmailLayoutPreview
-            html={built.html}
-            background={theme.emailBackgroundColor}
-            title={`Recovery ${RECOVERY_STEP_META[step].label} preview`}
+            layoutPresetId={draft.layoutPresetId}
+            recoveryDay={recoveryDay}
+            theme={theme}
+            storeName={storeName}
+            storeLogoUrl={storeLogoUrl}
+            copyOverride={copyOverride}
+            footerSupport={footerSupport}
+            previewVars={previewVars}
+            showDeclineGuardBadge={showDeclineGuardBadge}
           />
         </div>
 
@@ -302,7 +274,9 @@ export default function EmailLayoutStudio({
               />
               <ColorField
                 label="Email text"
-                value={mergedConfigured.emailTextColor ?? theme.emailTextColor}
+                value={
+                  mergedConfigured.emailTextColor ?? theme.emailTextColor
+                }
                 onChange={(v) => updateShell("emailTextColor", v)}
               />
             </fieldset>
@@ -312,12 +286,12 @@ export default function EmailLayoutStudio({
                 Short copy
               </legend>
               <p className="text-[11px] text-[#8a8f98]">
-                Overrides for {RECOVERY_STEP_META[step].label} only.
+                Overrides for {RECOVERY_DAY_META[recoveryDay].label} only.
               </p>
               <TextField
                 label="Headline"
                 value={copyOverride?.headline ?? ""}
-                placeholder={copyOverride?.headline ? "" : "Default for this step"}
+                placeholder={copyOverride?.headline ? "" : "Default for this day"}
                 onChange={(v) => updateCopy("headline", v)}
               />
               <TextField

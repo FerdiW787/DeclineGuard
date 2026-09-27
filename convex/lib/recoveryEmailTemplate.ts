@@ -1,21 +1,17 @@
 import {
-  renderBlocksHtml,
   renderBlocksText,
   type EmailBlock,
 } from "./emailBlocks";
-import { allowHttpsUrl, safePaymentUpdateUrl } from "./safeUrl";
+import { safePaymentUpdateUrl } from "./safeUrl";
 import {
   ensureCtaLabelContrast,
   ensureShellTextHierarchy,
 } from "./brandImport/colors";
 import {
-  emailFontHeadLinks,
-  emailFontStackWithRaw,
   normalizeEmailFont,
   type EmailFontId,
 } from "./emailFonts";
-import { normalizeLayoutPresetId } from "./emailTheme";
-import { renderRecoveryLayoutHtml } from "./recoveryLayoutHtml";
+import { buildRecoveryLayoutHtml } from "./recoveryLayoutHtml";
 
 export type RecoveryTemplateId = "gentle" | "direct" | "urgent";
 
@@ -129,6 +125,8 @@ export type RecoveryEmailVars = {
   ctaBorderRadiusPx?: number | null;
   emailBackgroundColor?: string | null;
   emailTextColor?: string | null;
+  pageBackgroundColor?: string | null;
+  pageTextColor?: string | null;
   /** Homepage link color (billing / inline) */
   linkColor?: string | null;
   /** Raw CSS font-family from homepage — preferred in stack */
@@ -231,34 +229,6 @@ function applyVars(
     .replace(/\{\{amount\}\}/g, amount);
 }
 
-function socialRowHtml(
-  socials: RecoverySocialLinks | undefined,
-  linkColor = "#0c0c0c",
-): string {
-  const items: Array<{ label: string; href: string }> = [];
-  const push = (label: string, href: string | null | undefined) => {
-    const safe = allowHttpsUrl(href);
-    if (safe) items.push({ label, href: safe });
-  };
-  push("X", socials?.x);
-  push("LinkedIn", socials?.linkedin);
-  push("YouTube", socials?.youtube);
-  push("Instagram", socials?.instagram);
-
-  if (items.length === 0) return "";
-
-  const links = items
-    .map(
-      (item, i) =>
-        `<a href="${escapeAttr(item.href)}" style="color:${escapeAttr(linkColor)};text-decoration:none;${
-          i < items.length - 1 ? "margin-right:14px;" : ""
-        }">${escapeHtml(item.label)}</a>`,
-    )
-    .join("");
-
-  return `<p style="margin:0 0 16px;font-size:13px;line-height:1.5;">${links}</p>`;
-}
-
 export function buildRecoveryEmail(input: RecoveryEmailVars): {
   subject: string;
   html: string;
@@ -273,17 +243,19 @@ export function buildRecoveryEmail(input: RecoveryEmailVars): {
 
   const subject = applyVars(copy.subject, vars, "text");
   const headline = applyVars(copy.headline, vars, "text");
-  const body = applyVars(copy.bodyHtml, vars, "html");
+  const bodyText = applyVars(copy.bodyHtml.replace(/<[^>]+>/g, ""), vars, "text");
   const ctaUrl = safePaymentUpdateUrl(input.updatePaymentUrl);
   const year = new Date().getFullYear();
   const primary = input.primaryColor.trim() || "#0c0c0c";
   const shellBg = input.emailBackgroundColor?.trim() || "#ffffff";
+  const pageBg = input.pageBackgroundColor?.trim() || shellBg;
   const hierarchy = ensureShellTextHierarchy(
     shellBg,
     input.emailTextColor?.trim() || "#0c0c0c",
     input.secondaryColor.trim() || "#6b6b70",
   );
   const shellText = hierarchy.bodyText;
+  const pageText = input.pageTextColor?.trim() || shellText;
   const secondary = hierarchy.mutedText;
   const ctaBg = input.ctaBackgroundColor?.trim() || primary;
   const ctaText = ensureCtaLabelContrast(
@@ -295,94 +267,52 @@ export function buildRecoveryEmail(input: RecoveryEmailVars): {
     Number.isFinite(input.ctaBorderRadiusPx)
       ? Math.max(0, Math.min(9999, input.ctaBorderRadiusPx))
       : 12;
-  const ctaRadiusCss = `${ctaRadius}px`;
-  const isDarkShell = shellBg.toLowerCase() !== "#ffffff" && shellBg !== "#fff";
-  const ruleColor = isDarkShell ? "rgba(255,255,255,0.12)" : "#e8e8ea";
-  const mutedFooter = secondary;
-  const faintFooter = isDarkShell ? "#6b6b70" : "#a1a1a6";
-  // Brand-level link color (Customizations) wins over per-template copy.
   const linkColor =
     input.linkColor?.trim() ||
     copy.linkColor?.trim() ||
     primary;
   const support = input.supportEmail?.trim() || null;
-  const supportBlock = support
-    ? `Questions or feedback? Drop us a line at
-        <a href="mailto:${escapeAttr(support)}" style="color:${escapeAttr(linkColor)};text-decoration:underline;">${escapeHtml(support)}</a>.`
-    : `Questions or feedback? Just reply to this email.`;
-  const helpHref = support ? `mailto:${support}` : ctaUrl;
-  const socialHtml = socialRowHtml(input.socials, linkColor);
-  const badgeHtml = input.showDeclineGuardBadge
-    ? `<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid ${ruleColor};font-size:11px;line-height:1.5;color:${faintFooter};text-align:center;">
-        Recovery sent by <span style="color:${escapeAttr(linkColor)};font-weight:600;">DeclineGuard</span>
-      </p>`
-    : "";
-  const logoUrl = allowHttpsUrl(input.storeLogoUrl);
-  const initials = storeInitials(input.storeName);
-  const logoMark = logoUrl
-    ? `<img src="${escapeAttr(logoUrl)}" alt="${escapeHtml(input.storeName)}" width="44" height="44" style="display:block;width:44px;height:44px;border-radius:10px;object-fit:cover;" />`
-    : `<div style="display:inline-block;width:44px;height:44px;border-radius:10px;background:${escapeAttr(primary)};color:#ffffff;font-size:15px;font-weight:700;letter-spacing:-0.02em;line-height:44px;text-align:center;">${escapeHtml(initials)}</div>`;
   const emailFont = normalizeEmailFont(input.emailFont);
-  const fontFamily = emailFontStackWithRaw(emailFont, input.fontFamilyRaw);
-  const fontHeadLinks = emailFontHeadLinks(emailFont);
 
   const useBlocks = copy.blocks && copy.blocks.length > 0;
-  const blocksHtml = useBlocks
-    ? applyVars(
-        renderBlocksHtml(copy.blocks!, {
-          primaryColor: primary,
-          linkColor,
-          mutedColor: secondary,
-          ctaUrl,
-          ctaBackgroundColor: ctaBg,
-          ctaTextColor: ctaText,
-          ctaBorderRadiusPx: ctaRadius,
-          bodyTextColor: shellText,
-        }),
-        vars,
-        "html",
-      )
-    : "";
-
-  const html = renderRecoveryLayoutHtml({
-    layoutPresetId: normalizeLayoutPresetId(input.layoutPresetId),
-    templateId: input.templateId,
-    subject,
-    headline,
-    bodyHtml: body,
-    greeting: vars.first_name,
-    ctaLabel: copy.cta,
-    ctaUrl,
-    ignoreNote: copy.ignoreNote,
-    storeName: input.storeName,
-    productName: input.productName,
-    amountLabel: input.amountLabel,
-    logoMark,
-    year,
-    fontFamily,
-    fontHeadLinks,
-    shellBg,
-    shellText,
-    secondary,
-    primary,
-    ctaBg,
-    ctaText,
-    ctaRadiusCss,
-    linkColor,
-    mutedFooter,
-    faintFooter,
-    ruleColor,
-    supportBlock,
-    helpHref,
-    socialHtml,
-    badgeHtml,
-    useBlocks: Boolean(useBlocks),
-    blocksHtml,
-  });
-
   const blockText = useBlocks
     ? applyVars(renderBlocksText(copy.blocks!, ctaUrl), vars, "text")
-    : body.replace(/<[^>]+>/g, "");
+    : bodyText;
+
+  const built = buildRecoveryLayoutHtml({
+    layoutPresetId: input.layoutPresetId ?? "sonos",
+    step: input.templateId,
+    theme: {
+      brandColor: primary,
+      secondaryColor: secondary,
+      mutedTextColor: secondary,
+      linkColor,
+      pageBackgroundColor: pageBg,
+      pageTextColor: pageText,
+      emailBackgroundColor: shellBg,
+      emailTextColor: shellText,
+      ctaBackgroundColor: ctaBg,
+      ctaTextColor: ctaText,
+      ctaBorderRadiusPx: ctaRadius,
+      emailFont,
+      fontFamilyRaw: input.fontFamilyRaw ?? null,
+    },
+    copy: {
+      headline,
+      body: blockText,
+      cta: copy.cta,
+    },
+    storeName: input.storeName,
+    storeLogoUrl: input.storeLogoUrl,
+    supportEmail: support,
+    firstName: vars.first_name,
+    productName: input.productName,
+    amountLabel: input.amountLabel,
+    ctaUrl,
+    showDeclineGuardBadge: input.showDeclineGuardBadge,
+    copyrightYear: year,
+  });
+  const html = built.html;
 
   const textParts = [
     `Hi ${vars.first_name},`,

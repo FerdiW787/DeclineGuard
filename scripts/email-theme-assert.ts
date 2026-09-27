@@ -163,35 +163,54 @@ if (uniqueStructures.size !== expectedIds.length) {
   throw new Error("FAIL: layoutPresetId must produce five distinct structures");
 }
 
+const expectedStructure: Record<(typeof expectedIds)[number], string> = {
+  sonos: "centered-hero",
+  avocode: "compact-card",
+  benchmark: "help-cards",
+  fontbase: "dark-frame",
+  "nordvpn-structure": "header-flip",
+};
+for (const row of structures) {
+  const expected = expectedStructure[row.id];
+  if (row.structure !== expected) {
+    throw new Error(`FAIL: ${row.id} structure ${row.structure} !== ${expected}`);
+  }
+}
+
 const sonosHtml = structures.find((row) => row.id === "sonos")!.html;
 const avocodeHtml = structures.find((row) => row.id === "avocode")!.html;
-if (sonosHtml.includes('data-rail="avocode"')) {
-  throw new Error("FAIL: sonos must not use avocode left-rail structure");
+if (sonosHtml.includes('data-structure="compact-card"')) {
+  throw new Error("FAIL: sonos must not use avocode compact-card structure");
 }
-if (!avocodeHtml.includes('data-rail="avocode"')) {
-  throw new Error("FAIL: avocode must include left rail");
+if (!avocodeHtml.includes("compact-card")) {
+  throw new Error("FAIL: avocode must use compact-card structure");
 }
-if (!structures.find((row) => row.id === "benchmark")!.html.includes('data-masthead="benchmark"')) {
-  throw new Error("FAIL: benchmark must include header band");
+if (!structures.find((row) => row.id === "benchmark")!.html.includes("How to update a card")) {
+  throw new Error("FAIL: benchmark must include help cards");
 }
-if (!structures.find((row) => row.id === "fontbase")!.html.includes('data-display="fontbase"')) {
-  throw new Error("FAIL: fontbase must include typographic display");
+if (!structures.find((row) => row.id === "fontbase")!.html.includes('data-structure="dark-frame"')) {
+  throw new Error("FAIL: fontbase must use dark-frame structure");
 }
 if (
   !structures
     .find((row) => row.id === "nordvpn-structure")!
-    .html.includes('data-topbar="nordvpn-structure"')
+    .html.includes('data-structure="header-flip"')
 ) {
-  throw new Error("FAIL: nordvpn-structure must include dark top bar");
+  throw new Error("FAIL: nordvpn-structure must use header-flip structure");
 }
 
+const day0 = buildRecoveryEmail({
+  ...sharedColors,
+  templateId: "gentle",
+  layoutPresetId: "sonos",
+});
 const day2 = buildRecoveryEmail({
   ...sharedColors,
   templateId: "direct",
   layoutPresetId: "sonos",
 });
-if (!day2.html.includes("Day 2")) {
-  throw new Error("FAIL: day step must change copy (Day 2) without changing layout id");
+if (day0.html === day2.html) {
+  throw new Error("FAIL: day step must change copy without changing layout id");
 }
 if (!day2.html.includes('data-layout="sonos"')) {
   throw new Error("FAIL: day step must keep layout structure");

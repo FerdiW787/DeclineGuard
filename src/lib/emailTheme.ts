@@ -42,10 +42,26 @@ export {
 
 import {
   LAYOUT_PRESET_CATALOG,
+  normalizeLayoutPresetId,
+  resolveLayoutPresetId,
   type EmailThemeTokens,
+  type LayoutPresetId,
 } from "../../convex/lib/emailTheme";
 
 export const DEFAULT_RECOVERY_SEQUENCE_STEP = "day0" as const;
+
+export function toBackendLayoutPresetId(
+  layoutPresetId: string | null | undefined,
+): string {
+  return normalizeLayoutPresetId(layoutPresetId);
+}
+
+export function fromBackendLayoutPresetId(
+  backendId: string | null | undefined,
+  _localFeId?: string | null,
+): LayoutPresetId {
+  return resolveLayoutPresetId(backendId ?? "");
+}
 
 export type RecoverySettingsLayoutFields = {
   stylingMode: import("../../convex/lib/emailTheme").StylingMode;

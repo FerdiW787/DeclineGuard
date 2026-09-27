@@ -1,11 +1,11 @@
 import {
   DEFAULT_LAYOUT_PRESET_ID,
   DEFAULT_STYLING_MODE,
+  RECOVERY_DAY_IDS,
   isStylingMode,
   resolveLayoutPresetId,
-  RECOVERY_SEQUENCE_STEPS,
   type LayoutPresetId,
-  type RecoverySequenceStep,
+  type RecoveryDayId,
   type StylingMode,
 } from "./emailLayoutPresets";
 import type { EmailCopyOverride, EmailLayoutCopyOverrides } from "./emailLayoutCopy";
@@ -14,12 +14,19 @@ import type { EmailThemeTokens } from "./emailTheme";
 const STORAGE_KEY = "dg.emailLayoutDraft.v2";
 
 /**
- * FE draft — one global layout + styling mode for recovery Day 0 / 2 / 5.
+ * FE draft for the global recovery-layout pick.
+ * `stylingMode` + locked `layoutPresetId` persist via
+ * `setStylingMode` / `setLayoutPresetId` (sonos | avocode | benchmark |
+ * fontbase | nordvpn-structure). Legacy quiet-verify → sonos.
  */
 export type EmailLayoutDraft = {
   stylingMode: StylingMode;
   layoutPresetId: LayoutPresetId;
   copyOverrides: EmailLayoutCopyOverrides;
+  /**
+   * Shell colors the current save mutation cannot store
+   * (`emailBackgroundColor`, `emailTextColor`).
+   */
   shellOverrides: {
     emailBackgroundColor?: string;
     emailTextColor?: string;
@@ -38,9 +45,9 @@ function sanitizeCopyOverrides(
 ): EmailLayoutCopyOverrides {
   if (!raw || typeof raw !== "object") return {};
   const out: EmailLayoutCopyOverrides = {};
-  for (const step of RECOVERY_SEQUENCE_STEPS) {
-    if (!(step in raw)) continue;
-    const entry = (raw as Record<string, unknown>)[step];
+  for (const day of RECOVERY_DAY_IDS) {
+    if (!(day in raw)) continue;
+    const entry = (raw as Record<string, unknown>)[day];
     if (!entry || typeof entry !== "object") continue;
     const rec = entry as Record<string, unknown>;
     const next: EmailCopyOverride = {};
@@ -50,7 +57,7 @@ function sanitizeCopyOverrides(
     if (typeof rec.secondaryLink === "string") {
       next.secondaryLink = rec.secondaryLink;
     }
-    if (Object.keys(next).length > 0) out[step] = next;
+    if (Object.keys(next).length > 0) out[day] = next;
   }
   return out;
 }
@@ -109,6 +116,7 @@ export function draftsEqual(a: EmailLayoutDraft, b: EmailLayoutDraft): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+/** Brand fields `saveEmailCustomizations` already accepts. */
 export type PersistableEmailLayoutFields = {
   brandColor: string;
   secondaryColor: string;
@@ -117,6 +125,14 @@ export type PersistableEmailLayoutFields = {
   linkColor: string;
 };
 
+/**
+ * Thin persist adapter.
+ *
+ * Writes the recovery-layout draft to localStorage. Color fields that
+ * `saveEmailCustomizations` already accepts are returned for the live
+ * save path. `stylingMode` + BE-mapped `layoutPresetId` persist via
+ * `setStylingMode` / `setLayoutPresetId` when those refs exist.
+ */
 export function persistEmailLayoutSettings(input: {
   draft: EmailLayoutDraft;
   configured: Partial<EmailThemeTokens>;
@@ -151,16 +167,18 @@ export function persistEmailLayoutSettings(input: {
       shellOverrides: input.draft.shellOverrides,
     },
     convexGap: [
-      "copyOverrides (recovery short copy)",
+      "layoutPresetId (locked: sonos | avocode | benchmark | fontbase | nordvpn-structure)",
+      "stylingMode",
+      "copyOverrides (recovery Day 0 / 2 / 5 short copy)",
       "emailBackgroundColor",
       "emailTextColor",
     ],
   };
 }
 
-export function copyOverrideForStep(
+export function copyOverrideForDay(
   draft: EmailLayoutDraft,
-  step: RecoverySequenceStep,
+  recoveryDay: RecoveryDayId,
 ): EmailCopyOverride | undefined {
-  return draft.copyOverrides[step];
+  return draft.copyOverrides[recoveryDay];
 }

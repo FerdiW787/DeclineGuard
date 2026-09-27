@@ -25,6 +25,8 @@ export {
   recoveryColorsFromTheme,
   resolveLayoutPresetId,
   resolveRecoveryEmailTheme,
+  toBackendLayoutPresetId,
+  fromBackendLayoutPresetId,
   resolveTheme,
   resolveThemeFromSettings,
   type EmailThemeTokens,

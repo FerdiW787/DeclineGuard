@@ -19,7 +19,7 @@ export default function LayoutPresetPicker({
   return (
     <div
       role="listbox"
-      aria-label="Email layout"
+      aria-label="Recovery layout"
       className={cn(
         "grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5",
         className,
@@ -65,17 +65,32 @@ function LayoutThumb({ id }: { id: LayoutPresetId }) {
     case "sonos":
       return (
         <div
-          className="flex h-16 flex-col items-center justify-center gap-1.5 rounded-lg"
-          style={{ background: theme.emailBackgroundColor }}
+          className="flex h-16 flex-col overflow-hidden rounded-lg"
+          style={{ background: theme.pageBackgroundColor }}
         >
+          <div
+            className="mx-2 mt-1.5 flex flex-1 flex-col items-center justify-center gap-1 rounded-sm"
+            style={{ background: theme.emailBackgroundColor }}
+          >
+            <span className="h-1 w-8 rounded-full bg-black/20" />
+            <span className="h-4 w-full bg-black/8" />
+            <span
+              className="h-1.5 w-10 rounded-full"
+              style={{ background: theme.ctaBackgroundColor }}
+            />
+          </div>
+        </div>
+      );
+    case "nordvpn-structure":
+      return (
+        <div
+          className="flex h-16 flex-col justify-center gap-1 rounded-lg px-2"
+          style={{ background: theme.pageBackgroundColor }}
+        >
+          <span className="h-1 w-8 rounded-full bg-black/20" />
+          <span className="h-5 w-full rounded-sm" style={{ background: "#111" }} />
           <span
-            className="size-2 rounded-full"
-            style={{ background: theme.brandColor }}
-          />
-          <span className="h-1 w-10 rounded-full bg-black/15" />
-          <span className="h-1 w-7 rounded-full bg-black/10" />
-          <span
-            className="mt-0.5 h-2 w-8 rounded-full"
+            className="h-2 w-8 rounded-full"
             style={{ background: theme.ctaBackgroundColor }}
           />
         </div>
@@ -83,56 +98,46 @@ function LayoutThumb({ id }: { id: LayoutPresetId }) {
     case "avocode":
       return (
         <div
-          className="flex h-16 overflow-hidden rounded-lg"
-          style={{ background: theme.emailBackgroundColor }}
+          className="flex h-16 flex-col items-center justify-center gap-1 rounded-lg"
+          style={{ background: theme.pageBackgroundColor }}
         >
-          <span className="w-1.5 shrink-0" style={{ background: theme.brandColor }} />
-          <div className="flex flex-1 flex-col justify-center gap-1 px-2">
-            <span className="h-1 w-8 rounded-full bg-black/20" />
-            <span className="h-4 rounded-sm bg-white/80" />
-            <span
-              className="h-2 w-7 rounded-sm"
-              style={{ background: theme.ctaBackgroundColor }}
-            />
+          <span
+            className="h-5 w-6 rounded-sm border bg-white"
+            style={{ borderColor: "rgba(0,0,0,0.1)" }}
+          />
+          <span
+            className="h-1.5 w-9 rounded-full"
+            style={{ background: theme.ctaBackgroundColor }}
+          />
+        </div>
+      );
+    case "fontbase":
+      return (
+        <div
+          className="flex h-16 flex-col items-center justify-center rounded-lg px-2"
+          style={{ background: theme.pageBackgroundColor }}
+        >
+          <div
+            className="flex w-full flex-1 flex-col items-center justify-center gap-1 rounded-sm"
+            style={{ background: theme.emailBackgroundColor }}
+          >
+            <span className="h-1 w-10 rounded-full bg-black/20" />
+            <span className="h-2 w-8 rounded-sm bg-black/80" />
           </div>
         </div>
       );
     case "benchmark":
       return (
         <div
-          className="flex h-16 flex-col overflow-hidden rounded-lg"
-          style={{ background: theme.emailBackgroundColor }}
-        >
-          <span className="h-4 w-full" style={{ background: theme.brandColor }} />
-          <div className="flex flex-1 flex-col justify-center gap-1 px-2.5">
-            <span className="h-1 w-10 rounded-full bg-black/20" />
-            <span className="h-1 w-7 rounded-full bg-black/10" />
-          </div>
-        </div>
-      );
-    case "fontbase":
-      return (
-        <div
           className="flex h-16 flex-col justify-center gap-1 rounded-lg px-2.5"
           style={{ background: theme.emailBackgroundColor }}
         >
-          <span className="h-px w-full" style={{ background: theme.brandColor }} />
-          <span className="h-3 w-11 bg-black/20" />
-          <span className="h-px w-full" style={{ background: theme.brandColor }} />
-          <span className="h-1 w-8 bg-black/15" />
-        </div>
-      );
-    case "nordvpn-structure":
-      return (
-        <div
-          className="flex h-16 flex-col overflow-hidden rounded-lg"
-          style={{ background: theme.emailBackgroundColor }}
-        >
-          <span className="h-3 w-full" style={{ background: theme.brandColor }} />
-          <div className="flex flex-1 flex-col justify-center gap-1 px-2">
-            <span className="h-3 rounded-sm border border-black/10 bg-white" />
-            <span className="h-3 rounded-sm border border-black/10 bg-white" />
-          </div>
+          <span className="h-1 w-10 rounded-full bg-black/18" />
+          <span
+            className="h-2 w-8 rounded-md"
+            style={{ background: theme.ctaBackgroundColor }}
+          />
+          <span className="h-3 rounded-sm bg-black/6" />
         </div>
       );
     default: {

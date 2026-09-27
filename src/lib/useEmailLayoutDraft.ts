@@ -4,18 +4,15 @@ import {
   writeEmailLayoutDraft,
   type EmailLayoutDraft,
 } from "./emailLayoutDraft";
-import {
-  isStylingMode,
-  resolveLayoutPresetId,
-  type StylingMode,
-} from "./emailLayoutPresets";
+import { isStylingMode, type StylingMode } from "./emailLayoutPresets";
+import { fromBackendLayoutPresetId } from "./emailTheme";
 
 export type EmailLayoutServerTheme = {
   stylingMode?: string | null;
   layoutPresetId?: string | null;
 };
 
-/** Shared FE draft — one global layout for recovery Day 0 / Day 2 / Day 5. */
+/** Shared FE draft — one global recovery-layout + styling mode for Day 0 / 2 / 5. */
 export function useEmailLayoutDraft(server?: EmailLayoutServerTheme | null) {
   const [draft, setDraftState] = useState(loadEmailLayoutDraft);
   const hydratedRef = useRef(false);
@@ -25,16 +22,20 @@ export function useEmailLayoutDraft(server?: EmailLayoutServerTheme | null) {
     const mode: StylingMode | null = isStylingMode(server.stylingMode)
       ? server.stylingMode
       : null;
-    const layout = server.layoutPresetId
-      ? resolveLayoutPresetId(server.layoutPresetId)
-      : null;
-    if (!mode && !layout) return;
+    const hasLayout = Boolean(server.layoutPresetId?.trim());
+    if (!mode && !hasLayout) return;
     hydratedRef.current = true;
     setDraftState((prev) => {
       const next: EmailLayoutDraft = {
         ...prev,
         ...(mode ? { stylingMode: mode } : {}),
-        ...(layout ? { layoutPresetId: layout } : {}),
+        ...(hasLayout
+          ? {
+              layoutPresetId: fromBackendLayoutPresetId(
+                server.layoutPresetId,
+              ),
+            }
+          : {}),
       };
       writeEmailLayoutDraft(next);
       return next;

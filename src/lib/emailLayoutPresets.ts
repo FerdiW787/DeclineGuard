@@ -1,19 +1,23 @@
 /**
- * Picker labels + recovery-step display. IDs/tokens live in `emailTheme.ts`.
+ * Picker labels + recovery-day preview meta.
+ * IDs/tokens live in `emailTheme.ts`.
+ *
+ * Locked catalog id ↔ reference:
+ *   sonos              → refs/sonos.png
+ *   avocode            → refs/avocode.png
+ *   benchmark          → refs/benchmark.png
+ *   fontbase           → refs/fontbase.png
+ *   nordvpn-structure  → refs/nordvpn-structure.png
  */
 
 export {
   DEFAULT_LAYOUT_PRESET_ID,
-  DEFAULT_RECOVERY_SEQUENCE_STEP,
   DEFAULT_STYLING_MODE,
   LAYOUT_PRESET_IDS,
-  RECOVERY_SEQUENCE_STEPS,
   isLayoutPresetId,
-  isRecoverySequenceStep,
   isStylingMode,
   resolveLayoutPresetId,
   type LayoutPresetId,
-  type RecoverySequenceStep,
   type RecoverySettingsLayoutFields,
   type StylingMode,
 } from "./emailTheme";
@@ -22,8 +26,11 @@ import {
   LAYOUT_PRESET_CATALOG,
   LAYOUT_PRESET_IDS,
   type LayoutPresetId,
-  type RecoverySequenceStep,
 } from "./emailTheme";
+import {
+  TEMPLATE_META,
+  type RecoveryTemplateId,
+} from "./recoveryEmailCopy";
 
 export type LayoutPresetMeta = {
   id: LayoutPresetId;
@@ -33,7 +40,7 @@ export type LayoutPresetMeta = {
 
 export const LAYOUT_PRESET_META: readonly LayoutPresetMeta[] =
   LAYOUT_PRESET_IDS.map((id) => {
-    const preset = LAYOUT_PRESET_CATALOG[id];
+    const preset = LAYOUT_PRESET_CATALOG[id]!;
     return {
       id,
       label: preset.name,
@@ -41,23 +48,46 @@ export const LAYOUT_PRESET_META: readonly LayoutPresetMeta[] =
     };
   });
 
-export const RECOVERY_STEP_META: Record<
-  RecoverySequenceStep,
-  { label: string; hint: string }
+export const RECOVERY_DAY_IDS = ["gentle", "direct", "urgent"] as const;
+
+export type RecoveryDayId = RecoveryTemplateId;
+
+export const DEFAULT_RECOVERY_DAY: RecoveryDayId = "gentle";
+
+export const RECOVERY_DAY_META: Record<
+  RecoveryDayId,
+  { label: string; hint: string; day: string }
 > = {
-  day0: { label: "Day 0", hint: "Gentle — first notice" },
-  day2: { label: "Day 2", hint: "Direct — second notice" },
-  day5: { label: "Day 5", hint: "Urgent — final notice" },
+  gentle: {
+    label: "Day 0",
+    hint: TEMPLATE_META.gentle.when,
+    day: TEMPLATE_META.gentle.day,
+  },
+  direct: {
+    label: "Day 2",
+    hint: TEMPLATE_META.direct.when,
+    day: TEMPLATE_META.direct.day,
+  },
+  urgent: {
+    label: "Day 5",
+    hint: TEMPLATE_META.urgent.when,
+    day: TEMPLATE_META.urgent.day,
+  },
 };
+
+export const RECOVERY_DAY_OPTIONS = RECOVERY_DAY_IDS.map((id) => ({
+  id,
+  label: RECOVERY_DAY_META[id].label,
+}));
+
+export function isRecoveryDayId(value: unknown): value is RecoveryDayId {
+  return (
+    typeof value === "string" &&
+    (RECOVERY_DAY_IDS as readonly string[]).includes(value)
+  );
+}
 
 export function layoutPresetMeta(id: string): LayoutPresetMeta {
   const found = LAYOUT_PRESET_META.find((item) => item.id === id);
   return found ?? LAYOUT_PRESET_META[0]!;
-}
-
-export function recoveryStepMeta(step: RecoverySequenceStep): {
-  label: string;
-  hint: string;
-} {
-  return RECOVERY_STEP_META[step];
 }

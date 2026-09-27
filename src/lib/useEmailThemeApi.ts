@@ -7,7 +7,11 @@ import {
   type EmailThemeSettings,
   type RecoveryEmailPreview,
 } from "./emailThemeApi";
-import type { RecoverySequenceStep, StylingMode } from "./emailTheme";
+import {
+  toBackendLayoutPresetId,
+  type RecoverySequenceStep,
+  type StylingMode,
+} from "./emailTheme";
 
 /**
  * Convex hooks for recovery theme. Persist mutations throw so callers
@@ -71,7 +75,9 @@ export function useSetLayoutPresetId() {
       if (!ref) {
         throw new Error("setLayoutPresetId is not available");
       }
-      return await convex.mutation(ref, { layoutPresetId });
+      return await convex.mutation(ref, {
+        layoutPresetId: toBackendLayoutPresetId(layoutPresetId),
+      });
     },
     [convex],
   );
