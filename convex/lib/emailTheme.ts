@@ -253,13 +253,18 @@ export function resolveTheme(input: ResolveThemeInput): ResolvedEmailTheme {
   };
 }
 
-/** Infer mode for rows created before stylingMode existed. */
+/**
+ * Infer mode for rows created before stylingMode existed.
+ * Unset → configured (legacy preserve: saveEmailColors / customizations
+ * without brand import must keep BrandKit tokens, not Quiet Verify).
+ * New merchants write explicit stylingMode: "preset" on insert.
+ */
 export function inferStylingMode(row: {
   stylingMode?: string | null;
   brandImportCompletedAt?: number | null;
 }): StylingMode {
   if (isStylingMode(row.stylingMode)) return row.stylingMode;
-  return row.brandImportCompletedAt != null ? "configured" : "preset";
+  return "configured";
 }
 
 export type SettingsTokenSource = {

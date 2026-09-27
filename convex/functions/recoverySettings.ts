@@ -1037,6 +1037,7 @@ export const completeBrandImport = mutation({
       pageTextColor,
       emailBackgroundColor,
       emailTextColor,
+      stylingMode: "configured" as const,
       ...(fontFamilyRaw ? { fontFamilyRaw } : {}),
       updatedAt: now,
       ...(fromName ? { fromName } : {}),
