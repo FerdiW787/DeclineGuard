@@ -29,6 +29,7 @@ import {
   ensureCtaLabelContrast,
   ensureShellTextHierarchy,
 } from "../../../../convex/lib/brandImport/colors";
+import { PAYMENT_UPDATE_HREF } from "@/lib/emailRichText";
 import {
   BLOCK_TYPE_META,
   collectEmailColors,
@@ -120,6 +121,12 @@ type Props = {
   frameClassName?: string;
   footerSupport: string;
   socialLinks: readonly (readonly [string, string])[];
+  /** Kit chrome — Sonos is logo-only + centered, no greeting. */
+  logoAlign?: "left" | "center" | "right";
+  showStoreName?: boolean;
+  showGreeting?: boolean;
+  /** NordVPN-style top accent stripe. */
+  showAccentBar?: boolean;
 };
 
 const ADDABLE: EmailBlockType[] = [
@@ -166,6 +173,10 @@ export default function EmailBuilderCanvas({
   frameClassName,
   footerSupport,
   socialLinks,
+  logoAlign = "left",
+  showStoreName = true,
+  showGreeting = true,
+  showAccentBar = false,
 }: Props) {
   useEmailFontLoader(emailFont);
   const shellBg = resolveShellBackground(
@@ -394,6 +405,14 @@ export default function EmailBuilderCanvas({
           </div>
         ) : null}
 
+        {showAccentBar ? (
+          <div
+            aria-hidden
+            className="h-1.5 w-full"
+            style={{ background: primary }}
+          />
+        ) : null}
+
         <div
           data-email-column=""
           className="px-6 py-8 md:px-8"
@@ -411,14 +430,18 @@ export default function EmailBuilderCanvas({
             primary={primary}
             emailFont={emailFont}
             textColor={shellText}
+            align={logoAlign}
+            showName={showStoreName}
           />
 
-          <p
-            className="mb-4 text-[17px] font-semibold tracking-tight"
-            style={{ color: shellText }}
-          >
-            Hi {customerFirstName},
-          </p>
+          {showGreeting ? (
+            <p
+              className="mb-4 text-[17px] font-semibold tracking-tight"
+              style={{ color: shellText }}
+            >
+              Hi {customerFirstName},
+            </p>
+          ) : null}
 
           {!readOnly && !inlineEdit ? (
             <AddGap
@@ -434,6 +457,7 @@ export default function EmailBuilderCanvas({
             <div key={block.id}>
               <CanvasBlock
                 block={block}
+                roleLabel={blockRoleLabel(block, document.blocks)}
                 readOnly={readOnly}
                 inlineEdit={inlineEdit}
                 selected={activeSelectedId === block.id}
@@ -769,8 +793,42 @@ function BlockTypeIcon({ type }: { type: EmailBlockType }) {
   }
 }
 
+function blockRoleLabel(
+  block: EmailBlock,
+  blocks: EmailBlock[],
+): string {
+  switch (block.type) {
+    case "button":
+      return "Button";
+    case "image":
+      return "Image";
+    case "spacer":
+      return "Spacer";
+    case "divider":
+      return "Divider";
+    case "linkRow":
+      return "Link";
+    case "text": {
+      if (block.html.includes(PAYMENT_UPDATE_HREF)) return "Link";
+      const texts = blocks.filter(
+        (item) =>
+          item.type === "text" && !item.html.includes(PAYMENT_UPDATE_HREF),
+      );
+      const idx = texts.findIndex((item) => item.id === block.id);
+      if (idx === 0) return "Headline";
+      if (idx === 1) return "Body";
+      return "Text";
+    }
+    default: {
+      const _never: never = block;
+      return _never;
+    }
+  }
+}
+
 function CanvasBlock({
   block,
+  roleLabel,
   readOnly,
   inlineEdit,
   selected,
@@ -799,6 +857,7 @@ function CanvasBlock({
   onDrop,
 }: {
   block: EmailBlock;
+  roleLabel: string;
   readOnly: boolean;
   inlineEdit: boolean;
   selected: boolean;
@@ -914,8 +973,7 @@ function CanvasBlock({
 
   if (readOnly || inlineEdit) {
     const live = Boolean(inlineEdit && !readOnly);
-    const isText = block.type === "text";
-    const chrome = live && isText;
+    const chrome = live;
     const faceFallbacks = {
       body: bodyTextColor,
       muted: mutedColor,
@@ -934,6 +992,11 @@ function CanvasBlock({
           onSelect();
         }}
       >
+        {chrome && selected ? (
+          <span className="pointer-events-none absolute -top-2.5 left-2 z-20 rounded bg-[#2563eb] px-1.5 py-[3px] text-[9px] font-bold uppercase tracking-wide text-white shadow-sm">
+            {roleLabel}
+          </span>
+        ) : null}
         {chrome && selected && block.type === "text" ? (
           <TextBlockEditBar
             block={block}
@@ -965,13 +1028,13 @@ function CanvasBlock({
         <div
           ref={chromeRef}
           role={chrome ? "group" : undefined}
-          aria-label={chrome ? "Text block" : undefined}
+          aria-label={chrome ? `${roleLabel} block` : undefined}
           className={
             chrome
-              ? `border-2 p-1 transition-colors duration-150 ${
+              ? `cursor-text rounded-sm border-2 p-1 transition-colors duration-150 ${
                   selected
                     ? "border-[#2563eb]"
-                    : "border-transparent hover:border-[#2563eb]"
+                    : "border-transparent hover:border-[#2563eb]/70"
                 }`
               : "relative"
           }
@@ -1145,11 +1208,24 @@ function BlockContent({
       link: linkColor,
     });
     if (inlineEdit) {
+      if (!selected) {
+        return (
+          <p
+            style={face}
+            dangerouslySetInnerHTML={{
+              __html: styleEmailAnchors(
+                markersToHtml(applyCopyVars(block.html, vars)),
+                linkColor,
+              ),
+            }}
+          />
+        );
+      }
       return (
         <InlineRichText
           value={block.html}
           onChange={(html) => onPatch({ html })}
-          editable={selected}
+          editable
           showSelectionMenu
           brandColor={primary}
           emailColors={emailColors}
@@ -1228,11 +1304,12 @@ function BlockContent({
       ? block.backgroundColor
       : ctaBackgroundColor || primary;
     const label = ensureCtaLabelContrast(bg, ctaTextColor);
+    const liveEdit = inlineEdit && selected;
     return (
       <div style={{ textAlign: block.align }}>
         <span
           className={`inline-flex px-5 py-2.5 text-xs font-semibold transition-[box-shadow] duration-150 ${
-            inlineEdit
+            liveEdit
               ? "cursor-text outline-none hover:shadow-[0_0_0_3px_rgba(8,9,10,0.08)]"
               : ""
           }`}
@@ -1241,11 +1318,11 @@ function BlockContent({
             color: label,
             borderRadius: ctaBorderRadiusPx,
           }}
-          contentEditable={inlineEdit}
+          contentEditable={liveEdit}
           suppressContentEditableWarning
-          spellCheck={inlineEdit}
+          spellCheck={liveEdit}
           onBlur={
-            inlineEdit
+            liveEdit
               ? (e) => {
                   const next = e.currentTarget.textContent?.trim() ?? "";
                   if (next && next !== block.label) onPatch({ label: next });
@@ -1281,19 +1358,19 @@ function BlockContent({
         style={{ color: mutedColor }}
       >
         <EditableSpan
-          enabled={inlineEdit}
+          enabled={inlineEdit && selected}
           value={block.prefix}
           onChange={(prefix) => onPatch({ prefix })}
         />
         <EditableSpan
-          enabled={inlineEdit}
+          enabled={inlineEdit && selected}
           value={block.linkLabel}
           onChange={(linkLabel) => onPatch({ linkLabel })}
           className="underline"
           style={{ color: linkColor }}
         />
         <EditableSpan
-          enabled={inlineEdit}
+          enabled={inlineEdit && selected}
           value={block.suffix}
           onChange={(suffix) => onPatch({ suffix })}
         />

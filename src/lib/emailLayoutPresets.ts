@@ -1,23 +1,20 @@
 /**
- * Picker labels + recovery-day preview meta.
- * IDs/tokens live in `emailTheme.ts`.
- *
- * Locked catalog id ↔ reference:
- *   sonos              → refs/sonos.png
- *   avocode            → refs/avocode.png
- *   benchmark          → refs/benchmark.png
- *   fontbase           → refs/fontbase.png
- *   nordvpn-structure  → refs/nordvpn-structure.png
+ * Picker labels + lifecycle display. IDs/tokens live in `emailTheme.ts`
+ * (Riley public API mirror).
  */
 
 export {
   DEFAULT_LAYOUT_PRESET_ID,
+  DEFAULT_LIFECYCLE_EMAIL_TYPE,
   DEFAULT_STYLING_MODE,
   LAYOUT_PRESET_IDS,
+  LIFECYCLE_EMAIL_TYPES,
   isLayoutPresetId,
+  isLifecycleEmailType,
   isStylingMode,
   resolveLayoutPresetId,
   type LayoutPresetId,
+  type LifecycleEmailType,
   type RecoverySettingsLayoutFields,
   type StylingMode,
 } from "./emailTheme";
@@ -26,6 +23,7 @@ import {
   LAYOUT_PRESET_CATALOG,
   LAYOUT_PRESET_IDS,
   type LayoutPresetId,
+  type LifecycleEmailType,
 } from "./emailTheme";
 import {
   TEMPLATE_META,
@@ -47,6 +45,29 @@ export const LAYOUT_PRESET_META: readonly LayoutPresetMeta[] =
       structure: preset.description,
     };
   });
+
+/** Product labels match the RGE refs — never Quiet Verify / Soft Expire. */
+export const LAYOUT_PRESET_STRUCTURE_META: Record<
+  LayoutPresetId,
+  { label: string; hint: string }
+> = {
+  sonos: { label: "Sonos", hint: "Verify your email" },
+  avocode: { label: "Avocode", hint: "Your trial ended" },
+  benchmark: { label: "Benchmark", hint: "Your data is safe" },
+  fontbase: { label: "FontBase", hint: "Upcoming renewal" },
+  "nordvpn-structure": { label: "NordVPN", hint: "Your account has expired" },
+};
+
+export const LIFECYCLE_EMAIL_META: Record<
+  LifecycleEmailType,
+  { label: string; hint: string }
+> = {
+  verify: { label: "Verify", hint: "Confirm the address" },
+  decline_pause: { label: "Decline / pause", hint: "Payment failed or paused" },
+  trial_ended: { label: "Trial ended", hint: "Trial wrapped up" },
+  renewal: { label: "Renewal", hint: "Upcoming or due" },
+  expiry: { label: "Expiry", hint: "Access is ending" },
+};
 
 export const RECOVERY_DAY_IDS = ["gentle", "direct", "urgent"] as const;
 

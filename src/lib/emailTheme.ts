@@ -43,6 +43,7 @@ export {
 
 import {
   LAYOUT_PRESET_CATALOG,
+  SONOS_TOKENS,
   normalizeLayoutPresetId,
   resolveLayoutPresetId,
   type EmailThemeTokens,
@@ -50,6 +51,12 @@ import {
 } from "../../convex/lib/emailTheme";
 
 export const DEFAULT_RECOVERY_SEQUENCE_STEP = "day0" as const;
+
+/** Legacy alias — maps to sonos via normalizeLayoutPresetId. */
+export const QUIET_VERIFY_LAYOUT_ID = "quiet-verify";
+
+/** @deprecated Use SONOS_TOKENS. Kept for Jules Lab/picker fallbacks. */
+export const QUIET_VERIFY_TOKENS: EmailThemeTokens = SONOS_TOKENS;
 
 export function toBackendLayoutPresetId(
   layoutPresetId: string | null | undefined,
@@ -62,6 +69,31 @@ export function fromBackendLayoutPresetId(
   _localFeId?: string | null,
 ): LayoutPresetId {
   return resolveLayoutPresetId(backendId ?? "");
+}
+
+/**
+ * Leftover Jules studio keys. Product send is Day 0 / 2 / 5 only —
+ * these exist so Lab-adjacent draft files typecheck until Jules drops them.
+ */
+export const LIFECYCLE_EMAIL_TYPES = [
+  "verify",
+  "decline_pause",
+  "trial_ended",
+  "renewal",
+  "expiry",
+] as const;
+
+export type LifecycleEmailType = (typeof LIFECYCLE_EMAIL_TYPES)[number];
+
+export const DEFAULT_LIFECYCLE_EMAIL_TYPE: LifecycleEmailType = "verify";
+
+export function isLifecycleEmailType(
+  value: unknown,
+): value is LifecycleEmailType {
+  return (
+    typeof value === "string" &&
+    (LIFECYCLE_EMAIL_TYPES as readonly string[]).includes(value)
+  );
 }
 
 export type RecoverySettingsLayoutFields = {

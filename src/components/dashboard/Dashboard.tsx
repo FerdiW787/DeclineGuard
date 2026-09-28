@@ -1028,9 +1028,7 @@ function Dashboard() {
             lsConnected ? "dg-inset" : ""
           } ${
             lsConnected && useChromeScroll
-              ? nav === "customizations" && !emailFocusMode
-                ? "overflow-x-hidden overflow-y-visible"
-                : "overflow-hidden"
+              ? "overflow-hidden"
               : "overflow-y-auto"
           } ${
             lsConnected
@@ -1359,7 +1357,7 @@ function Dashboard() {
                   )}
                 </section>
               ) : nav === "customizations" ? (
-                <section className="relative flex min-h-0 flex-1 flex-col overflow-visible">
+                <section className="relative flex min-h-0 flex-1 flex-col">
                   {emailFocusMode ? null : (
                   <div className="relative z-10 shrink-0 px-5 pt-3 pb-1 lg:hidden">
                     <nav className="flex gap-1 overflow-x-auto rounded-full border border-black/6 bg-white/80 p-1 text-sm font-medium">

@@ -34,6 +34,8 @@ export type EmailBlockBase = {
   marginBottom: number;
 };
 
+export type TextCopySlot = "eyebrow" | "headline" | "body";
+
 export type TextBlock = EmailBlockBase & {
   type: "text";
   /** Supports **bold** markers, HTML subset, and newlines */
@@ -46,6 +48,8 @@ export type TextBlock = EmailBlockBase & {
   italic?: boolean;
   underline?: boolean;
   align: BlockAlign;
+  /** Short-copy role. Chrome / extra kit lines stay untagged. */
+  copySlot?: TextCopySlot;
 };
 
 export const TEXT_SIZE_OPTIONS = [13, 15, 17, 20, 24] as const;
@@ -521,6 +525,7 @@ export function createTextBlock(
     italic: opts.italic,
     underline: opts.underline,
     align: opts.align ?? "left",
+    copySlot: opts.copySlot,
     marginTop: opts.marginTop ?? 0,
     marginBottom: opts.marginBottom ?? 16,
   };
@@ -684,12 +689,14 @@ export function blocksFromLegacyCopy(copy: LegacyEmailCopy): EmailBlock[] {
     createTextBlock(copy.headline, {
       fontSize: 15,
       color: "muted",
+      copySlot: "headline",
       marginTop: 0,
       marginBottom: 8,
     }),
     createTextBlock(plainToBoldMarkers(copy.body), {
       fontSize: 15,
       color: "default",
+      copySlot: "body",
       marginTop: 16,
       marginBottom: 24,
     }),

@@ -1,23 +1,23 @@
 import {
   DEFAULT_LAYOUT_PRESET_ID,
   DEFAULT_STYLING_MODE,
-  RECOVERY_DAY_IDS,
   isStylingMode,
   resolveLayoutPresetId,
+  LIFECYCLE_EMAIL_TYPES,
   type LayoutPresetId,
-  type RecoveryDayId,
+  type LifecycleEmailType,
   type StylingMode,
 } from "./emailLayoutPresets";
 import type { EmailCopyOverride, EmailLayoutCopyOverrides } from "./emailLayoutCopy";
 import type { EmailThemeTokens } from "./emailTheme";
 
-const STORAGE_KEY = "dg.emailLayoutDraft.v2";
+const STORAGE_KEY = "dg.emailLayoutDraft.v1";
 
 /**
- * FE draft for the global recovery-layout pick.
- * `stylingMode` + locked `layoutPresetId` persist via
- * `setStylingMode` / `setLayoutPresetId` (sonos | avocode | benchmark |
- * fontbase | nordvpn-structure). Legacy quiet-verify → sonos.
+ * Riley-shaped FE draft. recoverySettings will store stylingMode +
+ * layoutPresetId (default sonos; legacy quiet-verify maps here) when Convex tips; until then
+ * this stays in localStorage. Kit ids are FE-local until Riley’s catalog
+ * accepts them — persist errors should surface, not remap on hydrate.
  */
 export type EmailLayoutDraft = {
   stylingMode: StylingMode;
@@ -45,9 +45,9 @@ function sanitizeCopyOverrides(
 ): EmailLayoutCopyOverrides {
   if (!raw || typeof raw !== "object") return {};
   const out: EmailLayoutCopyOverrides = {};
-  for (const day of RECOVERY_DAY_IDS) {
-    if (!(day in raw)) continue;
-    const entry = (raw as Record<string, unknown>)[day];
+  for (const type of LIFECYCLE_EMAIL_TYPES) {
+    if (!(type in raw)) continue;
+    const entry = (raw as Record<string, unknown>)[type];
     if (!entry || typeof entry !== "object") continue;
     const rec = entry as Record<string, unknown>;
     const next: EmailCopyOverride = {};
@@ -57,7 +57,7 @@ function sanitizeCopyOverrides(
     if (typeof rec.secondaryLink === "string") {
       next.secondaryLink = rec.secondaryLink;
     }
-    if (Object.keys(next).length > 0) out[day] = next;
+    if (Object.keys(next).length > 0) out[type] = next;
   }
   return out;
 }
@@ -128,9 +128,9 @@ export type PersistableEmailLayoutFields = {
 /**
  * Thin persist adapter.
  *
- * Writes the recovery-layout draft to localStorage. Color fields that
+ * Writes the Riley-shaped draft to localStorage. Color fields that
  * `saveEmailCustomizations` already accepts are returned for the live
- * save path. `stylingMode` + BE-mapped `layoutPresetId` persist via
+ * save path. `stylingMode` + `layoutPresetId` persist via
  * `setStylingMode` / `setLayoutPresetId` when those refs exist.
  */
 export function persistEmailLayoutSettings(input: {
@@ -167,18 +167,18 @@ export function persistEmailLayoutSettings(input: {
       shellOverrides: input.draft.shellOverrides,
     },
     convexGap: [
-      "layoutPresetId (locked: sonos | avocode | benchmark | fontbase | nordvpn-structure)",
+      "layoutPresetId",
       "stylingMode",
-      "copyOverrides (recovery Day 0 / 2 / 5 short copy)",
+      "copyOverrides (lifecycle short copy)",
       "emailBackgroundColor",
       "emailTextColor",
     ],
   };
 }
 
-export function copyOverrideForDay(
+export function copyOverrideForType(
   draft: EmailLayoutDraft,
-  recoveryDay: RecoveryDayId,
+  emailType: LifecycleEmailType,
 ): EmailCopyOverride | undefined {
-  return draft.copyOverrides[recoveryDay];
+  return draft.copyOverrides[emailType];
 }

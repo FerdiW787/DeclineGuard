@@ -1,5 +1,8 @@
-import type { LayoutPresetId, RecoveryDayId } from "./emailLayoutPresets";
-import { DEFAULT_EMAIL_COPY } from "./recoveryEmailCopy";
+import type {
+  LayoutPresetId,
+  LifecycleEmailType,
+  RecoveryDayId,
+} from "./emailLayoutPresets";
 
 export type EmailLayoutCopy = {
   eyebrow: string;
@@ -20,7 +23,7 @@ export type EmailCopyOverride = {
 };
 
 export type EmailLayoutCopyOverrides = Partial<
-  Record<RecoveryDayId, EmailCopyOverride>
+  Record<LifecycleEmailType | RecoveryDayId, EmailCopyOverride>
 >;
 
 type CopyVars = {
@@ -30,85 +33,125 @@ type CopyVars = {
   storeName?: string;
 };
 
-/**
- * Recovery sequence copy (Day 0 / Day 2 / Day 5) — not lifecycle email kinds.
- * Headline / body / CTA stay in sync with `DEFAULT_EMAIL_COPY`.
- */
-const BASE_BY_DAY: Record<RecoveryDayId, EmailLayoutCopy> = {
-  gentle: {
-    eyebrow: "Day 0",
-    headline: DEFAULT_EMAIL_COPY.gentle.headline,
-    body: DEFAULT_EMAIL_COPY.gentle.body,
-    cta: DEFAULT_EMAIL_COPY.gentle.cta,
-    secondaryLink: "Review billing",
+const BASE_BY_TYPE: Record<LifecycleEmailType, EmailLayoutCopy> = {
+  verify: {
+    eyebrow: "A quick check",
+    headline: "Confirm this is you",
+    body: "We only need a moment to make sure {{first_name}} still wants email from {{store}}.",
+    cta: "Confirm email",
+    secondaryLink: "This wasn’t me",
     support: [
-      "Takes about a minute",
-      "Your access stays on while you update",
+      "Takes a few seconds",
+      "You can unsubscribe anytime",
     ],
-    status: "Payment needs an update",
+    status: "Waiting to confirm",
   },
-  direct: {
-    eyebrow: "Day 2",
-    headline: DEFAULT_EMAIL_COPY.direct.headline,
-    body: DEFAULT_EMAIL_COPY.direct.body,
-    cta: DEFAULT_EMAIL_COPY.direct.cta,
+  decline_pause: {
+    eyebrow: "Payment update",
+    headline: "Your payment didn’t go through",
+    body: "The charge of {{amount}} for {{product}} failed. Update billing to keep access.",
+    cta: "Update payment",
     secondaryLink: "Open billing",
     support: [
-      "Same billing page as last time",
-      "Access stays on after a successful update",
+      "Access stays on while you update",
+      "Card details stay on your billing page",
     ],
-    status: "Still waiting on billing",
+    status: "Payment paused",
   },
-  urgent: {
-    eyebrow: "Day 5",
-    headline: DEFAULT_EMAIL_COPY.urgent.headline,
-    body: DEFAULT_EMAIL_COPY.urgent.body,
-    cta: DEFAULT_EMAIL_COPY.urgent.cta,
+  trial_ended: {
+    eyebrow: "Trial wrapped up",
+    headline: "Your trial has ended",
+    body: "Thanks for trying {{product}}. Subscribe to keep the same workspace and data.",
+    cta: "Continue",
+    secondaryLink: "Not now",
+    support: [
+      "Your workspace is still here",
+      "Nothing is deleted for sitting this out",
+    ],
+    status: "Trial ended",
+  },
+  renewal: {
+    eyebrow: "Upcoming renewal",
+    headline: "Your renewal is coming up",
+    body: "{{product}} renews soon for {{amount}}. You’re all set unless you want to change the card.",
+    cta: "Review billing",
+    secondaryLink: "Manage plan",
+    support: [
+      "Same plan and workspace",
+      "Change the card anytime before renewal",
+    ],
+    status: "Renewal scheduled",
+  },
+  expiry: {
+    eyebrow: "Access ending",
+    headline: "Access is ending soon",
+    body: "{{product}} will stop unless billing is updated. Your data stays until you come back.",
+    cta: "Restore access",
     secondaryLink: "Need more time?",
     support: [
-      "Update now to avoid a pause",
-      "Your data stays if access stops",
+      "Workspace data stays put",
+      "Restore from the same billing page",
     ],
-    status: "Last notice",
+    status: "Ending soon",
   },
 };
 
-/** Layout chrome only — DeclineGuard / merchant voice, not cloned marketing copy. */
+/** Layout-specific chrome only — not third-party copy. */
 const LAYOUT_CHROME: Record<
   LayoutPresetId,
-  Partial<Record<RecoveryDayId, Partial<EmailLayoutCopy>>>
+  Partial<Record<LifecycleEmailType, Partial<EmailLayoutCopy>>>
 > = {
   sonos: {
-    gentle: {
-      eyebrow: "A quick update",
+    verify: {
+      eyebrow: "Just to be sure",
+      headline: "One tap to confirm",
     },
   },
-  avocode: {},
+  avocode: {
+    trial_ended: {
+      eyebrow: "Trial wrapped up",
+      headline: "Your trial has ended",
+    },
+    decline_pause: {
+      eyebrow: "Billing needs a moment",
+    },
+  },
   benchmark: {
-    gentle: {
-      status: "Your data is safe",
+    decline_pause: {
+      status: "Paused — your data is safe",
+      headline: "Don’t worry — your data is safe",
+      body: "The payment of {{amount}} for {{product}} didn’t go through. Everything you saved is still here.",
     },
-    direct: {
-      status: "Your data is safe",
+    trial_ended: {
+      status: "Paused — your data is safe",
     },
-    urgent: {
-      status: "Your data is still safe",
+    expiry: {
+      status: "Ending — your data is safe",
     },
   },
-  fontbase: {},
+  fontbase: {
+    renewal: {
+      eyebrow: "Upcoming renewal",
+      headline: "Your renewal is coming up",
+    },
+  },
   "nordvpn-structure": {
-    urgent: {
-      status: "Access may pause soon",
+    expiry: {
+      eyebrow: "Account expired",
+      headline: "Your account has expired",
+    },
+    decline_pause: {
+      eyebrow: "Needs a card update",
     },
   },
 };
 
 export function defaultLayoutCopy(
   layoutPresetId: LayoutPresetId,
-  recoveryDay: RecoveryDayId,
+  emailType: LifecycleEmailType,
 ): EmailLayoutCopy {
-  const base = BASE_BY_DAY[recoveryDay];
-  const chrome = LAYOUT_CHROME[layoutPresetId][recoveryDay];
+  const base = BASE_BY_TYPE[emailType];
+  const chrome = LAYOUT_CHROME[layoutPresetId][emailType];
   return {
     ...base,
     ...chrome,
@@ -118,10 +161,10 @@ export function defaultLayoutCopy(
 
 export function resolveLayoutCopy(
   layoutPresetId: LayoutPresetId,
-  recoveryDay: RecoveryDayId,
+  emailType: LifecycleEmailType,
   overrides?: EmailCopyOverride | null,
 ): EmailLayoutCopy {
-  const base = defaultLayoutCopy(layoutPresetId, recoveryDay);
+  const base = defaultLayoutCopy(layoutPresetId, emailType);
   return {
     ...base,
     headline: overrides?.headline?.trim() || base.headline,
@@ -139,34 +182,4 @@ export function applyLayoutCopyVars(text: string, vars: CopyVars): string {
     .replace(/\{\{amount\}\}/g, vars.amount)
     .replace(/\{\{first_name\}\}/g, first)
     .replace(/\{\{store\}\}/g, store);
-}
-
-export function recoveryDayNumber(recoveryDay: RecoveryDayId): 0 | 2 | 5 {
-  switch (recoveryDay) {
-    case "gentle":
-      return 0;
-    case "direct":
-      return 2;
-    case "urgent":
-      return 5;
-    default: {
-      const _exhaustive: never = recoveryDay;
-      return _exhaustive;
-    }
-  }
-}
-
-export function recoveryDayLabel(recoveryDay: RecoveryDayId): string {
-  switch (recoveryDay) {
-    case "gentle":
-      return "Day 0";
-    case "direct":
-      return "Day 2";
-    case "urgent":
-      return "Day 5";
-    default: {
-      const _exhaustive: never = recoveryDay;
-      return _exhaustive;
-    }
-  }
 }
