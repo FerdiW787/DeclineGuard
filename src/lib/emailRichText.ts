@@ -60,7 +60,7 @@ export function normalizeLinkUrl(raw: string): string | null {
 }
 
 const EVENT_HANDLER_ATTR_RE =
-  /\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
+  /\bon[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 
 /** Drop on* attributes so preview HTML cannot keep event handlers. */
 export function stripEventHandlerAttrs(html: string): string {
@@ -81,6 +81,14 @@ function hrefFromAttrs(attrs: string): string {
   return (match?.[1] ?? match?.[2] ?? match?.[3] ?? "").trim();
 }
 
+/** Clean dangling `<a …>` — never return the raw open tag. */
+function rebuildOpenAnchor(attrs: string): string {
+  const raw = hrefFromAttrs(attrs);
+  if (isPaymentUpdateHref(raw)) return `<a href="${raw}">`;
+  const href = allowHttpsUrl(raw);
+  return href ? `<a href="${escapeHtml(href)}">` : "";
+}
+
 function rewriteAnchors(
   html: string,
   replace: (attrs: string, inner: string) => string,
@@ -94,11 +102,9 @@ function rewriteAnchors(
     if (next === current) break;
     current = next;
   }
-  return current.replace(/<a\b([^>]*)>/gi, (openTag, attrs: string) => {
-    const raw = hrefFromAttrs(attrs);
-    if (isPaymentUpdateHref(raw) || allowHttpsUrl(raw)) return openTag;
-    return "";
-  });
+  return current.replace(/<a\b([^>]*)>/gi, (_open, attrs: string) =>
+    rebuildOpenAnchor(attrs),
+  );
 }
 
 function hrefFromRaw(raw: string): string | null {
@@ -109,13 +115,18 @@ function hrefFromRaw(raw: string): string | null {
 /** Inline link color + underline so email clients keep the style. */
 export function styleEmailAnchors(html: string, linkColor: string): string {
   const color = linkColor.trim() || "#2563eb";
-  return rewriteAnchors(
+  const rewritten = rewriteAnchors(
     stripEventHandlerAttrs(ensurePaymentLinkSpacing(html)),
     (attrs, inner) => {
       const href = hrefFromRaw(hrefFromAttrs(attrs));
       if (!href) return inner;
-      return `<a href="${escapeHtml(href)}" style="color:${escapeHtml(color)};text-decoration:underline">${inner}</a>`;
+      return `<a href="${escapeHtml(href)}">${inner}</a>`;
     },
+  );
+  const style = `color:${escapeHtml(color)};text-decoration:underline`;
+  return rewritten.replace(
+    /<a href="((?:https:[^"]+)|#update-payment|#billing)">/gi,
+    `<a href="$1" style="${style}">`,
   );
 }
 
@@ -166,7 +177,8 @@ export function sanitizeEditorHtml(html: string): string {
   );
 }
 
-function sanitizeEditorHtmlString(html: string): string {
+/** String/SSR sanitizer — used by preview when `document` is unavailable. */
+export function sanitizeEditorHtmlString(html: string): string {
   return stripEventHandlerAttrs(html)
     .replace(/<br\s*\/?>/gi, "<br />")
     .replace(/<\/?(?:b|strong)(?:\s[^>]*)?>/gi, (m) =>
@@ -186,10 +198,9 @@ function sanitizeEditorHtmlString(html: string): string {
       if (!href) return inner;
       return `<a href="${escapeHtml(href)}">${inner}</a>`;
     })
-    .replace(/<a\b([^>]*)>/gi, (_open, attrs: string) => {
-      const href = hrefFromRaw(hrefFromAttrs(attrs));
-      return href ? `<a href="${escapeHtml(href)}">` : "";
-    })
+    .replace(/<a\b([^>]*)>/gi, (_open, attrs: string) =>
+      rebuildOpenAnchor(attrs),
+    )
     .replace(/<(?!\/?(?:strong|em|u|span|br|a)\b)[^>]+>/gi, "");
 }
 
