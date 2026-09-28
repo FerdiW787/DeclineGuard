@@ -724,6 +724,7 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
               )}
               <button
                 type="button"
+                id="email-lab-toggle"
                 aria-pressed={labMode}
                 aria-label={labMode ? "Exit lab" : "Open lab"}
                 onClick={() => setLabMode((open) => !open)}
@@ -823,22 +824,15 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
             </div>
           </Panel>
 
-          <div
-            key={labMode ? "lab-rail" : "edit-rail"}
-            className="dg-float-in-right min-w-0"
-          >
-            {labMode ? (
-              <EmailLabSidebar
-                layoutPresetId={layoutDraft.layoutPresetId}
-                stylingMode={layoutDraft.stylingMode}
-                theme={theme}
-                storeName={storeName}
-                storeLogoUrl={storeLogoUrl}
-                previewCopy={labPreviewCopy}
-                onSelectKit={onLayoutPresetChange}
-                onStylingModeChange={onStylingModeChange}
-              />
-            ) : (
+          <div className="relative min-w-0 overflow-hidden lg:w-[21rem]">
+            <div
+              className={cn(
+                "transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                labMode
+                  ? "pointer-events-none absolute inset-x-0 top-0 -translate-x-8 opacity-0"
+                  : "relative translate-x-0 opacity-100",
+              )}
+            >
               <EmailCustomizeSidebar
                 stylingMode={layoutDraft.stylingMode}
                 layoutPresetId={layoutDraft.layoutPresetId}
@@ -863,7 +857,27 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
                 onCopyChange={changeShortCopy}
                 dayLabel={`${dayMeta.day} · ${dayMeta.label}`}
               />
-            )}
+            </div>
+            <div
+              className={cn(
+                "transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                labMode
+                  ? "relative translate-x-0 opacity-100"
+                  : "pointer-events-none absolute inset-x-0 top-0 translate-x-full opacity-0",
+              )}
+              aria-hidden={!labMode}
+            >
+              <EmailLabSidebar
+                layoutPresetId={layoutDraft.layoutPresetId}
+                stylingMode={layoutDraft.stylingMode}
+                theme={theme}
+                storeName={storeName}
+                storeLogoUrl={storeLogoUrl}
+                previewCopy={labPreviewCopy}
+                onSelectKit={onLayoutPresetChange}
+                onStylingModeChange={onStylingModeChange}
+              />
+            </div>
           </div>
         </div>
         </div>
