@@ -91,7 +91,9 @@ export function stripEventHandlerAttrs(html: string): string {
       const cleaned = attrsFromTagRest(rest);
       switch (name) {
         case "a":
-          return rebuildOpenAnchor(cleaned);
+          // Bare `<a>` if href is rejected so the closed-pair pass can unwrap
+          // inner. Returning "" here leaves an orphan `</a>`.
+          return rebuildOpenAnchor(cleaned) || "<a>";
         case "span":
           return rebuildOpenSpan(cleaned);
         case "br":
