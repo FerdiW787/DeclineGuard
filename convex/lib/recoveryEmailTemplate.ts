@@ -3,23 +3,28 @@ import {
   renderBlocksText,
   type EmailBlock,
 } from "./emailBlocks";
-import { safePaymentUpdateUrl } from "./safeUrl";
+import { allowHttpsUrl, safePaymentUpdateUrl } from "./safeUrl";
 import {
   ensureCtaLabelContrast,
   ensureShellTextHierarchy,
 } from "./brandImport/colors";
 import {
+  emailFontHeadLinks,
+  emailFontStackWithRaw,
   normalizeEmailFont,
   type EmailFontId,
 } from "./emailFonts";
-import {
-  buildRecoveryLayoutHtml,
-  type RecoverySocialLinks,
-} from "./recoveryLayoutHtml";
+import { normalizeLayoutPresetId } from "./emailTheme";
+import { starterBlocksForKit } from "./recoveryBlockKits";
 
 export type RecoveryTemplateId = "gentle" | "direct" | "urgent";
 
-export type { RecoverySocialLinks };
+export type RecoverySocialLinks = {
+  x?: string | null;
+  linkedin?: string | null;
+  youtube?: string | null;
+  instagram?: string | null;
+};
 
 type TemplateCopy = {
   subject: string;
@@ -59,7 +64,7 @@ export type EmailCopyOverrides = Partial<
 
 /**
  * Copy tuned from industry dunning patterns.
- * HTML structure is selected by layoutPresetId (five recovery layouts).
+ * layoutPresetId selects a starter block kit; send is blocks + theme tokens.
  */
 const TEMPLATES: Record<RecoveryTemplateId, TemplateCopy> = {
   gentle: {
@@ -93,7 +98,7 @@ const TEMPLATES: Record<RecoveryTemplateId, TemplateCopy> = {
 export type RecoveryEmailVars = {
   templateId: RecoveryTemplateId;
   /**
-   * Selects HTML structure (Sonos / Avocode / Benchmark / FontBase / NordVPN).
+   * Selects starter block kit (Sonos / Avocode / Benchmark / FontBase / NordVPN).
    * Day step still selects copy/urgency via templateId.
    */
   layoutPresetId?: string | null;
@@ -228,12 +233,42 @@ function applyVars(
     .replace(/\{\{amount\}\}/g, amount);
 }
 
+function socialRowHtml(
+  socials: RecoverySocialLinks | undefined,
+  linkColor = "#0c0c0c",
+): string {
+  const items: Array<{ label: string; href: string }> = [];
+  const push = (label: string, href: string | null | undefined) => {
+    const safe = allowHttpsUrl(href);
+    if (safe) items.push({ label, href: safe });
+  };
+  push("X", socials?.x);
+  push("LinkedIn", socials?.linkedin);
+  push("YouTube", socials?.youtube);
+  push("Instagram", socials?.instagram);
+  if (items.length === 0) return "";
+  const links = items
+    .map(
+      (item, i) =>
+        `<a href="${escapeAttr(item.href)}" style="color:${escapeAttr(linkColor)};text-decoration:none;${
+          i < items.length - 1 ? "margin-right:14px;" : ""
+        }">${escapeHtml(item.label)}</a>`,
+    )
+    .join("");
+  return `<p style="margin:0 0 16px;font-size:13px;line-height:1.5;">${links}</p>`;
+}
+
 export function buildRecoveryEmail(input: RecoveryEmailVars): {
   subject: string;
   html: string;
   text: string;
 } {
   const copy = resolveCopy(input.templateId, input.copyOverrides);
+  const kit = normalizeLayoutPresetId(input.layoutPresetId);
+  const blocks =
+    copy.blocks && copy.blocks.length > 0
+      ? copy.blocks
+      : starterBlocksForKit(kit, input.templateId);
   const vars = {
     first_name: firstName(input.customerName, input.customerEmail),
     product: input.productName,
@@ -241,8 +276,6 @@ export function buildRecoveryEmail(input: RecoveryEmailVars): {
   };
 
   const subject = applyVars(copy.subject, vars, "text");
-  const headline = applyVars(copy.headline, vars, "text");
-  const bodyText = applyVars(copy.bodyHtml.replace(/<[^>]+>/g, ""), vars, "text");
   const ctaUrl = safePaymentUpdateUrl(input.updatePaymentUrl);
   const year = new Date().getFullYear();
   const primary = input.primaryColor.trim() || "#0c0c0c";
@@ -270,93 +303,129 @@ export function buildRecoveryEmail(input: RecoveryEmailVars): {
     input.linkColor?.trim() ||
     copy.linkColor?.trim() ||
     primary;
+  const pad =
+    typeof copy.emailPadding === "number" && Number.isFinite(copy.emailPadding)
+      ? Math.max(0, Math.min(80, Math.round(copy.emailPadding)))
+      : 24;
+  const cardBg = copy.shellBackground?.trim() || shellBg;
+  const cardBorderOn = copy.shellBorder !== false;
+  const cardBorderColor = copy.shellBorderColor?.trim() || primary;
+  const cardRadius =
+    typeof copy.shellRadius === "number" && Number.isFinite(copy.shellRadius)
+      ? Math.max(0, Math.min(48, Math.round(copy.shellRadius)))
+      : 0;
+  const cardBorderWidth =
+    typeof copy.shellBorderWidth === "number" &&
+    Number.isFinite(copy.shellBorderWidth)
+      ? Math.max(1, Math.min(8, Math.round(copy.shellBorderWidth)))
+      : 1;
+  const cardBox = [
+    `background:${escapeAttr(cardBg)}`,
+    cardBorderOn
+      ? `border:${cardBorderWidth}px solid ${escapeAttr(cardBorderColor)}`
+      : "border:0",
+    `border-radius:${cardRadius}px`,
+    "overflow:hidden",
+  ].join(";");
   const support = input.supportEmail?.trim() || null;
+  const supportBlock = support
+    ? `Questions or feedback? Drop us a line at
+        <a href="mailto:${escapeAttr(support)}" style="color:${escapeAttr(linkColor)};text-decoration:underline;">${escapeHtml(support)}</a>.`
+    : `Questions or feedback? Just reply to this email.`;
+  const helpHref = support ? `mailto:${escapeAttr(support)}` : escapeAttr(ctaUrl);
+  const socialHtml = socialRowHtml(input.socials, linkColor);
+  const isDarkShell = shellBg.toLowerCase() !== "#ffffff" && shellBg !== "#fff";
+  const ruleColor = isDarkShell ? "rgba(255,255,255,0.12)" : "#e8e8ea";
+  const mutedFooter = secondary;
+  const faintFooter = isDarkShell ? "#6b6b70" : "#a1a1a6";
+  const badgeHtml = input.showDeclineGuardBadge
+    ? `<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid ${ruleColor};font-size:11px;line-height:1.5;color:${faintFooter};text-align:center;">
+        Recovery sent by <span style="color:${escapeAttr(linkColor)};font-weight:600;">DeclineGuard</span>
+      </p>`
+    : "";
+  const logoUrl = allowHttpsUrl(input.storeLogoUrl);
+  const initials = storeInitials(input.storeName);
+  const logoMark = logoUrl
+    ? `<img src="${escapeAttr(logoUrl)}" alt="${escapeHtml(input.storeName)}" width="44" height="44" style="display:block;width:44px;height:44px;border-radius:10px;object-fit:cover;" />`
+    : `<div style="display:inline-block;width:44px;height:44px;border-radius:10px;background:${escapeAttr(primary)};color:#ffffff;font-size:15px;font-weight:700;letter-spacing:-0.02em;line-height:44px;text-align:center;">${escapeHtml(initials)}</div>`;
+  const headerHtml = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 36px;">
+        <tr>
+          <td style="vertical-align:middle;padding:0 12px 0 0;">${logoMark}</td>
+          <td style="vertical-align:middle;padding:0;">
+            <p style="margin:0;font-size:17px;line-height:1.3;font-weight:600;letter-spacing:-0.01em;color:${escapeAttr(shellText)};">${escapeHtml(input.storeName)}</p>
+          </td>
+        </tr>
+      </table>`;
   const emailFont = normalizeEmailFont(input.emailFont);
+  const fontFamily = emailFontStackWithRaw(emailFont, input.fontFamilyRaw);
+  const fontHeadLinks = emailFontHeadLinks(emailFont);
 
-  const useBlocks = Boolean(copy.blocks && copy.blocks.length > 0);
-  const blockText = useBlocks
-    ? applyVars(renderBlocksText(copy.blocks!, ctaUrl), vars, "text")
-    : bodyText;
-  const blocksHtml = useBlocks
-    ? applyVars(
-        renderBlocksHtml(copy.blocks!, {
-          primaryColor: primary,
-          linkColor,
-          mutedColor: secondary,
-          ctaUrl,
-          ctaBackgroundColor: ctaBg,
-          ctaTextColor: ctaText,
-          ctaBorderRadiusPx: ctaRadius,
-          bodyTextColor: shellText,
-        }),
-        vars,
-        "html",
-      )
-    : undefined;
-
-  const hasShell =
-    copy.emailPadding !== undefined ||
-    Boolean(copy.shellBackground) ||
-    copy.shellBorder !== undefined ||
-    copy.shellBorderColor !== undefined ||
-    copy.shellBorderWidth !== undefined ||
-    copy.shellRadius !== undefined;
-
-  const built = buildRecoveryLayoutHtml({
-    layoutPresetId: input.layoutPresetId ?? "sonos",
-    step: input.templateId,
-    theme: {
-      brandColor: primary,
-      secondaryColor: secondary,
-      mutedTextColor: secondary,
+  const blocksHtml = applyVars(
+    renderBlocksHtml(blocks, {
+      primaryColor: primary,
       linkColor,
-      pageBackgroundColor: pageBg,
-      pageTextColor: pageText,
-      emailBackgroundColor: shellBg,
-      emailTextColor: shellText,
+      mutedColor: secondary,
+      ctaUrl,
       ctaBackgroundColor: ctaBg,
       ctaTextColor: ctaText,
       ctaBorderRadiusPx: ctaRadius,
-      emailFont,
-      fontFamilyRaw: input.fontFamilyRaw ?? null,
-    },
-    copy: {
-      headline,
-      body: useBlocks ? blockText : bodyText,
-      cta: copy.cta,
-    },
-    bodyHtml: blocksHtml,
-    ignoreNote: copy.ignoreNote,
-    socials: input.socials,
-    shell: hasShell
-      ? {
-          emailPadding: copy.emailPadding,
-          shellBackground: copy.shellBackground,
-          shellBorderColor: copy.shellBorderColor,
-          shellBorder: copy.shellBorder,
-          shellBorderWidth: copy.shellBorderWidth,
-          shellRadius: copy.shellRadius,
-        }
-      : undefined,
-    storeName: input.storeName,
-    storeLogoUrl: input.storeLogoUrl,
-    supportEmail: support,
-    firstName: vars.first_name,
-    productName: input.productName,
-    amountLabel: input.amountLabel,
-    ctaUrl,
-    showDeclineGuardBadge: input.showDeclineGuardBadge,
-    copyrightYear: year,
-  });
-  const html = built.html;
+      bodyTextColor: shellText,
+    }),
+    vars,
+    "html",
+  );
+  const blockText = applyVars(renderBlocksText(blocks, ctaUrl), vars, "text");
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escapeHtml(subject)}</title>
+    ${fontHeadLinks}
+  </head>
+  <body data-compose="blocks" data-email-kit="${escapeAttr(kit)}" style="margin:0;padding:0;background:${escapeAttr(pageBg)};font-family:${escapeAttr(fontFamily)};color:${escapeAttr(pageText)};-webkit-font-smoothing:antialiased;">
+    <div style="max-width:480px;margin:0 auto;padding:40px ${pad}px 48px;${cardBox}">
+      ${headerHtml}
+
+      <p style="margin:0 0 16px;font-size:18px;line-height:1.4;font-weight:600;color:${escapeAttr(shellText)};">
+        Hi ${escapeHtml(vars.first_name)},
+      </p>
+      <div data-body-slot="blocks">${blocksHtml}</div>
+      <p data-ignore-note="true" style="margin:16px 0 0;font-size:13px;line-height:1.5;color:${faintFooter};">
+        ${escapeHtml(copy.ignoreNote)}
+      </p>
+
+      <hr style="border:none;border-top:1px solid ${ruleColor};margin:40px 0 28px;" />
+
+      <p style="margin:0 0 10px;font-size:28px;line-height:1.15;font-weight:700;letter-spacing:-0.03em;color:${escapeAttr(shellText)};">
+        ${escapeHtml(input.storeName)}
+      </p>
+      <p style="margin:0 0 20px;font-size:13px;line-height:1.5;color:${mutedFooter};">
+        ${supportBlock}
+      </p>
+
+      ${socialHtml}
+
+      <p style="margin:0 0 20px;font-size:13px;line-height:1.5;">
+        <a href="${escapeAttr(ctaUrl)}" style="color:${escapeAttr(linkColor)};text-decoration:underline;margin-right:16px;">Manage subscription</a>
+        <a href="${helpHref}" style="color:${escapeAttr(linkColor)};text-decoration:underline;">Help center</a>
+      </p>
+
+      <p style="margin:0;font-size:12px;line-height:1.5;color:${faintFooter};">
+        © ${year} ${escapeHtml(input.storeName)}. All rights reserved.
+      </p>
+
+      ${badgeHtml}
+    </div>
+  </body>
+</html>`;
 
   const textParts = [
     `Hi ${vars.first_name},`,
     "",
-    ...(useBlocks ? [] : [headline, ""]),
     blockText,
     "",
-    ...(useBlocks ? [] : [`${copy.cta}: ${ctaUrl}`, ""]),
     copy.ignoreNote,
     "",
     "—",
@@ -377,4 +446,8 @@ function escapeHtml(value: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function escapeAttr(value: string): string {
+  return escapeHtml(value).replace(/'/g, "&#39;");
 }

@@ -12,16 +12,17 @@ import {
  * Import:
  *   import { resolveTheme, type EmailThemeTokens } from "../../convex/lib/emailTheme";
  *
- * One global `layoutPresetId` selects layout structure for the 3 recovery
+ * One global `layoutPresetId` selects the starter block kit for the 3 recovery
  * emails (Day 0 / Day 2 / Day 5). `stylingMode` only swaps token source:
  * catalog (preset) vs merchant BrandKit (configured). Token field names match
  * recoverySettings / BrandKit — do not invent a parallel alias set.
+ * Send renders blocks + theme tokens — not layout-table HTML.
  */
 
 export const STYLING_MODES = ["preset", "configured"] as const;
 export type StylingMode = (typeof STYLING_MODES)[number];
 
-/** Five layout templates (RGE structural refs). IDs describe layout, not product emails. */
+/** Five RGE starter block kits. IDs describe kit structure, not product emails. */
 export const LAYOUT_PRESET_IDS = [
   "sonos",
   "avocode",
@@ -232,9 +233,8 @@ const LEGACY_LAYOUT_PRESET_IDS: Record<string, LayoutPresetId> = {
 };
 
 /**
- * Shared read-path remaps for leftover ids. Both `normalizeLayoutPresetId`
- * and `normalizeRecoveryLayoutId` must use this table so send + preview
- * pick the same layout (e.g. soft-expire → fontbase, not sonos).
+ * Shared read-path remaps for leftover ids. Send and any leftover layout
+ * normalizer must use this table (e.g. soft-expire → fontbase, not sonos).
  */
 export const LEGACY_LAYOUT_PRESET_ID_MAP: Record<string, LayoutPresetId> = {
   ...LEGACY_LAYOUT_PRESET_IDS,
@@ -493,7 +493,7 @@ export function resolveThemeFromSettings(settings: {
   });
 }
 
-/** Theme + recovery step. Same tokens for Day 0 / 2 / 5; layout from layoutPresetId. */
+/** Theme + recovery step. Same tokens for Day 0 / 2 / 5; kit from layoutPresetId. */
 export function resolveRecoveryEmailTheme(
   step: RecoverySequenceStep,
   input: ResolveThemeInput,

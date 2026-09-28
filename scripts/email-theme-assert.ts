@@ -3,6 +3,7 @@
  */
 import {
   LAYOUT_PRESET_IDS,
+  LEGACY_LAYOUT_PRESET_ID_MAP,
   NEW_MERCHANT_THEME_DEFAULTS,
   RECOVERY_SEQUENCE_STEPS,
   SONOS_TOKENS,
@@ -13,11 +14,11 @@ import {
   resolveThemeFromSettings,
 } from "../convex/lib/emailTheme";
 import { renderBlocksHtml } from "../convex/lib/emailBlocks";
-import { buildRecoveryEmail } from "../convex/lib/recoveryEmailTemplate";
 import {
-  buildRecoveryLayoutHtml,
-  normalizeRecoveryLayoutId,
-} from "../convex/lib/recoveryLayoutHtml";
+  kitVisibleFingerprint,
+  starterBlocksForKit,
+} from "../convex/lib/recoveryBlockKits";
+import { buildRecoveryEmail } from "../convex/lib/recoveryEmailTemplate";
 import {
   inferStylingMode as feInferStylingMode,
   normalizeLayoutPresetId as feNormalizeLayoutPresetId,
@@ -144,13 +145,11 @@ const sharedColors = {
   linkColor: "#112233",
 } as const;
 
-const fingerprints: Record<(typeof expectedIds)[number], string> = {
-  sonos: "height:176px",
-  avocode: "width:96px;height:64px",
-  benchmark: "How to update a card",
-  fontbase: "Recovery email ·",
-  "nordvpn-structure": "width:64px;height:80px;background:#1a1a1a",
-};
+const layoutTableSentinels = [
+  "height:176px",
+  "width:96px;height:64px",
+  "width:64px;height:80px;background:#1a1a1a",
+];
 
 const structures = expectedIds.map((id) => {
   const built = buildRecoveryEmail({
@@ -158,47 +157,34 @@ const structures = expectedIds.map((id) => {
     templateId: "gentle",
     layoutPresetId: id,
   });
-  const viaBuilder = buildRecoveryLayoutHtml({
-    layoutPresetId: id,
-    step: "day0",
-    theme: {
-      brandColor: "#112233",
-      secondaryColor: "#667788",
-      mutedTextColor: "#667788",
-      linkColor: "#112233",
-      pageBackgroundColor: "#f7f5f2",
-      pageTextColor: "#1a1a1a",
-      emailBackgroundColor: "#f7f5f2",
-      emailTextColor: "#1a1a1a",
-      ctaBackgroundColor: "#112233",
-      ctaTextColor: "#ffffff",
-      ctaBorderRadiusPx: 4,
-      emailFont: "system",
-      fontFamilyRaw: null,
-    },
-    copy: { headline: "Headline", body: "Body", cta: "CTA" },
-    storeName: "Acme",
-  });
-  if (!built.html.includes(fingerprints[id])) {
-    throw new Error(`FAIL: ${id} send HTML missing Jules structure fingerprint`);
+  if (!built.html.includes(`data-email-kit="${id}"`)) {
+    throw new Error(`FAIL: ${id} send HTML must mark data-email-kit`);
   }
-  if (!viaBuilder.html.includes(fingerprints[id])) {
-    throw new Error(`FAIL: ${id} buildRecoveryLayoutHtml missing fingerprint`);
+  if (!built.html.includes('data-compose="blocks"')) {
+    throw new Error(`FAIL: ${id} send must be blocks+theme, not layout-table HTML`);
+  }
+  if (!built.html.includes(kitVisibleFingerprint(id))) {
+    throw new Error(`FAIL: ${id} kit defaults missing from send HTML`);
+  }
+  if (starterBlocksForKit(id, "gentle").length === 0) {
+    throw new Error(`FAIL: ${id} starter kit must provide blocks`);
+  }
+  for (const sentinel of layoutTableSentinels) {
+    if (built.html.includes(sentinel)) {
+      throw new Error(`FAIL: ${id} send leaked layout-table HTML (${sentinel})`);
+    }
   }
   return { id, html: built.html };
 });
 
 const uniqueHtml = new Set(structures.map((row) => row.html));
 if (uniqueHtml.size !== expectedIds.length) {
-  throw new Error("FAIL: layoutPresetId must produce five distinct structures");
+  throw new Error("FAIL: layoutPresetId must seed five distinct block kits");
 }
 
 const sonosHtml = structures.find((row) => row.id === "sonos")!.html;
-if (sonosHtml.includes(fingerprints.avocode)) {
-  throw new Error("FAIL: sonos must not use avocode compact-card structure");
-}
-if (!structures.find((row) => row.id === "benchmark")!.html.includes("How to update a card")) {
-  throw new Error("FAIL: benchmark must include help cards");
+if (sonosHtml.includes(kitVisibleFingerprint("avocode"))) {
+  throw new Error("FAIL: sonos kit must not use avocode starter blocks");
 }
 
 const day0 = buildRecoveryEmail({
@@ -212,27 +198,23 @@ const day2 = buildRecoveryEmail({
   layoutPresetId: "sonos",
 });
 if (day0.html === day2.html) {
-  throw new Error("FAIL: day step must change copy without changing layout id");
+  throw new Error("FAIL: day step must change kit copy without changing kit id");
 }
-if (!day2.html.includes(fingerprints.sonos)) {
-  throw new Error("FAIL: day step must keep layout structure");
+if (!day2.html.includes('data-email-kit="sonos"')) {
+  throw new Error("FAIL: day step must keep the same starter kit");
 }
 
-const softExpireTheme = normalizeLayoutPresetId("soft-expire");
-const softExpireLayout = normalizeRecoveryLayoutId("soft-expire");
-if (softExpireTheme !== softExpireLayout) {
+if (normalizeLayoutPresetId("soft-expire") !== "fontbase") {
   throw new Error(
-    `FAIL: shared legacy map — soft-expire must resolve to the same id (theme=${softExpireTheme} layout=${softExpireLayout})`,
+    `FAIL: soft-expire must map to fontbase, got ${normalizeLayoutPresetId("soft-expire")}`,
   );
 }
-if (softExpireTheme !== "fontbase") {
-  throw new Error(
-    `FAIL: soft-expire must map to fontbase, got ${softExpireTheme}`,
-  );
+if (LEGACY_LAYOUT_PRESET_ID_MAP["soft-expire"] !== "fontbase") {
+  throw new Error("FAIL: shared legacy map must send soft-expire → fontbase");
 }
 
 if (!day0.html.includes("data-ignore-note") || !day0.html.includes("already updated")) {
-  throw new Error("FAIL: ignoreNote must appear in layout HTML");
+  throw new Error("FAIL: ignoreNote must appear in send HTML");
 }
 
 const withSocials = buildRecoveryEmail({
@@ -242,7 +224,7 @@ const withSocials = buildRecoveryEmail({
   socials: { x: "https://x.com/acme" },
 });
 if (!withSocials.html.includes("https://x.com/acme")) {
-  throw new Error("FAIL: merchant socials must appear in layout HTML");
+  throw new Error("FAIL: merchant socials must appear in send HTML");
 }
 
 const withBlocks = buildRecoveryEmail({
@@ -271,31 +253,16 @@ const withBlocks = buildRecoveryEmail({
   },
 });
 if (!withBlocks.html.includes('data-compose="blocks"')) {
-  throw new Error("FAIL: blocks path must mark data-compose=blocks");
+  throw new Error("FAIL: merchant blocks must compose via renderBlocksHtml");
 }
 if (!withBlocks.html.includes("<strong>block</strong>")) {
-  throw new Error("FAIL: blocks must compose as HTML inside layout chrome");
+  throw new Error("FAIL: merchant blocks must compose as HTML inside theme chrome");
 }
 if (withBlocks.html.includes("&lt;strong&gt;block&lt;/strong&gt;")) {
   throw new Error("FAIL: blocks HTML must not be escaped as plain text");
 }
 if (!withBlocks.html.includes("Pro Monthly")) {
   throw new Error("FAIL: block placeholders must apply");
-}
-if (!withBlocks.html.includes(fingerprints.sonos)) {
-  throw new Error("FAIL: blocks compose must keep layout chrome");
-}
-
-const withoutBlocks = buildRecoveryEmail({
-  ...sharedColors,
-  templateId: "gentle",
-  layoutPresetId: "sonos",
-});
-if (!withoutBlocks.html.includes('data-compose="copy"')) {
-  throw new Error("FAIL: no-blocks path must keep layout copy/body");
-}
-if (!withoutBlocks.html.includes(fingerprints.sonos)) {
-  throw new Error("FAIL: no-blocks path must keep layout chrome");
 }
 
 const withShell = buildRecoveryEmail({
@@ -419,5 +386,5 @@ if (!xssComposed.html.includes("https://safe.example")) {
 }
 
 console.log(
-  "asserts green: configured-legacy #112233, quiet-verify→sonos, 5 layout ids, FE normalize sonos, unset→configured, D0/D2/D5, structural HTML by layoutPresetId, blocks HTML compose, shared soft-expire map, socials, ignoreNote, shell chrome, block href/attr sanitizer",
+  "asserts green: configured-legacy #112233, quiet-verify→sonos, 5 kit ids, FE normalize sonos, unset→configured, D0/D2/D5, blocks+theme send, no layout-table body, shared soft-expire map, socials, ignoreNote, shell chrome, block href/attr sanitizer",
 );
