@@ -115,7 +115,7 @@ function looksLikeHtml(text: string): boolean {
 const EVENT_HANDLER_ATTR_RE =
   /\bon[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 
-function stripEventHandlerAttrs(html: string): string {
+export function stripEventHandlerAttrs(html: string): string {
   return html.replace(
     /<(\/)?([a-zA-Z][\w:-]*)((?:[\s/][^>]*)?)>/g,
     (
@@ -127,8 +127,14 @@ function stripEventHandlerAttrs(html: string): string {
       if (closing) return `</${tag}>`;
       const raw = rest ?? "";
       const voidSlash = /^[\s/]*$/.test(raw);
-      const attrs = raw.replace(/\/\s*$/, "").replace(/^\//, " ");
-      const cleaned = attrs.replace(EVENT_HANDLER_ATTR_RE, "");
+      const attrs = raw.replace(/\/\s*$/, "").replace(/^\/+/, " ");
+      const stripped = attrs.replace(EVENT_HANDLER_ATTR_RE, "");
+      const cleaned =
+        stripped.trim().length === 0
+          ? ""
+          : stripped.startsWith(" ")
+            ? stripped
+            : ` ${stripped}`;
       const suffix = voidSlash && raw.includes("/") ? " /" : "";
       return `<${tag}${cleaned}${suffix}>`;
     },

@@ -18,6 +18,7 @@ import {
   persistTextCopySlot,
   renderBlocksHtml,
   sanitizeStoredHtml,
+  stripEventHandlerAttrs as beStripEventHandlerAttrs,
 } from "../convex/lib/emailBlocks";
 import {
   BLOCK_KIT_SPEC,
@@ -593,6 +594,39 @@ for (const probe of slashGlueCases) {
   }
 }
 
+const slashAttrAnchor = '<a/href="https://safe.example">x</a>';
+const slashAttrSpan = '<span/style="color:red">x</span>';
+for (const [label, strip] of [
+  ["FE", stripEventHandlerAttrs],
+  ["BE", beStripEventHandlerAttrs],
+] as const) {
+  const aOut = strip(slashAttrAnchor);
+  if (/<ahref=/i.test(aOut) || !/<a href="https:\/\/safe\.example">x<\/a>/.test(aOut)) {
+    throw new Error(
+      `FAIL: ${label} strip must turn <a/href> into <a href="https://safe.example">x</a> (got ${aOut})`,
+    );
+  }
+  const spanOut = strip(slashAttrSpan);
+  if (/<spanstyle=/i.test(spanOut) || !/<span style="color:red">x<\/span>/.test(spanOut)) {
+    throw new Error(
+      `FAIL: ${label} strip must turn <span/style> into <span style="color:red">x</span> (got ${spanOut})`,
+    );
+  }
+}
+const aSaved = persistTextBlockHtml(slashAttrAnchor);
+const aFe = sanitizeEditorHtml(slashAttrAnchor);
+for (const [label, out] of [
+  ["BE save", aSaved],
+  ["FE sanitizeEditorHtml", aFe],
+] as const) {
+  if (/<ahref=/i.test(out)) {
+    throw new Error(`FAIL: ${label} glued <ahref= from slash-href`);
+  }
+  if (!out.includes("x") || !out.includes("https://safe.example")) {
+    throw new Error(`FAIL: ${label} must keep slash-href text and https href`);
+  }
+}
+
 const credsHref = '<a href="https://user:pass@safe.example">creds</a>';
 const credsSaved = persistTextBlockHtml(credsHref);
 const credsRendered = renderTextHtml(credsHref);
@@ -746,5 +780,5 @@ if (!day0.html.includes("Open the billing page") || !day0.html.includes("to cont
 }
 
 console.log(
-  "asserts green: configured-legacy #112233, quiet-verify→sonos, 5 kit ids, FE normalize sonos, unset→configured, D0/D2/D5, blocks+theme send, no layout-table body, shared soft-expire map, socials, ignoreNote, shell chrome, block href/attr sanitizer, FE/BE starter kit parity, copySlot persist, glued onclick + dangling open, FE sanitizer parity, slash-glue on* + allowHttpsUrl closed-a",
+  "asserts green: configured-legacy #112233, quiet-verify→sonos, 5 kit ids, FE normalize sonos, unset→configured, D0/D2/D5, blocks+theme send, no layout-table body, shared soft-expire map, socials, ignoreNote, shell chrome, block href/attr sanitizer, FE/BE starter kit parity, copySlot persist, glued onclick + dangling open, FE sanitizer parity, slash-glue on* + allowHttpsUrl closed-a, slash-attr space after tag",
 );
