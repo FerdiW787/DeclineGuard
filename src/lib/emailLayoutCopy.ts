@@ -1,4 +1,8 @@
-import type { LayoutPresetId, LifecycleEmailType } from "./emailLayoutPresets";
+import type {
+  LayoutPresetId,
+  LifecycleEmailType,
+  RecoveryDayId,
+} from "./emailLayoutPresets";
 
 export type EmailLayoutCopy = {
   eyebrow: string;
@@ -19,7 +23,7 @@ export type EmailCopyOverride = {
 };
 
 export type EmailLayoutCopyOverrides = Partial<
-  Record<LifecycleEmailType, EmailCopyOverride>
+  Record<LifecycleEmailType | RecoveryDayId, EmailCopyOverride>
 >;
 
 type CopyVars = {
@@ -97,25 +101,25 @@ const LAYOUT_CHROME: Record<
   LayoutPresetId,
   Partial<Record<LifecycleEmailType, Partial<EmailLayoutCopy>>>
 > = {
-  "quiet-verify": {
+  sonos: {
     verify: {
       eyebrow: "Just to be sure",
       headline: "One tap to confirm",
     },
   },
-  "soft-expire": {
-    expiry: {
-      eyebrow: "A quiet heads-up",
-      headline: "This access is winding down",
+  avocode: {
+    trial_ended: {
+      eyebrow: "Trial wrapped up",
+      headline: "Your trial has ended",
     },
     decline_pause: {
       eyebrow: "Billing needs a moment",
     },
   },
-  "safe-pause": {
+  benchmark: {
     decline_pause: {
       status: "Paused — your data is safe",
-      headline: "We’ve paused access, not your work",
+      headline: "Don’t worry — your data is safe",
       body: "The payment of {{amount}} for {{product}} didn’t go through. Everything you saved is still here.",
     },
     trial_ended: {
@@ -125,16 +129,16 @@ const LAYOUT_CHROME: Record<
       status: "Ending — your data is safe",
     },
   },
-  "soft-renew": {
+  fontbase: {
     renewal: {
-      eyebrow: "A few days out",
-      headline: "Renewal is on the calendar",
+      eyebrow: "Upcoming renewal",
+      headline: "Your renewal is coming up",
     },
   },
-  "alert-expire": {
+  "nordvpn-structure": {
     expiry: {
-      eyebrow: "Before access stops",
-      headline: "Update billing to stay on",
+      eyebrow: "Account expired",
+      headline: "Your account has expired",
     },
     decline_pause: {
       eyebrow: "Needs a card update",

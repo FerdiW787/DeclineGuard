@@ -1,37 +1,39 @@
 /**
- * Compatibility barrel — Riley’s live export is mirrored in `emailTheme.ts`.
- * After `cursor/lifecycle-email-theme-2f33` merges to `dev`, switch to
- * `convex/lib/emailTheme`.
+ * Compatibility barrel — Convex theme contract + recovery send/preview builders.
+ * Catalog: sonos | avocode | benchmark | fontbase | nordvpn-structure.
  */
 
 export {
   DEFAULT_LAYOUT_PRESET_ID,
+  DEFAULT_RECOVERY_SEQUENCE_STEP,
   DEFAULT_STYLING_MODE,
   LAYOUT_PRESET_CATALOG,
   LAYOUT_PRESET_IDS,
-  LIFECYCLE_EMAIL_TYPES,
   NEW_MERCHANT_THEME_DEFAULTS,
-  QUIET_VERIFY_LAYOUT_ID,
-  QUIET_VERIFY_TOKENS,
+  RECOVERY_SEQUENCE_STEPS,
+  SONOS_LAYOUT_ID,
+  SONOS_TOKENS,
   assertKnownLayoutPresetId,
   configuredTokensFromSettings,
+  fromBackendLayoutPresetId,
   getLayoutPreset,
   inferStylingMode,
   isLayoutPresetId,
-  isLifecycleEmailType,
+  isRecoverySequenceStep,
   isStylingMode,
   listLayoutPresets,
   normalizeLayoutPresetId,
   normalizeStylingMode,
   recoveryColorsFromTheme,
   resolveLayoutPresetId,
-  resolveLifecycleEmailTheme,
+  resolveRecoveryEmailTheme,
   resolveTheme,
   resolveThemeFromSettings,
+  toBackendLayoutPresetId,
   type EmailThemeTokens,
   type LayoutPreset,
   type LayoutPresetId,
-  type LifecycleEmailType,
+  type RecoverySequenceStep,
   type RecoverySettingsLayoutFields,
   type ResolveThemeInput,
   type ResolvedEmailTheme,
@@ -40,15 +42,14 @@ export {
 } from "./emailTheme";
 
 export {
-  buildLifecycleEmail,
-  listLifecycleEmailTypes,
-  type BuiltLifecycleEmail,
-  type LifecycleEmailVars,
-} from "./lifecycleEmailTemplate";
+  buildRecoveryEmail,
+  type RecoveryEmailVars,
+  type RecoveryTemplateId,
+} from "../../convex/lib/recoveryEmailTemplate";
 
 export {
   emailThemeApiLive,
   emailThemeRefs,
   type EmailThemeSettings,
-  type LifecycleEmailPreview,
+  type RecoveryEmailPreview,
 } from "./emailThemeApi";

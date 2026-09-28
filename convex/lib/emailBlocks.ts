@@ -2,6 +2,8 @@ import { allowHttpsUrl } from "./safeUrl";
 
 export type BlockAlign = "left" | "center" | "right";
 
+export type TextCopySlot = "eyebrow" | "headline" | "body";
+
 export type EmailBlock =
   | {
       id: string;
@@ -14,6 +16,8 @@ export type EmailBlock =
       italic?: boolean;
       underline?: boolean;
       align: BlockAlign;
+      /** FE Lab mapping — ignored by HTML render. */
+      copySlot?: TextCopySlot;
       marginTop: number;
       marginBottom: number;
     }
@@ -108,13 +112,119 @@ function looksLikeHtml(text: string): boolean {
   return /<\/?(?:strong|b|em|i|u|span|br|a)\b/i.test(text);
 }
 
-function sanitizeStoredHtml(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, "<br />")
-    .replace(/<\/?(?:b|strong)>/gi, (m) =>
+const EVENT_HANDLER_ATTR_RE =
+  /\bon[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
+
+function attrsFromTagRest(rest: string | undefined): string {
+  return (rest ?? "")
+    .replace(/^\/*/, "")
+    .replace(/\/\s*$/, "")
+    .replace(EVENT_HANDLER_ATTR_RE, "");
+}
+
+function normalizeSpanHex(hex: string): string {
+  const h = hex.trim();
+  if (/^#[0-9a-f]{3}$/i.test(h) && h[1] && h[2] && h[3]) {
+    return `#${h[1]}${h[1]}${h[2]}${h[2]}${h[3]}${h[3]}`.toLowerCase();
+  }
+  return h.toLowerCase();
+}
+
+function rebuildOpenSpan(attrs: string): string {
+  const quoted =
+    attrs.match(/style\s*=\s*"([^"]*)"/i)?.[1] ??
+    attrs.match(/style\s*=\s*'([^']*)'/i)?.[1] ??
+    "";
+  const color = quoted.match(/(?:^|;)\s*color:\s*(#[0-9a-fA-F]{3,6})/i)?.[1];
+  if (color && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(color)) {
+    return `<span style="color:${normalizeSpanHex(color)}">`;
+  }
+  return "<span>";
+}
+
+/** Drop on*; never re-emit raw attrs. Invalid href → bare `<a>` so pairs unwrap. */
+export function stripEventHandlerAttrs(html: string): string {
+  return html.replace(
+    /<([a-zA-Z][\w:-]*)((?:[\s/][^>]*)?)>/g,
+    (_full, tag: string, rest: string | undefined) => {
+      const name = tag.toLowerCase();
+      const cleaned = attrsFromTagRest(rest);
+      switch (name) {
+        case "a":
+          return rebuildOpenAnchor(cleaned) || "<a>";
+        case "span":
+          return rebuildOpenSpan(cleaned);
+        case "br":
+          return "<br />";
+        case "strong":
+        case "b":
+          return "<strong>";
+        case "em":
+        case "i":
+          return "<em>";
+        case "u":
+          return "<u>";
+        default:
+          return `<${name}>`;
+      }
+    },
+  );
+}
+
+export function persistTextCopySlot(
+  value: string | undefined | null,
+): TextCopySlot | undefined {
+  if (value === "eyebrow" || value === "headline" || value === "body") {
+    return value;
+  }
+  return undefined;
+}
+
+function rebuildOpenAnchor(attrs: string): string {
+  const raw = hrefFromAttrs(attrs);
+  if (isPaymentPlaceholderHref(raw)) return `<a href="${raw}">`;
+  const href = allowHttpsUrl(raw);
+  return href ? `<a href="${escapeAttr(href)}">` : "";
+}
+
+function hrefFromAttrs(attrs: string): string {
+  const match = attrs.match(
+    /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i,
+  );
+  return (match?.[1] ?? match?.[2] ?? match?.[3] ?? "").trim();
+}
+
+function isPaymentPlaceholderHref(href: string): boolean {
+  return href === "#update-payment" || href === "#billing";
+}
+
+function rewriteAnchors(
+  html: string,
+  replace: (attrs: string, inner: string) => string,
+): string {
+  let current = html;
+  for (let i = 0; i < 4; i += 1) {
+    const next = current.replace(
+      /<a\b([^>]*)>([\s\S]*?)<\/a>/gi,
+      (_full, attrs: string, inner: string) => replace(attrs, inner),
+    );
+    if (next === current) break;
+    current = next;
+  }
+  return current.replace(/<a\b([^>]*)>/gi, (_open, attrs: string) =>
+    rebuildOpenAnchor(attrs),
+  );
+}
+
+export function sanitizeStoredHtml(html: string): string {
+  return stripEventHandlerAttrs(html)
+    .replace(/<br(?:[\s/][^>]*)?>/gi, "<br />")
+    .replace(/<\/?(?:b|strong)(?:[\s/][^>]*)?>/gi, (m) =>
       m.startsWith("</") ? "</strong>" : "<strong>",
     )
-    .replace(/<\/?(?:i|em)>/gi, (m) => (m.startsWith("</") ? "</em>" : "<em>"))
+    .replace(/<\/?(?:i|em)(?:[\s/][^>]*)?>/gi, (m) =>
+      m.startsWith("</") ? "</em>" : "<em>",
+    )
     .replace(/<span\b([^>]*)>([\s\S]*?)<\/span>/gi, (_, attrs: string, inner: string) => {
       const style = attrs.match(/style\s*=\s*"([^"]*)"/i)?.[1] ?? "";
       let out = inner;
@@ -129,11 +239,25 @@ function sanitizeStoredHtml(html: string): string {
       if (color) out = `<span style="color:${color}">${out}</span>`;
       return out;
     })
-    .replace(
-      /<a\s+[^>]*href="((?:https:[^"]+)|#update-payment|#billing)"[^>]*>/gi,
-      '<a href="$1">',
+    .replace(/<u(?:[\s/][^>]*)?>/gi, "<u>")
+    .replace(/<\/u(?:[\s/][^>]*)?>/gi, "</u>")
+    .replace(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi, (_full, attrs: string, inner: string) => {
+      const raw = hrefFromAttrs(attrs);
+      if (isPaymentPlaceholderHref(raw)) {
+        return `<a href="${raw}">${inner}</a>`;
+      }
+      const href = allowHttpsUrl(raw);
+      return href ? `<a href="${escapeAttr(href)}">${inner}</a>` : inner;
+    })
+    .replace(/<a\b([^>]*)>/gi, (_open, attrs: string) =>
+      rebuildOpenAnchor(attrs),
     )
     .replace(/<(?!\/?(?:strong|em|u|span|br|a)\b)[^>]+>/gi, "");
+}
+
+/** Save-path HTML: sanitize, then keep payment-link spacing. */
+export function persistTextBlockHtml(html: string): string {
+  return ensurePaymentLinkSpacing(sanitizeStoredHtml(html));
 }
 
 function ensurePaymentLinkSpacing(html: string): string {
@@ -154,16 +278,17 @@ function styleEmailAnchors(
   ctaUrl?: string,
 ): string {
   const color = linkColor.trim() || "#2563eb";
-  return ensurePaymentLinkSpacing(html).replace(/<a\b([^>]*)>/gi, (full, attrs: string) => {
-    const hrefMatch = attrs.match(/\bhref\s*=\s*"([^"]*)"/i);
-    const raw = hrefMatch?.[1] ?? "";
-    const href =
-      raw === "#update-payment" || raw === "#billing"
-        ? ctaUrl || raw
-        : allowHttpsUrl(raw);
-    if (!href) return full;
-    return `<a href="${escapeAttr(href)}" style="color:${escapeAttr(color)};text-decoration:underline">`;
+  const styled = rewriteAnchors(
+    stripEventHandlerAttrs(ensurePaymentLinkSpacing(html)),
+    (attrs, inner) => {
+    const raw = hrefFromAttrs(attrs);
+    const href = isPaymentPlaceholderHref(raw)
+      ? ctaUrl || raw
+      : allowHttpsUrl(raw);
+    if (!href) return inner;
+    return `<a href="${escapeAttr(href)}" style="color:${escapeAttr(color)};text-decoration:underline">${inner}</a>`;
   });
+  return styled;
 }
 
 /** Convert **markers** or a safe HTML subset to email HTML. */

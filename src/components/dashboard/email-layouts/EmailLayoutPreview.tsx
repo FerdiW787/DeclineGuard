@@ -6,7 +6,11 @@ import {
   resolveLayoutCopy,
   type EmailCopyOverride,
 } from "@/lib/emailLayoutCopy";
-import type { LayoutPresetId, LifecycleEmailType } from "@/lib/emailLayoutPresets";
+import type {
+  LayoutPresetId,
+  LifecycleEmailType,
+  RecoveryDayId,
+} from "@/lib/emailLayoutPresets";
 import { isDarkHex, type EmailThemeTokens } from "@/lib/emailTheme";
 import {
   DEFAULT_EMAIL_FONT,
@@ -21,9 +25,16 @@ type PreviewVars = {
   firstName?: string;
 };
 
+const RECOVERY_DAY_TO_TYPE: Record<RecoveryDayId, LifecycleEmailType> = {
+  gentle: "decline_pause",
+  direct: "decline_pause",
+  urgent: "expiry",
+};
+
 type Props = {
   layoutPresetId: LayoutPresetId;
-  emailType: LifecycleEmailType;
+  emailType?: LifecycleEmailType;
+  recoveryDay?: RecoveryDayId;
   theme: EmailThemeTokens;
   storeName: string;
   storeLogoUrl?: string | null;
@@ -42,6 +53,7 @@ function preventNav(e: MouseEvent) {
 export default function EmailLayoutPreview({
   layoutPresetId,
   emailType,
+  recoveryDay,
   theme,
   storeName,
   storeLogoUrl = null,
@@ -58,7 +70,10 @@ export default function EmailLayoutPreview({
     firstName: previewVars?.firstName ?? "Maya",
     storeName,
   };
-  const raw = resolveLayoutCopy(layoutPresetId, emailType, copyOverride);
+  const resolvedType =
+    emailType ??
+    (recoveryDay ? RECOVERY_DAY_TO_TYPE[recoveryDay] : "decline_pause");
+  const raw = resolveLayoutCopy(layoutPresetId, resolvedType, copyOverride);
   const copy = {
     eyebrow: applyLayoutCopyVars(raw.eyebrow, vars),
     headline: applyLayoutCopyVars(raw.headline, vars),
@@ -81,7 +96,7 @@ export default function EmailLayoutPreview({
 
   const inner = (() => {
     switch (layoutPresetId) {
-      case "quiet-verify":
+      case "sonos":
         return (
           <QuietVerify
             theme={theme}
@@ -91,7 +106,7 @@ export default function EmailLayoutPreview({
             copy={copy}
           />
         );
-      case "soft-expire":
+      case "avocode":
         return (
           <SoftExpire
             theme={theme}
@@ -102,7 +117,7 @@ export default function EmailLayoutPreview({
             vars={vars}
           />
         );
-      case "safe-pause":
+      case "benchmark":
         return (
           <SafePause
             theme={theme}
@@ -112,7 +127,7 @@ export default function EmailLayoutPreview({
             copy={copy}
           />
         );
-      case "soft-renew":
+      case "fontbase":
         return (
           <SoftRenew
             theme={theme}
@@ -123,7 +138,7 @@ export default function EmailLayoutPreview({
             vars={vars}
           />
         );
-      case "alert-expire":
+      case "nordvpn-structure":
         return (
           <AlertExpire
             theme={theme}

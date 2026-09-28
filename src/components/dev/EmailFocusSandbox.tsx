@@ -35,7 +35,7 @@ export default function EmailFocusSandbox() {
       style={focusMode ? { background: "#ffffff" } : undefined}
     >
       <aside
-        className={`relative z-20 flex w-[248px] shrink-0 flex-col overflow-hidden bg-[#f7f8f8] transition-[margin] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        className={`relative z-20 hidden w-[248px] shrink-0 flex-col overflow-hidden bg-[#f7f8f8] transition-[margin] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] lg:flex ${
           focusMode ? "-ml-[248px] pointer-events-none" : ""
         }`}
       >

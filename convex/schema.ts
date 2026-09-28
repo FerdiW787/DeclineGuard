@@ -404,7 +404,7 @@ export default defineSchema({
       v.union(v.literal("browser"), v.literal("css"), v.literal("defaults")),
     ),
     /**
-     * Token source for lifecycle + recovery emails.
+     * Token source for the 3 recovery emails (Day 0 / Day 2 / Day 5).
      * preset = catalog tokens for layoutPresetId; configured = BrandKit fields.
      * New merchants default to "preset".
      */
@@ -412,8 +412,9 @@ export default defineSchema({
       v.union(v.literal("preset"), v.literal("configured")),
     ),
     /**
-     * One global layout for ALL lifecycle emails (not a per-type map).
-     * New merchants default to "quiet-verify".
+     * One global layout for all three recovery emails (not a per-step map).
+     * Catalog: sonos | avocode | benchmark | fontbase | nordvpn-structure.
+     * New merchants default to "sonos". Legacy "quiet-verify" maps to sonos.
      */
     layoutPresetId: v.optional(v.string()),
     /** Rolling monthly rebrand quota — set on each successful import */

@@ -1,14 +1,13 @@
 /**
- * Typed wrappers for Riley’s Convex theme API.
- * Names match recoverySettings / brandImportActions after their merge.
- * Refs are optional until `api` is regenerated on `dev`.
+ * Typed wrappers for the Convex recovery theme API.
+ * Refs: getRecoveryEmailTheme / getRecoveryEmailPreviews / recoverySequenceSteps.
  */
 
 import { api } from "../../convex/_generated/api";
 import type { FunctionReference, FunctionReturnType } from "convex/server";
 import type {
   EmailThemeTokens,
-  LifecycleEmailType,
+  RecoverySequenceStep,
   ResolvedEmailTheme,
   StylingMode,
 } from "./emailTheme";
@@ -18,7 +17,7 @@ export type EmailThemeSettings = {
   layoutPresetId: string;
   resolved: ResolvedEmailTheme;
   catalog: Array<{ id: string; name: string; description: string }>;
-  lifecycleEmailTypes: LifecycleEmailType[];
+  recoverySequenceSteps: RecoverySequenceStep[];
   storefrontDomain: string | null;
   crawlDomain: string | null;
   brandDomain: string | null;
@@ -27,8 +26,9 @@ export type EmailThemeSettings = {
   quota: unknown;
 };
 
-export type LifecycleEmailPreview = {
-  emailType: LifecycleEmailType;
+export type RecoveryEmailPreview = {
+  step: RecoverySequenceStep;
+  templateId: "gentle" | "direct" | "urgent";
   stylingMode: StylingMode;
   layoutPresetId: string;
   tokens: EmailThemeTokens;
@@ -44,17 +44,17 @@ type RecoverySettingsBag = typeof api.functions.recoverySettings & {
     Record<string, never>,
     EmailThemeSettings | null
   >;
-  getLifecycleEmailTheme?: FunctionReference<
+  getRecoveryEmailTheme?: FunctionReference<
     "query",
     "public",
-    { emailType: LifecycleEmailType },
-    LifecycleEmailPreview | null
+    { step: RecoverySequenceStep },
+    RecoveryEmailPreview | null
   >;
-  getLifecycleEmailPreviews?: FunctionReference<
+  getRecoveryEmailPreviews?: FunctionReference<
     "query",
     "public",
     Record<string, never>,
-    LifecycleEmailPreview[] | null
+    RecoveryEmailPreview[] | null
   >;
   setStylingMode?: FunctionReference<
     "mutation",
@@ -91,13 +91,12 @@ function brandImportApi(): BrandImportBag {
   return api.functions.brandImportActions as BrandImportBag;
 }
 
-/** Riley query/mutation/action refs — null until generated on this branch. */
 export const emailThemeRefs = {
   getEmailTheme: () => recoverySettingsApi().getEmailTheme ?? null,
-  getLifecycleEmailTheme: () =>
-    recoverySettingsApi().getLifecycleEmailTheme ?? null,
-  getLifecycleEmailPreviews: () =>
-    recoverySettingsApi().getLifecycleEmailPreviews ?? null,
+  getRecoveryEmailTheme: () =>
+    recoverySettingsApi().getRecoveryEmailTheme ?? null,
+  getRecoveryEmailPreviews: () =>
+    recoverySettingsApi().getRecoveryEmailPreviews ?? null,
   setStylingMode: () => recoverySettingsApi().setStylingMode ?? null,
   setLayoutPresetId: () => recoverySettingsApi().setLayoutPresetId ?? null,
   importBrandFromStorefront: () =>

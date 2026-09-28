@@ -111,6 +111,7 @@ async function runPreviewStep(
 
   const email = buildRecoveryEmail({
     templateId,
+    layoutPresetId: theme.layoutPresetId,
     primaryColor: colors.primaryColor,
     secondaryColor: colors.secondaryColor,
     storeName: payload.storeName,
@@ -135,6 +136,8 @@ async function runPreviewStep(
     ctaBorderRadiusPx: colors.ctaBorderRadiusPx,
     emailBackgroundColor: colors.emailBackgroundColor,
     emailTextColor: colors.emailTextColor,
+    pageBackgroundColor: colors.pageBackgroundColor,
+    pageTextColor: colors.pageTextColor,
     linkColor: colors.linkColor,
     fontFamilyRaw: colors.fontFamilyRaw,
   });

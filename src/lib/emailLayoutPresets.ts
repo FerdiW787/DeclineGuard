@@ -25,6 +25,10 @@ import {
   type LayoutPresetId,
   type LifecycleEmailType,
 } from "./emailTheme";
+import {
+  TEMPLATE_META,
+  type RecoveryTemplateId,
+} from "./recoveryEmailCopy";
 
 export type LayoutPresetMeta = {
   id: LayoutPresetId;
@@ -42,6 +46,18 @@ export const LAYOUT_PRESET_META: readonly LayoutPresetMeta[] =
     };
   });
 
+/** Product labels match the RGE refs — never Quiet Verify / Soft Expire. */
+export const LAYOUT_PRESET_STRUCTURE_META: Record<
+  LayoutPresetId,
+  { label: string; hint: string }
+> = {
+  sonos: { label: "Sonos", hint: "Verify your email" },
+  avocode: { label: "Avocode", hint: "Your trial ended" },
+  benchmark: { label: "Benchmark", hint: "Your data is safe" },
+  fontbase: { label: "FontBase", hint: "Upcoming renewal" },
+  "nordvpn-structure": { label: "NordVPN", hint: "Your account has expired" },
+};
+
 export const LIFECYCLE_EMAIL_META: Record<
   LifecycleEmailType,
   { label: string; hint: string }
@@ -52,6 +68,45 @@ export const LIFECYCLE_EMAIL_META: Record<
   renewal: { label: "Renewal", hint: "Upcoming or due" },
   expiry: { label: "Expiry", hint: "Access is ending" },
 };
+
+export const RECOVERY_DAY_IDS = ["gentle", "direct", "urgent"] as const;
+
+export type RecoveryDayId = RecoveryTemplateId;
+
+export const DEFAULT_RECOVERY_DAY: RecoveryDayId = "gentle";
+
+export const RECOVERY_DAY_META: Record<
+  RecoveryDayId,
+  { label: string; hint: string; day: string }
+> = {
+  gentle: {
+    label: "Day 0",
+    hint: TEMPLATE_META.gentle.when,
+    day: TEMPLATE_META.gentle.day,
+  },
+  direct: {
+    label: "Day 2",
+    hint: TEMPLATE_META.direct.when,
+    day: TEMPLATE_META.direct.day,
+  },
+  urgent: {
+    label: "Day 5",
+    hint: TEMPLATE_META.urgent.when,
+    day: TEMPLATE_META.urgent.day,
+  },
+};
+
+export const RECOVERY_DAY_OPTIONS = RECOVERY_DAY_IDS.map((id) => ({
+  id,
+  label: RECOVERY_DAY_META[id].label,
+}));
+
+export function isRecoveryDayId(value: unknown): value is RecoveryDayId {
+  return (
+    typeof value === "string" &&
+    (RECOVERY_DAY_IDS as readonly string[]).includes(value)
+  );
+}
 
 export function layoutPresetMeta(id: string): LayoutPresetMeta {
   const found = LAYOUT_PRESET_META.find((item) => item.id === id);
