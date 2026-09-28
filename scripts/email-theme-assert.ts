@@ -37,6 +37,11 @@ import {
   LAYOUT_PRESET_IDS as FE_LAYOUT_PRESET_IDS,
   RECOVERY_SEQUENCE_STEPS as FE_RECOVERY_SEQUENCE_STEPS,
 } from "../src/lib/emailTheme";
+import {
+  sanitizeEditorHtml,
+  stripEventHandlerAttrs,
+  styleEmailAnchors,
+} from "../src/lib/emailRichText";
 
 const legacy = resolveThemeFromSettings({
   brandColor: "#112233",
@@ -498,6 +503,41 @@ if (persistTextCopySlot("hero") !== undefined) {
   throw new Error("FAIL: unknown copySlot must not persist");
 }
 
+const feDanglingProbe =
+  '…<a href="https://safe.example"onclick="alert(1)">';
+const feStyled = styleEmailAnchors(feDanglingProbe, "#112233");
+assertSafeHrefs(feStyled, "FE styleEmailAnchors dangling glued onclick");
+if (!feStyled.includes("https://safe.example")) {
+  throw new Error("FAIL: FE styleEmailAnchors must keep allowlisted https href");
+}
+if (feStyled.includes("onclick") || feStyled.includes("alert(1)")) {
+  throw new Error("FAIL: FE styleEmailAnchors must drop glued onclick");
+}
+if (!/<a href="https:\/\/safe\.example\/?">/.test(feStyled)) {
+  throw new Error(
+    `FAIL: FE styleEmailAnchors must rebuild dangling open to href-only tag (got ${feStyled})`,
+  );
+}
+
+const feStripped = stripEventHandlerAttrs(
+  '<a href="https://safe.example"onclick="alert(1)">ok</a>',
+);
+if (/\bon[a-z]+\s*=/i.test(feStripped)) {
+  throw new Error("FAIL: FE stripEventHandlerAttrs must drop glued onclick");
+}
+if (!feStripped.includes("https://safe.example") || !feStripped.includes("ok")) {
+  throw new Error("FAIL: FE stripEventHandlerAttrs must keep href and inner text");
+}
+
+const feEditor = sanitizeEditorHtml(feDanglingProbe);
+assertSafeHrefs(feEditor, "FE sanitizeEditorHtml dangling glued onclick");
+if (!feEditor.includes("https://safe.example")) {
+  throw new Error("FAIL: FE sanitizeEditorHtml must keep allowlisted https href");
+}
+if (feEditor.includes("onclick") || feEditor.includes("alert(1)")) {
+  throw new Error("FAIL: FE sanitizeEditorHtml must drop glued onclick");
+}
+
 type ShapeBlock = {
   type: string;
   html?: string;
@@ -634,5 +674,5 @@ if (!day0.html.includes("Open the billing page") || !day0.html.includes("to cont
 }
 
 console.log(
-  "asserts green: configured-legacy #112233, quiet-verify→sonos, 5 kit ids, FE normalize sonos, unset→configured, D0/D2/D5, blocks+theme send, no layout-table body, shared soft-expire map, socials, ignoreNote, shell chrome, block href/attr sanitizer, FE/BE starter kit parity, copySlot persist, glued onclick + dangling open",
+  "asserts green: configured-legacy #112233, quiet-verify→sonos, 5 kit ids, FE normalize sonos, unset→configured, D0/D2/D5, blocks+theme send, no layout-table body, shared soft-expire map, socials, ignoreNote, shell chrome, block href/attr sanitizer, FE/BE starter kit parity, copySlot persist, glued onclick + dangling open, FE sanitizer parity",
 );
