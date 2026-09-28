@@ -62,20 +62,51 @@ export function normalizeLinkUrl(raw: string): string | null {
 const EVENT_HANDLER_ATTR_RE =
   /\bon[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 
-/** Drop on* attributes so preview HTML cannot keep event handlers. */
+function attrsFromTagRest(rest: string | undefined): string {
+  return (rest ?? "")
+    .replace(/^\/*/, "")
+    .replace(/\/\s*$/, "")
+    .replace(EVENT_HANDLER_ATTR_RE, "");
+}
+
+/** Open `<span>` with hex color only — never raw attr passthrough. */
+function rebuildOpenSpan(attrs: string): string {
+  const quoted =
+    attrs.match(/style\s*=\s*"([^"]*)"/i)?.[1] ??
+    attrs.match(/style\s*=\s*'([^']*)'/i)?.[1] ??
+    "";
+  const color = faceFromStyleText(quoted).color;
+  if (color && isHexColor(color)) {
+    return `<span style="color:${normalizeHex(color)}">`;
+  }
+  return "<span>";
+}
+
+/** Drop on* attributes; never re-emit raw attrs (slash-glue would become `<ahref>`). */
 export function stripEventHandlerAttrs(html: string): string {
-  // HTML5 allows `<strong/onclick=…>` — `/` starts attrs with no whitespace.
   return html.replace(
     /<([a-zA-Z][\w:-]*)((?:[\s/][^>]*)?)>/g,
     (_full, tag: string, rest: string | undefined) => {
-      const raw = rest ?? "";
-      const selfClose = /\/\s*$/.test(raw);
-      const attrs = raw.replace(/^\/*/, "").replace(/\/\s*$/, "");
-      const cleaned = attrs.replace(EVENT_HANDLER_ATTR_RE, "");
-      if (!/[^\s/]/.test(cleaned)) {
-        return selfClose ? `<${tag} />` : `<${tag}>`;
+      const name = tag.toLowerCase();
+      const cleaned = attrsFromTagRest(rest);
+      switch (name) {
+        case "a":
+          return rebuildOpenAnchor(cleaned);
+        case "span":
+          return rebuildOpenSpan(cleaned);
+        case "br":
+          return "<br />";
+        case "strong":
+        case "b":
+          return "<strong>";
+        case "em":
+        case "i":
+          return "<em>";
+        case "u":
+          return "<u>";
+        default:
+          return `<${name}>`;
       }
-      return selfClose ? `<${tag}${cleaned} />` : `<${tag}${cleaned}>`;
     },
   );
 }
@@ -196,7 +227,10 @@ export function sanitizeEditorHtmlString(html: string): string {
     .replace(/<u(?:[\s/][^>]*)?>/gi, "<u>")
     .replace(/<\/u>/gi, "</u>")
     .replace(/<span\b([^>]*)>([\s\S]*?)<\/span>/gi, (_, attrs: string, inner: string) => {
-      const style = attrs.match(/style\s*=\s*"([^"]*)"/i)?.[1] ?? "";
+      const style =
+        attrs.match(/style\s*=\s*"([^"]*)"/i)?.[1] ??
+        attrs.match(/style\s*=\s*'([^']*)'/i)?.[1] ??
+        "";
       return wrapWithFace(inner, faceFromStyleText(style));
     })
     .replace(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi, (_full, attrs: string, inner: string) => {
