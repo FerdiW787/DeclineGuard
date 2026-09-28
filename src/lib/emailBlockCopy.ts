@@ -3,6 +3,7 @@
 import {
   escapeHtml,
   markersToPlain,
+  resolveHeadlineBodyBlocks,
   type EmailBlock,
   type EmailDocument,
   type LinkRowBlock,
@@ -29,13 +30,6 @@ function isBillingLinkText(block: EmailBlock): block is TextBlock {
   return block.type === "text" && block.html.includes(PAYMENT_UPDATE_HREF);
 }
 
-function copyTextBlocks(blocks: EmailBlock[]): TextBlock[] {
-  return blocks.filter(
-    (block): block is TextBlock =>
-      block.type === "text" && !isBillingLinkText(block),
-  );
-}
-
 function plainOf(block: TextBlock): string {
   return markersToPlain(block.html).trim();
 }
@@ -60,43 +54,7 @@ export function resolveCopyTextSlots(doc: EmailDocument): {
   headline: TextBlock | undefined;
   body: TextBlock | undefined;
 } {
-  const texts = copyTextBlocks(doc.blocks);
-  const bySlot = (slot: "headline" | "body") =>
-    texts.find((block) => block.copySlot === slot);
-
-  let headline = bySlot("headline");
-  let body = bySlot("body");
-
-  const headlinePlain = doc.headline.trim();
-  const bodyPlain = markersToPlain(doc.body).trim();
-  if (!headline && headlinePlain) {
-    headline = texts.find((block) => plainOf(block) === headlinePlain);
-  }
-  if (!body && bodyPlain) {
-    body = texts.find(
-      (block) =>
-        block !== headline &&
-        (plainOf(block) === bodyPlain ||
-          plainOf(block) === doc.body.trim()),
-    );
-  }
-
-  if (!headline || !body) {
-    const mutedLead =
-      texts[0]?.color === "muted" &&
-      texts[0]?.copySlot !== "headline" &&
-      texts[0]?.copySlot !== "body" &&
-      texts.length >= 3;
-    if (mutedLead) {
-      headline = headline ?? texts[1];
-      body = body ?? texts[2];
-    } else {
-      headline = headline ?? texts[0];
-      body = body ?? texts[1] ?? texts[0];
-    }
-  }
-
-  return { headline, body };
+  return resolveHeadlineBodyBlocks(doc.blocks, doc);
 }
 
 export function shortCopyFromDocument(doc: EmailDocument): ShortCopyValues {
