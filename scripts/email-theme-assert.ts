@@ -13,7 +13,12 @@ import {
   resolveTheme,
   resolveThemeFromSettings,
 } from "../convex/lib/emailTheme";
-import { renderBlocksHtml } from "../convex/lib/emailBlocks";
+import {
+  persistTextBlockHtml,
+  persistTextCopySlot,
+  renderBlocksHtml,
+  sanitizeStoredHtml,
+} from "../convex/lib/emailBlocks";
 import {
   BLOCK_KIT_SPEC,
   kitShellSpec,
@@ -328,7 +333,7 @@ function assertSafeHrefs(html: string, label: string): void {
       throw new Error(`FAIL: ${label} leaked unsafe href ${href}`);
     }
   }
-  if (/\son[a-z]+\s*=/i.test(html)) {
+  if (/\bon[a-z]+\s*=/i.test(html)) {
     throw new Error(`FAIL: ${label} leaked event-handler attribute`);
   }
 }
@@ -389,6 +394,108 @@ const xssComposed = buildRecoveryEmail({
 assertSafeHrefs(xssComposed.html, "composed send HTML");
 if (!xssComposed.html.includes("https://safe.example")) {
   throw new Error("FAIL: composed HTML must keep allowlisted https href");
+}
+
+const gluedOnclick = '<a href="https://safe.example"onclick="alert(1)">ok</a>';
+const gluedRendered = renderBlocksHtml(
+  [
+    {
+      id: "glued",
+      type: "text",
+      html: gluedOnclick,
+      fontSize: 16,
+      color: "default",
+      align: "left",
+      marginTop: 0,
+      marginBottom: 0,
+    },
+  ],
+  {
+    primaryColor: "#112233",
+    linkColor: "#112233",
+    mutedColor: "#667788",
+    ctaUrl: "https://app.lemonsqueezy.com/my-orders",
+  },
+);
+assertSafeHrefs(gluedRendered, "glued onclick render");
+if (!gluedRendered.includes("https://safe.example") || !gluedRendered.includes("ok")) {
+  throw new Error("FAIL: glued onclick must keep allowlisted href and inner text");
+}
+const gluedSaved = persistTextBlockHtml(gluedOnclick);
+assertSafeHrefs(gluedSaved, "glued onclick save");
+if (gluedSaved.includes("onclick") || gluedSaved.includes("alert(1)")) {
+  throw new Error("FAIL: save path must strip glued onclick");
+}
+
+const danglingOpen =
+  'Go <a href="https://safe.example"onclick="alert(1)" target="_blank">';
+const danglingSaved = persistTextBlockHtml(danglingOpen);
+assertSafeHrefs(danglingSaved, "dangling open save");
+if (danglingSaved.includes("onclick") || danglingSaved.includes("target=")) {
+  throw new Error("FAIL: dangling open save must rebuild without raw attrs");
+}
+if (!/^Go <a href="https:\/\/safe\.example\/?">$/.test(danglingSaved.trim())) {
+  throw new Error(
+    `FAIL: dangling https open tag must be rebuilt, not returned raw (got ${danglingSaved})`,
+  );
+}
+const danglingSanitized = sanitizeStoredHtml(danglingOpen);
+assertSafeHrefs(danglingSanitized, "dangling open sanitize");
+if (danglingSanitized === danglingOpen || danglingSanitized.includes("onclick")) {
+  throw new Error("FAIL: sanitizeStoredHtml must not return raw dangling open tag");
+}
+
+const danglingRendered = renderBlocksHtml(
+  [
+    {
+      id: "dangling",
+      type: "text",
+      html: danglingOpen,
+      fontSize: 16,
+      color: "default",
+      align: "left",
+      marginTop: 0,
+      marginBottom: 0,
+    },
+  ],
+  {
+    primaryColor: "#112233",
+    linkColor: "#112233",
+    mutedColor: "#667788",
+    ctaUrl: "https://app.lemonsqueezy.com/my-orders",
+  },
+);
+assertSafeHrefs(danglingRendered, "dangling open render");
+if (danglingRendered.includes("onclick") || danglingRendered.includes("target=")) {
+  throw new Error("FAIL: dangling open render must not keep raw attrs");
+}
+
+const kitHeadline = starterBlocksForKit("sonos", "gentle").find(
+  (block) => block.type === "text" && block.copySlot === "headline",
+);
+if (!kitHeadline || kitHeadline.type !== "text") {
+  throw new Error("FAIL: sonos starter kit must emit headline copySlot");
+}
+const savedHeadline = persistTextCopySlot(kitHeadline.copySlot);
+if (savedHeadline !== "headline") {
+  throw new Error("FAIL: copySlot headline must round-trip persistTextCopySlot");
+}
+for (const slot of ["eyebrow", "headline", "body"] as const) {
+  const seeded = starterBlocksForKit("avocode", "direct").find(
+    (block) => block.type === "text" && block.copySlot === slot,
+  );
+  if (!seeded || seeded.type !== "text") {
+    throw new Error(`FAIL: avocode kit must emit copySlot ${slot}`);
+  }
+  if (persistTextCopySlot(seeded.copySlot) !== slot) {
+    throw new Error(`FAIL: copySlot ${slot} stripped on persist`);
+  }
+  if (persistTextBlockHtml(seeded.html).length === 0 && seeded.html.length > 0) {
+    throw new Error(`FAIL: persist must keep kit ${slot} html`);
+  }
+}
+if (persistTextCopySlot("hero") !== undefined) {
+  throw new Error("FAIL: unknown copySlot must not persist");
 }
 
 type ShapeBlock = {
@@ -527,5 +634,5 @@ if (!day0.html.includes("Open the billing page") || !day0.html.includes("to cont
 }
 
 console.log(
-  "asserts green: configured-legacy #112233, quiet-verify→sonos, 5 kit ids, FE normalize sonos, unset→configured, D0/D2/D5, blocks+theme send, no layout-table body, shared soft-expire map, socials, ignoreNote, shell chrome, block href/attr sanitizer, FE/BE starter kit parity",
+  "asserts green: configured-legacy #112233, quiet-verify→sonos, 5 kit ids, FE normalize sonos, unset→configured, D0/D2/D5, blocks+theme send, no layout-table body, shared soft-expire map, socials, ignoreNote, shell chrome, block href/attr sanitizer, FE/BE starter kit parity, copySlot persist, glued onclick + dangling open",
 );

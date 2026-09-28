@@ -19,6 +19,10 @@ import {
 } from "../lib/accountGuard";
 import { emailCopyValidator } from "../lib/emailBlockValidators";
 import {
+  persistTextBlockHtml,
+  persistTextCopySlot,
+} from "../lib/emailBlocks";
+import {
   DEFAULT_EMAIL_FONT,
   emailFontValidator,
   normalizeEmailFont,
@@ -174,6 +178,7 @@ type EmailBlockInput = {
   italic?: boolean;
   underline?: boolean;
   align?: string;
+  copySlot?: string;
   src?: string;
   alt?: string;
   width?: number;
@@ -256,15 +261,7 @@ function normalizeBlock(block: EmailBlockInput): EmailBlockInput | null {
 
   switch (block.type) {
     case "text": {
-      const html = (clampText(block.html, 4000) ?? "")
-        .replace(
-          /(\S)(<a\b[^>]*href="(?:#update-payment|#billing)")/gi,
-          "$1 $2",
-        )
-        .replace(
-          /(<a\b[^>]*href="(?:#update-payment|#billing)"[^>]*>[\s\S]*?<\/a>)(\S)/gi,
-          "$1 $2",
-        );
+      const html = persistTextBlockHtml(clampText(block.html, 4000) ?? "");
       const color =
         block.color === "muted" || block.color === "link"
           ? block.color
@@ -273,6 +270,7 @@ function normalizeBlock(block: EmailBlockInput): EmailBlockInput | null {
       const hexColor = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)
         ? hex
         : undefined;
+      const copySlot = persistTextCopySlot(block.copySlot);
       return {
         id,
         type: "text",
@@ -284,6 +282,7 @@ function normalizeBlock(block: EmailBlockInput): EmailBlockInput | null {
         italic: block.italic === true ? true : undefined,
         underline: block.underline === true ? true : undefined,
         align,
+        ...(copySlot ? { copySlot } : {}),
         marginTop,
         marginBottom,
       };

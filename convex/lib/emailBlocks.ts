@@ -2,6 +2,8 @@ import { allowHttpsUrl } from "./safeUrl";
 
 export type BlockAlign = "left" | "center" | "right";
 
+export type TextCopySlot = "eyebrow" | "headline" | "body";
+
 export type EmailBlock =
   | {
       id: string;
@@ -15,7 +17,7 @@ export type EmailBlock =
       underline?: boolean;
       align: BlockAlign;
       /** FE Lab mapping — ignored by HTML render. */
-      copySlot?: "eyebrow" | "headline" | "body";
+      copySlot?: TextCopySlot;
       marginTop: number;
       marginBottom: number;
     }
@@ -111,7 +113,7 @@ function looksLikeHtml(text: string): boolean {
 }
 
 const EVENT_HANDLER_ATTR_RE =
-  /\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
+  /\bon[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 
 function stripEventHandlerAttrs(html: string): string {
   return html.replace(
@@ -122,6 +124,22 @@ function stripEventHandlerAttrs(html: string): string {
       return `<${tag}${cleaned}${close}>`;
     },
   );
+}
+
+export function persistTextCopySlot(
+  value: string | undefined | null,
+): TextCopySlot | undefined {
+  if (value === "eyebrow" || value === "headline" || value === "body") {
+    return value;
+  }
+  return undefined;
+}
+
+function rebuildOpenAnchor(attrs: string): string {
+  const raw = hrefFromAttrs(attrs);
+  if (isPaymentPlaceholderHref(raw)) return `<a href="${raw}">`;
+  const href = allowHttpsUrl(raw);
+  return href ? `<a href="${escapeAttr(href)}">` : "";
 }
 
 function hrefFromAttrs(attrs: string): string {
@@ -148,14 +166,12 @@ function rewriteAnchors(
     if (next === current) break;
     current = next;
   }
-  return current.replace(/<a\b([^>]*)>/gi, (open, attrs: string) => {
-    const raw = hrefFromAttrs(attrs);
-    if (isPaymentPlaceholderHref(raw) || allowHttpsUrl(raw)) return open;
-    return "";
-  });
+  return current.replace(/<a\b([^>]*)>/gi, (_open, attrs: string) =>
+    rebuildOpenAnchor(attrs),
+  );
 }
 
-function sanitizeStoredHtml(html: string): string {
+export function sanitizeStoredHtml(html: string): string {
   return stripEventHandlerAttrs(html)
     .replace(/<br\s*\/?>/gi, "<br />")
     .replace(/<\/?(?:b|strong)(?:\s[^>]*)?>/gi, (m) =>
@@ -190,12 +206,15 @@ function sanitizeStoredHtml(html: string): string {
       }
       return inner;
     })
-    .replace(/<a\b([^>]*)>/gi, (open, attrs: string) => {
-      const raw = hrefFromAttrs(attrs);
-      if (isPaymentPlaceholderHref(raw) || /^https:/i.test(raw)) return open;
-      return "";
-    })
+    .replace(/<a\b([^>]*)>/gi, (_open, attrs: string) =>
+      rebuildOpenAnchor(attrs),
+    )
     .replace(/<(?!\/?(?:strong|em|u|span|br|a)\b)[^>]+>/gi, "");
+}
+
+/** Save-path HTML: sanitize, then keep payment-link spacing. */
+export function persistTextBlockHtml(html: string): string {
+  return ensurePaymentLinkSpacing(sanitizeStoredHtml(html));
 }
 
 function ensurePaymentLinkSpacing(html: string): string {
@@ -216,7 +235,9 @@ function styleEmailAnchors(
   ctaUrl?: string,
 ): string {
   const color = linkColor.trim() || "#2563eb";
-  const styled = rewriteAnchors(ensurePaymentLinkSpacing(html), (attrs, inner) => {
+  const styled = rewriteAnchors(
+    stripEventHandlerAttrs(ensurePaymentLinkSpacing(html)),
+    (attrs, inner) => {
     const raw = hrefFromAttrs(attrs);
     const href = isPaymentPlaceholderHref(raw)
       ? ctaUrl || raw
