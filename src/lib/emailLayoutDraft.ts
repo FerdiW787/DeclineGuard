@@ -15,7 +15,7 @@ const STORAGE_KEY = "dg.emailLayoutDraft.v1";
 
 /**
  * Riley-shaped FE draft. recoverySettings will store stylingMode +
- * layoutPresetId (default quiet-verify) when Convex tips; until then
+ * layoutPresetId (default sonos; legacy quiet-verify maps here) when Convex tips; until then
  * this stays in localStorage.
  */
 export type EmailLayoutDraft = {

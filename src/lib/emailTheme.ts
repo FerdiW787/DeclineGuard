@@ -14,18 +14,20 @@ export const STYLING_MODES = ["preset", "configured"] as const;
 export type StylingMode = (typeof STYLING_MODES)[number];
 
 export const QUIET_VERIFY_LAYOUT_ID = "quiet-verify";
+export const SONOS_LAYOUT_ID = "sonos";
 
+/** Starter block kits — 1:1 RGE refs. Legacy quiet-verify → sonos. */
 export const LAYOUT_PRESET_IDS = [
-  "quiet-verify",
-  "soft-expire",
-  "safe-pause",
-  "soft-renew",
-  "alert-expire",
+  "sonos",
+  "avocode",
+  "benchmark",
+  "fontbase",
+  "nordvpn-structure",
 ] as const;
 
 export type LayoutPresetId = (typeof LAYOUT_PRESET_IDS)[number];
 
-export const DEFAULT_LAYOUT_PRESET_ID: LayoutPresetId = QUIET_VERIFY_LAYOUT_ID;
+export const DEFAULT_LAYOUT_PRESET_ID: LayoutPresetId = SONOS_LAYOUT_ID;
 export const DEFAULT_STYLING_MODE: StylingMode = "preset";
 
 /** MVP lifecycle emails — same layout via the single global layoutPresetId. */
@@ -61,22 +63,25 @@ export type EmailThemeTokens = {
   fontFamilyRaw: string | null;
 };
 
-/** Quiet Verify — muted, trustworthy verify aesthetic (Riley catalog). */
-export const QUIET_VERIFY_TOKENS: EmailThemeTokens = {
-  brandColor: "#3d5248",
-  secondaryColor: "#7a756c",
-  mutedTextColor: "#7a756c",
-  linkColor: "#3d5248",
-  pageBackgroundColor: "#f6f4f0",
-  pageTextColor: "#2c2a26",
-  emailBackgroundColor: "#f6f4f0",
-  emailTextColor: "#2c2a26",
-  ctaBackgroundColor: "#3d5248",
-  ctaTextColor: "#f7f6f3",
-  ctaBorderRadiusPx: 8,
-  emailFont: "georgia",
+/** Sonos verify — black/white, super-pill CTA (RGE: verify-your-email-sonos). */
+export const SONOS_TOKENS: EmailThemeTokens = {
+  brandColor: "#000000",
+  secondaryColor: "#6b6b6b",
+  mutedTextColor: "#6b6b6b",
+  linkColor: "#000000",
+  pageBackgroundColor: "#ffffff",
+  pageTextColor: "#000000",
+  emailBackgroundColor: "#ffffff",
+  emailTextColor: "#000000",
+  ctaBackgroundColor: "#c8ff00",
+  ctaTextColor: "#000000",
+  ctaBorderRadiusPx: 9999,
+  emailFont: "system",
   fontFamilyRaw: null,
 };
+
+/** @deprecated Use SONOS_TOKENS. Kept for Riley catalog mirrors. */
+export const QUIET_VERIFY_TOKENS: EmailThemeTokens = SONOS_TOKENS;
 
 function layoutTokens(
   partial: Omit<EmailThemeTokens, "fontFamilyRaw" | "emailFont"> & {
@@ -98,82 +103,81 @@ export type LayoutPreset = {
 };
 
 export const LAYOUT_PRESET_CATALOG: Record<string, LayoutPreset> = {
-  [QUIET_VERIFY_LAYOUT_ID]: {
-    id: QUIET_VERIFY_LAYOUT_ID,
-    name: "Quiet Verify",
-    description:
-      "Muted, trustworthy verify layout for all lifecycle emails (verify, decline/pause, trial ended, renewal, expiry).",
-    tokens: QUIET_VERIFY_TOKENS,
+  sonos: {
+    id: "sonos",
+    name: "Sonos",
+    description: "Centered verify — logo, headline, pill CTA.",
+    tokens: SONOS_TOKENS,
   },
-  "soft-expire": {
-    id: "soft-expire",
-    name: "Soft Expire",
-    description: "What’s ending, then a calm restore.",
+  avocode: {
+    id: "avocode",
+    name: "Avocode",
+    description: "Left-aligned trial-ended stack.",
     tokens: layoutTokens({
-      brandColor: "#111827",
+      brandColor: "#2b6cff",
       secondaryColor: "#6b7280",
       mutedTextColor: "#6b7280",
-      linkColor: "#374151",
-      pageBackgroundColor: "#f4f5f7",
+      linkColor: "#2b6cff",
+      pageBackgroundColor: "#ffffff",
       pageTextColor: "#111827",
-      emailBackgroundColor: "#f4f5f7",
+      emailBackgroundColor: "#ffffff",
       emailTextColor: "#111827",
-      ctaBackgroundColor: "#1f2937",
-      ctaTextColor: "#f9fafb",
-      ctaBorderRadiusPx: 10,
+      ctaBackgroundColor: "#2b6cff",
+      ctaTextColor: "#ffffff",
+      ctaBorderRadiusPx: 6,
     }),
   },
-  "safe-pause": {
-    id: "safe-pause",
-    name: "Safe Pause",
-    description: "Paused — data stays, resume when ready.",
+  benchmark: {
+    id: "benchmark",
+    name: "Benchmark",
+    description: "Reassuring pause — your data is safe.",
     tokens: layoutTokens({
-      brandColor: "#2f3a2a",
-      secondaryColor: "#6b7264",
-      mutedTextColor: "#6b7264",
-      linkColor: "#3f4a38",
-      pageBackgroundColor: "#f6f7f4",
-      pageTextColor: "#1a1f16",
-      emailBackgroundColor: "#f6f7f4",
-      emailTextColor: "#1a1f16",
-      ctaBackgroundColor: "#2f3a2a",
-      ctaTextColor: "#f7f8f5",
-      ctaBorderRadiusPx: 12,
-    }),
-  },
-  "soft-renew": {
-    id: "soft-renew",
-    name: "Soft Renew",
-    description: "Upcoming renewal, what’s included.",
-    tokens: layoutTokens({
-      brandColor: "#3f3a33",
-      secondaryColor: "#7c746a",
-      mutedTextColor: "#7c746a",
-      linkColor: "#4a433b",
-      pageBackgroundColor: "#faf8f5",
-      pageTextColor: "#1c1917",
-      emailBackgroundColor: "#faf8f5",
-      emailTextColor: "#1c1917",
-      ctaBackgroundColor: "#3f3a33",
-      ctaTextColor: "#faf8f5",
+      brandColor: "#1f7a4d",
+      secondaryColor: "#5c6b61",
+      mutedTextColor: "#5c6b61",
+      linkColor: "#1f7a4d",
+      pageBackgroundColor: "#f7faf7",
+      pageTextColor: "#173322",
+      emailBackgroundColor: "#f7faf7",
+      emailTextColor: "#173322",
+      ctaBackgroundColor: "#1f7a4d",
+      ctaTextColor: "#f7faf7",
       ctaBorderRadiusPx: 8,
     }),
   },
-  "alert-expire": {
-    id: "alert-expire",
-    name: "Alert Expire",
-    description: "Accent bar, what happens next.",
+  fontbase: {
+    id: "fontbase",
+    name: "FontBase",
+    description: "Editorial upcoming renewal.",
     tokens: layoutTokens({
-      brandColor: "#18181b",
-      secondaryColor: "#71717a",
-      mutedTextColor: "#71717a",
-      linkColor: "#3f3f46",
-      pageBackgroundColor: "#ffffff",
-      pageTextColor: "#18181b",
-      emailBackgroundColor: "#ffffff",
-      emailTextColor: "#18181b",
-      ctaBackgroundColor: "#18181b",
+      brandColor: "#111111",
+      secondaryColor: "#6b6b6b",
+      mutedTextColor: "#6b6b6b",
+      linkColor: "#111111",
+      pageBackgroundColor: "#fafafa",
+      pageTextColor: "#111111",
+      emailBackgroundColor: "#fafafa",
+      emailTextColor: "#111111",
+      ctaBackgroundColor: "#111111",
       ctaTextColor: "#fafafa",
+      ctaBorderRadiusPx: 4,
+    }),
+  },
+  "nordvpn-structure": {
+    id: "nordvpn-structure",
+    name: "NordVPN",
+    description: "Expired account — accent frame, next step.",
+    tokens: layoutTokens({
+      brandColor: "#4687ff",
+      secondaryColor: "#5b6475",
+      mutedTextColor: "#5b6475",
+      linkColor: "#4687ff",
+      pageBackgroundColor: "#ffffff",
+      pageTextColor: "#0e1a33",
+      emailBackgroundColor: "#ffffff",
+      emailTextColor: "#0e1a33",
+      ctaBackgroundColor: "#4687ff",
+      ctaTextColor: "#ffffff",
       ctaBorderRadiusPx: 8,
     }),
   },
@@ -181,7 +185,7 @@ export const LAYOUT_PRESET_CATALOG: Record<string, LayoutPreset> = {
 
 export const NEW_MERCHANT_THEME_DEFAULTS = {
   stylingMode: "preset" as const,
-  layoutPresetId: QUIET_VERIFY_LAYOUT_ID,
+  layoutPresetId: SONOS_LAYOUT_ID,
 };
 
 export type ResolveThemeInput = {
@@ -202,17 +206,17 @@ export type RecoverySettingsLayoutFields = {
 };
 
 const LEGACY_LAYOUT_PRESET_IDS: Record<string, LayoutPresetId> = {
-  quiet_verify: "quiet-verify",
-  sonos: "quiet-verify",
-  soft_expire: "soft-expire",
-  avocode: "soft-expire",
-  safe_pause: "safe-pause",
-  benchmark: "safe-pause",
-  soft_renew: "soft-renew",
-  fontbase: "soft-renew",
-  alert_expire: "alert-expire",
-  "nordvpn-structure": "alert-expire",
-  nordvpn: "alert-expire",
+  "quiet-verify": "sonos",
+  quiet_verify: "sonos",
+  "soft-expire": "avocode",
+  soft_expire: "avocode",
+  "safe-pause": "benchmark",
+  safe_pause: "benchmark",
+  "soft-renew": "fontbase",
+  soft_renew: "fontbase",
+  "alert-expire": "nordvpn-structure",
+  alert_expire: "nordvpn-structure",
+  nordvpn: "nordvpn-structure",
 };
 
 export function isStylingMode(value: unknown): value is StylingMode {
@@ -245,7 +249,7 @@ export function normalizeLayoutPresetId(
   const raw = value?.trim() ?? "";
   const id = LEGACY_LAYOUT_PRESET_IDS[raw] ?? raw;
   if (id && LAYOUT_PRESET_CATALOG[id]) return id;
-  return QUIET_VERIFY_LAYOUT_ID;
+  return SONOS_LAYOUT_ID;
 }
 
 export function resolveLayoutPresetId(id: string): LayoutPresetId {
@@ -258,7 +262,7 @@ export function resolveLayoutPresetId(id: string): LayoutPresetId {
 export function getLayoutPreset(layoutPresetId: string): LayoutPreset {
   const id = normalizeLayoutPresetId(layoutPresetId);
   return (
-    LAYOUT_PRESET_CATALOG[id] ?? LAYOUT_PRESET_CATALOG[QUIET_VERIFY_LAYOUT_ID]!
+    LAYOUT_PRESET_CATALOG[id] ?? LAYOUT_PRESET_CATALOG[SONOS_LAYOUT_ID]!
   );
 }
 

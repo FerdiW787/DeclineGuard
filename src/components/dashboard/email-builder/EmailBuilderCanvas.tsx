@@ -121,6 +121,10 @@ type Props = {
   frameClassName?: string;
   footerSupport: string;
   socialLinks: readonly (readonly [string, string])[];
+  /** Kit chrome — Sonos is logo-only + centered, no greeting. */
+  logoAlign?: "left" | "center" | "right";
+  showStoreName?: boolean;
+  showGreeting?: boolean;
 };
 
 const ADDABLE: EmailBlockType[] = [
@@ -167,6 +171,9 @@ export default function EmailBuilderCanvas({
   frameClassName,
   footerSupport,
   socialLinks,
+  logoAlign = "left",
+  showStoreName = true,
+  showGreeting = true,
 }: Props) {
   useEmailFontLoader(emailFont);
   const shellBg = resolveShellBackground(
@@ -412,14 +419,18 @@ export default function EmailBuilderCanvas({
             primary={primary}
             emailFont={emailFont}
             textColor={shellText}
+            align={logoAlign}
+            showName={showStoreName}
           />
 
-          <p
-            className="mb-4 text-[17px] font-semibold tracking-tight"
-            style={{ color: shellText }}
-          >
-            Hi {customerFirstName},
-          </p>
+          {showGreeting ? (
+            <p
+              className="mb-4 text-[17px] font-semibold tracking-tight"
+              style={{ color: shellText }}
+            >
+              Hi {customerFirstName},
+            </p>
+          ) : null}
 
           {!readOnly && !inlineEdit ? (
             <AddGap

@@ -42,16 +42,16 @@ export const LAYOUT_PRESET_META: readonly LayoutPresetMeta[] =
     };
   });
 
-/** Merchant-facing structure names — never Quiet Verify / Soft Expire. */
+/** Product labels match the RGE refs — never Quiet Verify / Soft Expire. */
 export const LAYOUT_PRESET_STRUCTURE_META: Record<
   LayoutPresetId,
   { label: string; hint: string }
 > = {
-  "quiet-verify": { label: "Centered", hint: "Stacked on center" },
-  "soft-expire": { label: "Card", hint: "Bordered, left-aligned" },
-  "safe-pause": { label: "Soft stack", hint: "Open, more space" },
-  "soft-renew": { label: "Editorial", hint: "Flush left, no stroke" },
-  "alert-expire": { label: "Accent", hint: "Stronger frame" },
+  sonos: { label: "Sonos", hint: "Verify your email" },
+  avocode: { label: "Avocode", hint: "Your trial ended" },
+  benchmark: { label: "Benchmark", hint: "Your data is safe" },
+  fontbase: { label: "FontBase", hint: "Upcoming renewal" },
+  "nordvpn-structure": { label: "NordVPN", hint: "Your account has expired" },
 };
 
 export const LIFECYCLE_EMAIL_META: Record<

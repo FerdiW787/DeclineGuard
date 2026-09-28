@@ -81,7 +81,7 @@ export default function EmailLayoutPreview({
 
   const inner = (() => {
     switch (layoutPresetId) {
-      case "quiet-verify":
+      case "sonos":
         return (
           <QuietVerify
             theme={theme}
@@ -91,7 +91,7 @@ export default function EmailLayoutPreview({
             copy={copy}
           />
         );
-      case "soft-expire":
+      case "avocode":
         return (
           <SoftExpire
             theme={theme}
@@ -102,7 +102,7 @@ export default function EmailLayoutPreview({
             vars={vars}
           />
         );
-      case "safe-pause":
+      case "benchmark":
         return (
           <SafePause
             theme={theme}
@@ -112,7 +112,7 @@ export default function EmailLayoutPreview({
             copy={copy}
           />
         );
-      case "soft-renew":
+      case "fontbase":
         return (
           <SoftRenew
             theme={theme}
@@ -123,7 +123,7 @@ export default function EmailLayoutPreview({
             vars={vars}
           />
         );
-      case "alert-expire":
+      case "nordvpn-structure":
         return (
           <AlertExpire
             theme={theme}

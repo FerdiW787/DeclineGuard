@@ -62,7 +62,7 @@ export default function LayoutPresetPicker({
 function LayoutThumb({ id }: { id: LayoutPresetId }) {
   const theme = PRESET_THEMES[id] ?? QUIET_VERIFY_TOKENS;
   switch (id) {
-    case "quiet-verify":
+    case "sonos":
       return (
         <div
           className="flex h-16 flex-col items-center justify-center gap-1.5 rounded-lg"
@@ -80,7 +80,7 @@ function LayoutThumb({ id }: { id: LayoutPresetId }) {
           />
         </div>
       );
-    case "soft-expire":
+    case "avocode":
       return (
         <div
           className="flex h-16 flex-col justify-center gap-1 rounded-lg px-2.5"
@@ -97,7 +97,7 @@ function LayoutThumb({ id }: { id: LayoutPresetId }) {
           />
         </div>
       );
-    case "safe-pause":
+    case "benchmark":
       return (
         <div
           className="flex h-16 flex-col justify-center gap-1 rounded-lg px-2.5"
@@ -111,7 +111,7 @@ function LayoutThumb({ id }: { id: LayoutPresetId }) {
           <span className="h-4 rounded-md bg-black/6" />
         </div>
       );
-    case "soft-renew":
+    case "fontbase":
       return (
         <div
           className="flex h-16 flex-col justify-center gap-1 rounded-lg px-2.5"
@@ -126,7 +126,7 @@ function LayoutThumb({ id }: { id: LayoutPresetId }) {
           />
         </div>
       );
-    case "alert-expire":
+    case "nordvpn-structure":
       return (
         <div
           className="flex h-16 flex-col overflow-hidden rounded-lg"

@@ -19,7 +19,9 @@ import EmailBuilderCanvas, {
 } from "./email-builder/EmailBuilderCanvas";
 import CustomizeDock from "./email-builder/CustomizeDock";
 import EmailCustomizeSidebar from "./email-builder/EmailCustomizeSidebar";
+import EmailLabSidebar from "./email-builder/EmailLabSidebar";
 import {
+  applyCopyVars,
   TEMPLATE_META,
   type EmailCopyOverrides,
   type RecoveryTemplateId,
@@ -36,6 +38,12 @@ import {
   type ShortCopyField,
 } from "@/lib/emailBlockCopy";
 import { applyLayoutStructureToCopy } from "@/lib/emailLayoutStructure";
+import {
+  kitCopyFromDocument,
+  kitLogoAlign,
+  kitShowsGreeting,
+  kitShowsStoreName,
+} from "@/lib/emailBlockKits";
 import {
   cloneEmailCopy,
   mergeEmailCopyDocumentPatch,
@@ -65,7 +73,7 @@ import {
 } from "@/lib/emailLayoutDraft";
 import { useEmailLayoutDraft } from "@/lib/useEmailLayoutDraft";
 import type { LayoutPresetId } from "@/lib/emailLayoutPresets";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, FlaskConical } from "lucide-react";
 
 const TEMPLATE_ORDER: RecoveryTemplateId[] = ["gentle", "direct", "urgent"];
 
@@ -222,11 +230,13 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
       onSave,
       onDirtyChange,
       onUploadImage,
+      onFocusModeChange,
     },
     ref,
   ) {
     const [previewTemplate, setPreviewTemplate] =
       useState<RecoveryTemplateId>("gentle");
+    const [labMode, setLabMode] = useState(false);
     const [hasSelection, setHasSelection] = useState(false);
     const focusSelectionRef = useRef<EmailSelectionApi>({
       clear: () => false,
@@ -315,6 +325,21 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
     }, [initial]);
 
     useEffect(() => {
+      setLive((prev) => ({
+        ...prev,
+        emailCopy: applyLayoutStructureToCopy(
+          prev.emailCopy,
+          layoutDraft.layoutPresetId,
+        ),
+      }));
+    }, [layoutDraft.layoutPresetId]);
+
+    useEffect(() => {
+      onFocusModeChange?.(labMode);
+      return () => onFocusModeChange?.(false);
+    }, [labMode, onFocusModeChange]);
+
+    useEffect(() => {
       setPast([]);
       setFuture([]);
       setHasSelection(false);
@@ -396,6 +421,17 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
     };
     const activeDoc = live.emailCopy[previewTemplate];
     const shortCopy = shortCopyFromDocument(activeDoc);
+    const labPreviewCopy = (() => {
+      const raw = kitCopyFromDocument(previewTemplate, activeDoc);
+      return {
+        subject: applyCopyVars(raw.subject, copyVars),
+        eyebrow: applyCopyVars(raw.eyebrow, copyVars),
+        headline: applyCopyVars(raw.headline, copyVars),
+        body: applyCopyVars(raw.body, copyVars),
+        cta: applyCopyVars(raw.cta, copyVars),
+        link: applyCopyVars(raw.link, copyVars),
+      };
+    })();
     const dayMeta = TEMPLATE_META[previewTemplate];
     const dirty = !valuesEqual(live, initial);
     const hasUrlErrors = SOCIAL_FIELDS.some(
@@ -592,6 +628,11 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
         if (e.key === "Escape") {
           if (dismissSelection()) {
             e.preventDefault();
+            return;
+          }
+          if (labMode) {
+            e.preventDefault();
+            setLabMode(false);
           }
           return;
         }
@@ -610,7 +651,7 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
       };
       window.addEventListener("keydown", onKey);
       return () => window.removeEventListener("keydown", onKey);
-    }, [dismissSelection, redo, undo]);
+    }, [dismissSelection, labMode, redo, undo]);
 
     const onColorChange = (
       key:
@@ -638,13 +679,10 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
     };
 
     const onLayoutPresetChange = (id: LayoutPresetId) => {
+      if (id === layoutDraft.layoutPresetId) return;
+      pushEmailCopyHistory();
       setLayoutDraft((prev) => ({ ...prev, layoutPresetId: id }));
       onPersistTheme?.({ layoutPresetId: id });
-      pushEmailCopyHistory();
-      setLive((prev) => ({
-        ...prev,
-        emailCopy: applyLayoutStructureToCopy(prev.emailCopy, id),
-      }));
     };
 
     const onStylingModeChange = (next: StylingMode) => {
@@ -656,19 +694,25 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#f7f8f8]">
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-24 pt-3 lg:px-6 lg:pt-5">
         <PageHeader
-          eyebrow="Customizations"
+          eyebrow={labMode ? "Customizations · Lab" : "Customizations"}
           title="Recovery emails"
-          description="One in-email layout for Day 0, Day 2, and Day 5. Click a block to edit it in place."
+          description={
+            labMode
+              ? "QA the five RGE starter kits across Day 0, Day 2, and Day 5. Exit Lab to restore the usual chrome."
+              : "One in-email layout for Day 0, Day 2, and Day 5. Click a block to edit it in place."
+          }
           actions={
             <div className="flex flex-wrap items-center gap-2">
-              <SegmentedControl
-                options={STYLING_OPTIONS}
-                value={layoutDraft.stylingMode}
-                onChange={onStylingModeChange}
-                ariaLabel="Styling source"
-                idPrefix="email-styling"
-              />
-              {onGoToSequences ? (
+              {labMode ? null : (
+                <SegmentedControl
+                  options={STYLING_OPTIONS}
+                  value={layoutDraft.stylingMode}
+                  onChange={onStylingModeChange}
+                  ariaLabel="Styling source"
+                  idPrefix="email-styling"
+                />
+              )}
+              {labMode || !onGoToSequences ? null : (
                 <button
                   type="button"
                   onClick={onGoToSequences}
@@ -677,7 +721,21 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
                   Sequences
                   <ArrowRight className="dg-link-arrow size-3.5" />
                 </button>
-              ) : null}
+              )}
+              <button
+                type="button"
+                aria-pressed={labMode}
+                aria-label={labMode ? "Exit lab" : "Open lab"}
+                onClick={() => setLabMode((open) => !open)}
+                className={cn(
+                  "inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border transition-colors duration-300",
+                  labMode
+                    ? "border-black/12 bg-[#08090a] text-white"
+                    : "border-black/8 bg-white text-[#08090a] hover:border-black/16",
+                )}
+              >
+                <FlaskConical className="size-3.5" />
+              </button>
             </div>
           }
         />
@@ -698,7 +756,10 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
         <div
           className={cn(
             "mt-5 min-h-0 flex-1 gap-5",
-            "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)]",
+            "lg:grid",
+            labMode
+              ? "lg:grid-cols-[minmax(0,1fr)_minmax(17rem,21rem)]"
+              : "lg:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)]",
           )}
         >
           <Panel className="flex min-h-0 flex-col p-5 md:p-6">
@@ -709,7 +770,9 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
               <p className="mt-2 text-[12px] text-[#6b6f76]">
                 {hasSelection
                   ? "Editing this block. Esc clears the selection."
-                  : "Click a block to edit copy, the button, or the link."}
+                  : labMode
+                    ? "Switch kits on the right. Day 0 / 2 / 5 reuse this layout."
+                    : "Click a block to edit copy, the button, or the link."}
               </p>
             </div>
             <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto rounded-md bg-[#f7f8f8] px-3 py-5 md:px-6">
@@ -753,34 +816,55 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
                 showInboxMeta
                 footerSupport={footerSupport}
                 socialLinks={socialLinks}
+                logoAlign={kitLogoAlign(layoutDraft.layoutPresetId)}
+                showStoreName={kitShowsStoreName(layoutDraft.layoutPresetId)}
+                showGreeting={kitShowsGreeting(layoutDraft.layoutPresetId)}
               />
             </div>
           </Panel>
 
-          <EmailCustomizeSidebar
-            stylingMode={layoutDraft.stylingMode}
-            layoutPresetId={layoutDraft.layoutPresetId}
-            onLayoutPresetChange={onLayoutPresetChange}
-            colors={{
-              brandColor: live.brandColor,
-              ctaBackgroundColor: live.ctaBackgroundColor,
-              ctaTextColor: live.ctaTextColor,
-              linkColor: live.linkColor,
-              mutedTextColor: live.secondaryColor,
-              emailBackgroundColor:
-                layoutDraft.shellOverrides.emailBackgroundColor ??
-                emailBackgroundColor ??
-                theme.emailBackgroundColor,
-              emailTextColor:
-                layoutDraft.shellOverrides.emailTextColor ??
-                emailTextColor ??
-                theme.emailTextColor,
-            }}
-            onColorChange={onColorChange}
-            copy={shortCopy}
-            onCopyChange={changeShortCopy}
-            dayLabel={`${dayMeta.day} · ${dayMeta.label}`}
-          />
+          <div
+            key={labMode ? "lab-rail" : "edit-rail"}
+            className="dg-float-in-right min-w-0"
+          >
+            {labMode ? (
+              <EmailLabSidebar
+                layoutPresetId={layoutDraft.layoutPresetId}
+                stylingMode={layoutDraft.stylingMode}
+                theme={theme}
+                storeName={storeName}
+                storeLogoUrl={storeLogoUrl}
+                previewCopy={labPreviewCopy}
+                onSelectKit={onLayoutPresetChange}
+                onStylingModeChange={onStylingModeChange}
+              />
+            ) : (
+              <EmailCustomizeSidebar
+                stylingMode={layoutDraft.stylingMode}
+                layoutPresetId={layoutDraft.layoutPresetId}
+                onLayoutPresetChange={onLayoutPresetChange}
+                colors={{
+                  brandColor: live.brandColor,
+                  ctaBackgroundColor: live.ctaBackgroundColor,
+                  ctaTextColor: live.ctaTextColor,
+                  linkColor: live.linkColor,
+                  mutedTextColor: live.secondaryColor,
+                  emailBackgroundColor:
+                    layoutDraft.shellOverrides.emailBackgroundColor ??
+                    emailBackgroundColor ??
+                    theme.emailBackgroundColor,
+                  emailTextColor:
+                    layoutDraft.shellOverrides.emailTextColor ??
+                    emailTextColor ??
+                    theme.emailTextColor,
+                }}
+                onColorChange={onColorChange}
+                copy={shortCopy}
+                onCopyChange={changeShortCopy}
+                dayLabel={`${dayMeta.day} · ${dayMeta.label}`}
+              />
+            )}
+          </div>
         </div>
         </div>
 
