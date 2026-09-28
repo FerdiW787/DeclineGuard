@@ -203,10 +203,16 @@ export type RecoverySettingsLayoutFields = {
 
 const LEGACY_LAYOUT_PRESET_IDS: Record<string, LayoutPresetId> = {
   quiet_verify: "quiet-verify",
+  sonos: "quiet-verify",
   soft_expire: "soft-expire",
+  avocode: "soft-expire",
   safe_pause: "safe-pause",
+  benchmark: "safe-pause",
   soft_renew: "soft-renew",
+  fontbase: "soft-renew",
   alert_expire: "alert-expire",
+  "nordvpn-structure": "alert-expire",
+  nordvpn: "alert-expire",
 };
 
 export function isStylingMode(value: unknown): value is StylingMode {

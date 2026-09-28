@@ -42,6 +42,18 @@ export const LAYOUT_PRESET_META: readonly LayoutPresetMeta[] =
     };
   });
 
+/** Merchant-facing structure names — never Quiet Verify / Soft Expire. */
+export const LAYOUT_PRESET_STRUCTURE_META: Record<
+  LayoutPresetId,
+  { label: string; hint: string }
+> = {
+  "quiet-verify": { label: "Centered", hint: "Stacked on center" },
+  "soft-expire": { label: "Card", hint: "Bordered, left-aligned" },
+  "safe-pause": { label: "Soft stack", hint: "Open, more space" },
+  "soft-renew": { label: "Editorial", hint: "Flush left, no stroke" },
+  "alert-expire": { label: "Accent", hint: "Stronger frame" },
+};
+
 export const LIFECYCLE_EMAIL_META: Record<
   LifecycleEmailType,
   { label: string; hint: string }

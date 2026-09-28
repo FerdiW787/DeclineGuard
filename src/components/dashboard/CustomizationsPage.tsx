@@ -17,10 +17,10 @@ import { socialLinksFromSettings } from "./EmailPreviewBody";
 import EmailBuilderCanvas, {
   type EmailSelectionApi,
 } from "./email-builder/EmailBuilderCanvas";
-import EmailCoverflow from "./email-builder/EmailCoverflow";
 import CustomizeDock from "./email-builder/CustomizeDock";
+import EmailCustomizeSidebar from "./email-builder/EmailCustomizeSidebar";
 import {
-  applyCopyVars,
+  TEMPLATE_META,
   type EmailCopyOverrides,
   type RecoveryTemplateId,
 } from "@/lib/recoveryEmailCopy";
@@ -30,6 +30,12 @@ import {
   type EmailBlock,
   type EmailDocument,
 } from "@/lib/emailBuilder";
+import {
+  applyShortCopyToDocument,
+  shortCopyFromDocument,
+  type ShortCopyField,
+} from "@/lib/emailBlockCopy";
+import { applyLayoutStructureToCopy } from "@/lib/emailLayoutStructure";
 import {
   cloneEmailCopy,
   mergeEmailCopyDocumentPatch,
@@ -41,15 +47,37 @@ import {
   type EmailFontId,
 } from "@/lib/emailFonts";
 import { cn } from "@/lib/utils";
-import { formatMoneyAmount, type OpenFailureRow } from "./dashboardUi";
-import EmailLayoutStudio from "./email-layouts/EmailLayoutStudio";
-import { configuredTokensFromSettings, type StylingMode } from "@/lib/emailTheme";
+import {
+  formatMoneyAmount,
+  PageHeader,
+  Panel,
+  type OpenFailureRow,
+} from "./dashboardUi";
+import SegmentedControl from "./SegmentedControl";
+import {
+  configuredTokensFromSettings,
+  resolveTheme,
+  type StylingMode,
+} from "@/lib/emailTheme";
 import {
   loadEmailLayoutDraft,
   persistEmailLayoutSettings,
 } from "@/lib/emailLayoutDraft";
+import { useEmailLayoutDraft } from "@/lib/useEmailLayoutDraft";
+import type { LayoutPresetId } from "@/lib/emailLayoutPresets";
+import { ArrowRight } from "lucide-react";
 
 const TEMPLATE_ORDER: RecoveryTemplateId[] = ["gentle", "direct", "urgent"];
+
+const DAY_OPTIONS = TEMPLATE_ORDER.map((id) => ({
+  id,
+  label: TEMPLATE_META[id].day,
+}));
+
+const STYLING_OPTIONS = [
+  { id: "preset" as const, label: "Use preset" },
+  { id: "configured" as const, label: "Configured" },
+];
 
 const HTTPS_ERROR = "Make Sure its a valid https:// url";
 
@@ -188,19 +216,18 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
       showDeclineGuardBadge,
       openFailures,
       fromAddressHint,
-      brandDomain,
       onPersistTheme,
       serverTheme,
+      onGoToSequences,
       onSave,
       onDirtyChange,
       onUploadImage,
-      onFocusModeChange,
     },
     ref,
   ) {
     const [previewTemplate, setPreviewTemplate] =
-      useState<RecoveryTemplateId>("direct");
-    const [focusMode, setFocusMode] = useState(false);
+      useState<RecoveryTemplateId>("gentle");
+    const [hasSelection, setHasSelection] = useState(false);
     const focusSelectionRef = useRef<EmailSelectionApi>({
       clear: () => false,
     });
@@ -215,6 +242,8 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
     onSaveRef.current = onSave;
     const onPersistThemeRef = useRef(onPersistTheme);
     onPersistThemeRef.current = onPersistTheme;
+
+    const [layoutDraft, setLayoutDraft] = useEmailLayoutDraft(serverTheme);
 
     const [live, setLive] = useState(() =>
       buildInitial({
@@ -288,6 +317,8 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
     useEffect(() => {
       setPast([]);
       setFuture([]);
+      setHasSelection(false);
+      focusSelectionRef.current.clear();
     }, [previewTemplate]);
 
     useEffect(() => {
@@ -319,8 +350,30 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
       };
     }, [openFailures]);
 
-    const primary = live.brandColor || "#0c0c0c";
-    const secondary = live.secondaryColor || "#6b6b70";
+    const configured = configuredTokensFromSettings({
+      brandColor: live.brandColor,
+      secondaryColor: live.secondaryColor,
+      mutedTextColor: live.secondaryColor,
+      emailBackgroundColor:
+        layoutDraft.shellOverrides.emailBackgroundColor ?? emailBackgroundColor,
+      emailTextColor:
+        layoutDraft.shellOverrides.emailTextColor ?? emailTextColor,
+      pageBackgroundColor: emailBackgroundColor,
+      pageTextColor: emailTextColor,
+      linkColor: live.linkColor,
+      ctaBackgroundColor: live.ctaBackgroundColor,
+      ctaTextColor: live.ctaTextColor,
+      ctaBorderRadiusPx,
+      emailFont: live.emailFont,
+    });
+
+    const resolved = resolveTheme({
+      stylingMode: layoutDraft.stylingMode,
+      layoutPresetId: layoutDraft.layoutPresetId,
+      configured,
+    });
+    const theme = resolved.tokens;
+
     const footerSupport =
       live.supportEmail.trim() ||
       live.replyToEmail.trim() ||
@@ -342,6 +395,8 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
       firstName: previewSample.customer,
     };
     const activeDoc = live.emailCopy[previewTemplate];
+    const shortCopy = shortCopyFromDocument(activeDoc);
+    const dayMeta = TEMPLATE_META[previewTemplate];
     const dirty = !valuesEqual(live, initial);
     const hasUrlErrors = SOCIAL_FIELDS.some(
       (key) => !isValidHttpsUrl(live[key]),
@@ -350,22 +405,6 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
     useEffect(() => {
       onDirtyChange?.(dirty);
     }, [dirty, onDirtyChange]);
-
-    const enterFocus = (id: RecoveryTemplateId) => {
-      setPreviewTemplate(id);
-      setFocusMode(true);
-      onFocusModeChange?.(true);
-    };
-
-    const exitFocus = useCallback(() => {
-      setFocusMode(false);
-      onFocusModeChange?.(false);
-    }, [onFocusModeChange]);
-
-    const dismissFocus = useCallback(() => {
-      if (focusSelectionRef.current.clear()) return;
-      exitFocus();
-    }, [exitFocus]);
 
     const pushEmailCopyHistory = () => {
       if (!historyArmedRef.current) return;
@@ -404,17 +443,32 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
         const current = prev.emailCopy[id];
         const prevBlocks = current.blocks;
         const legacy = deriveLegacyFromBlocks(current.subject, blocks, current);
-        let emailCopy = {
+        let nextCopy = {
           ...prev.emailCopy,
           [id]: { ...current, ...legacy, blocks },
         };
-        emailCopy = syncBlockStylesAcrossTemplates(
-          emailCopy,
+        nextCopy = syncBlockStylesAcrossTemplates(
+          nextCopy,
           id,
           prevBlocks,
           blocks,
         );
-        return { ...prev, emailCopy };
+        return { ...prev, emailCopy: nextCopy };
+      });
+    };
+
+    const changeShortCopy = (field: ShortCopyField, value: string) => {
+      pushEmailCopyHistory();
+      setLive((prev) => {
+        const current = prev.emailCopy[previewTemplate];
+        const nextDoc = applyShortCopyToDocument(current, field, value);
+        return {
+          ...prev,
+          emailCopy: {
+            ...prev.emailCopy,
+            [previewTemplate]: nextDoc,
+          },
+        };
       });
     };
 
@@ -446,9 +500,9 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
     const canUndo = past.length > 0;
     const canRedo = future.length > 0;
     const canSave = dirty && !hasUrlErrors && !saving;
-    const dockVisible = focusMode || dirty || saving || showSaved;
+    const dockVisible = hasSelection || dirty || saving || showSaved;
     const dockVariant =
-      focusMode && (dirty || saving) ? "full" : "compact";
+      hasSelection || dirty || saving ? "full" : "compact";
 
     const runSave = useCallback(async (): Promise<boolean> => {
       const current = liveRef.current;
@@ -474,8 +528,10 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
             brandColor: current.brandColor,
             secondaryColor: current.secondaryColor,
             mutedTextColor: current.secondaryColor,
-            emailBackgroundColor,
-            emailTextColor,
+            emailBackgroundColor:
+              draft.shellOverrides.emailBackgroundColor ?? emailBackgroundColor,
+            emailTextColor:
+              draft.shellOverrides.emailTextColor ?? emailTextColor,
             pageBackgroundColor: emailBackgroundColor,
             pageTextColor: emailTextColor,
             linkColor: current.linkColor,
@@ -505,7 +561,7 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
         }
       }
       return ok;
-    }, []);
+    }, [ctaBorderRadiusPx, emailBackgroundColor, emailTextColor]);
 
     useImperativeHandle(
       ref,
@@ -523,11 +579,20 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
       [runSave],
     );
 
+    const dismissSelection = useCallback(() => {
+      if (focusSelectionRef.current.clear()) {
+        setHasSelection(false);
+        return true;
+      }
+      return false;
+    }, []);
+
     useEffect(() => {
       const onKey = (e: KeyboardEvent) => {
-        if (e.key === "Escape" && focusMode) {
-          e.preventDefault();
-          dismissFocus();
+        if (e.key === "Escape") {
+          if (dismissSelection()) {
+            e.preventDefault();
+          }
           return;
         }
         if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return;
@@ -545,120 +610,179 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
       };
       window.addEventListener("keydown", onKey);
       return () => window.removeEventListener("keydown", onKey);
-    }, [dismissFocus, focusMode, redo, undo]);
+    }, [dismissSelection, redo, undo]);
+
+    const onColorChange = (
+      key:
+        | "brandColor"
+        | "ctaBackgroundColor"
+        | "ctaTextColor"
+        | "linkColor"
+        | "mutedTextColor"
+        | "emailBackgroundColor"
+        | "emailTextColor",
+      value: string,
+    ) => {
+      if (key === "emailBackgroundColor" || key === "emailTextColor") {
+        setLayoutDraft((prev) => ({
+          ...prev,
+          shellOverrides: { ...prev.shellOverrides, [key]: value },
+        }));
+        return;
+      }
+      if (key === "mutedTextColor") {
+        setLive((prev) => ({ ...prev, secondaryColor: value }));
+        return;
+      }
+      setLive((prev) => ({ ...prev, [key]: value }));
+    };
+
+    const onLayoutPresetChange = (id: LayoutPresetId) => {
+      setLayoutDraft((prev) => ({ ...prev, layoutPresetId: id }));
+      onPersistTheme?.({ layoutPresetId: id });
+      pushEmailCopyHistory();
+      setLive((prev) => ({
+        ...prev,
+        emailCopy: applyLayoutStructureToCopy(prev.emailCopy, id),
+      }));
+    };
+
+    const onStylingModeChange = (next: StylingMode) => {
+      setLayoutDraft((prev) => ({ ...prev, stylingMode: next }));
+      onPersistTheme?.({ stylingMode: next });
+    };
 
     return (
-      <div
-        className={cn(
-          "relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-visible transition-colors duration-500",
-          focusMode ? "bg-white" : "bg-[#f7f8f8]",
-        )}
-      >
-        {!focusMode ? (
-          <div className="mx-auto w-full max-w-[72rem] px-4 pb-2 pt-5 md:px-6">
-            <EmailLayoutStudio
-              variant="page"
-              storeName={storeName}
-              storeLogoUrl={storeLogoUrl}
-              configured={configuredTokensFromSettings({
-                brandColor: live.brandColor,
-                secondaryColor: live.secondaryColor,
-                mutedTextColor: live.secondaryColor,
-                emailBackgroundColor,
-                emailTextColor,
-                pageBackgroundColor: emailBackgroundColor,
-                pageTextColor: emailTextColor,
-                linkColor: live.linkColor,
-                ctaBackgroundColor: live.ctaBackgroundColor,
-                ctaTextColor: live.ctaTextColor,
-                ctaBorderRadiusPx,
-                emailFont: live.emailFont,
-              })}
-              onPersistTheme={onPersistTheme}
-              serverTheme={serverTheme}
-              onConfiguredChange={(patch) => {
-                setLive((prev) => ({
-                  ...prev,
-                  ...(patch.brandColor
-                    ? { brandColor: patch.brandColor }
-                    : {}),
-                  ...(patch.mutedTextColor
-                    ? { secondaryColor: patch.mutedTextColor }
-                    : {}),
-                  ...(patch.ctaBackgroundColor
-                    ? { ctaBackgroundColor: patch.ctaBackgroundColor }
-                    : {}),
-                  ...(patch.ctaTextColor
-                    ? { ctaTextColor: patch.ctaTextColor }
-                    : {}),
-                  ...(patch.linkColor ? { linkColor: patch.linkColor } : {}),
-                }));
-              }}
-              emailFont={live.emailFont}
-              footerSupport={footerSupport}
-              showDeclineGuardBadge={showDeclineGuardBadge}
-              previewVars={copyVars}
-            />
-            <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8a8f98]">
-              Recovery sequence
-            </p>
-            <p className="mt-1 text-[13px] text-[#6b6f76]">
-              Gentle, Direct, and Urgent still send on day 0, 2, and 5. Layout
-              above is shared by every lifecycle email.
-            </p>
-          </div>
-        ) : null}
-
-        <EmailCoverflow
-          templates={TEMPLATE_ORDER}
-          selected={previewTemplate}
-          focusMode={focusMode}
-          primaryColor={primary}
-          onEnterFocus={enterFocus}
-          onExitFocus={dismissFocus}
-          inboxMeta={(id) => ({
-            from: senderLine,
-            subject: applyCopyVars(live.emailCopy[id].subject, copyVars),
-          })}
-          renderEmail={(id, frameWidth) => (
-            <EmailBuilderCanvas
-              document={live.emailCopy[id]}
-              device="desktop"
-              frameWidth={frameWidth}
-              readOnly={!focusMode || id !== previewTemplate}
-              inlineEdit={focusMode && id === previewTemplate}
-              selectionApiRef={
-                focusMode && id === previewTemplate
-                  ? focusSelectionRef
-                  : undefined
-              }
-              onChangeBlocks={(blocks) => changeBlocks(id, blocks)}
-              onPatchDocument={(patch) => patchDocument(id, patch)}
-              onRemoveBlock={(blockId) =>
-                changeBlocks(id, removeBlock(live.emailCopy[id].blocks, blockId))
-              }
-              onUploadImage={onUploadImage}
-              storeName={storeName}
-              storeLogoUrl={storeLogoUrl}
-              primary={primary}
-              secondary={secondary}
-              emailFont={live.emailFont}
-              ctaBackgroundColor={live.ctaBackgroundColor}
-              ctaTextColor={live.ctaTextColor}
-              ctaBorderRadiusPx={ctaBorderRadiusPx}
-              linkColor={live.linkColor}
-              emailBackgroundColor={emailBackgroundColor}
-              emailTextColor={emailTextColor}
-              senderLine={senderLine}
-              customerFirstName={previewSample.customer}
-              vars={copyVars}
-              showDeclineGuardBadge={showDeclineGuardBadge}
-              showInboxMeta={false}
-              footerSupport={footerSupport}
-              socialLinks={socialLinks}
-            />
-          )}
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#f7f8f8]">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-24 pt-3 lg:px-6 lg:pt-5">
+        <PageHeader
+          eyebrow="Customizations"
+          title="Recovery emails"
+          description="One in-email layout for Day 0, Day 2, and Day 5. Click a block to edit it in place."
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              <SegmentedControl
+                options={STYLING_OPTIONS}
+                value={layoutDraft.stylingMode}
+                onChange={onStylingModeChange}
+                ariaLabel="Styling source"
+                idPrefix="email-styling"
+              />
+              {onGoToSequences ? (
+                <button
+                  type="button"
+                  onClick={onGoToSequences}
+                  className="dg-link-arrow-host inline-flex cursor-pointer items-center gap-1 text-[12px] font-semibold text-[#08090a] underline-offset-2 hover:underline"
+                >
+                  Sequences
+                  <ArrowRight className="dg-link-arrow size-3.5" />
+                </button>
+              ) : null}
+            </div>
+          }
         />
+
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+          <SegmentedControl
+            options={DAY_OPTIONS}
+            value={previewTemplate}
+            onChange={setPreviewTemplate}
+            ariaLabel="Recovery day"
+            idPrefix="recovery-day"
+          />
+          <p className="text-[12px] text-[#6b6f76]">
+            {dayMeta.label} · {dayMeta.when}
+          </p>
+        </div>
+
+        <div
+          className={cn(
+            "mt-5 min-h-0 flex-1 gap-5",
+            "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)]",
+          )}
+        >
+          <Panel className="flex min-h-0 flex-col p-5 md:p-6">
+            <div className="mb-4 shrink-0">
+              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8a8f98]">
+                {dayMeta.day} · {dayMeta.label}
+              </p>
+              <p className="mt-2 text-[12px] text-[#6b6f76]">
+                {hasSelection
+                  ? "Editing this block. Esc clears the selection."
+                  : "Click a block to edit copy, the button, or the link."}
+              </p>
+            </div>
+            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pb-4">
+              <EmailBuilderCanvas
+                document={activeDoc}
+                device="desktop"
+                readOnly={false}
+                inlineEdit
+                selectionApiRef={focusSelectionRef}
+                onSelect={(id) => {
+                  setHasSelection(id != null);
+                }}
+                onChangeBlocks={(blocks) =>
+                  changeBlocks(previewTemplate, blocks)
+                }
+                onPatchDocument={(patch) =>
+                  patchDocument(previewTemplate, patch)
+                }
+                onRemoveBlock={(blockId) =>
+                  changeBlocks(
+                    previewTemplate,
+                    removeBlock(activeDoc.blocks, blockId),
+                  )
+                }
+                onUploadImage={onUploadImage}
+                storeName={storeName}
+                storeLogoUrl={storeLogoUrl}
+                primary={theme.brandColor}
+                secondary={theme.mutedTextColor}
+                emailFont={theme.emailFont}
+                ctaBackgroundColor={theme.ctaBackgroundColor}
+                ctaTextColor={theme.ctaTextColor}
+                ctaBorderRadiusPx={theme.ctaBorderRadiusPx}
+                linkColor={theme.linkColor}
+                emailBackgroundColor={theme.emailBackgroundColor}
+                emailTextColor={theme.emailTextColor}
+                senderLine={senderLine}
+                customerFirstName={previewSample.customer}
+                vars={copyVars}
+                showDeclineGuardBadge={showDeclineGuardBadge}
+                showInboxMeta
+                footerSupport={footerSupport}
+                socialLinks={socialLinks}
+              />
+            </div>
+          </Panel>
+
+          <EmailCustomizeSidebar
+            stylingMode={layoutDraft.stylingMode}
+            layoutPresetId={layoutDraft.layoutPresetId}
+            onLayoutPresetChange={onLayoutPresetChange}
+            colors={{
+              brandColor: live.brandColor,
+              ctaBackgroundColor: live.ctaBackgroundColor,
+              ctaTextColor: live.ctaTextColor,
+              linkColor: live.linkColor,
+              mutedTextColor: live.secondaryColor,
+              emailBackgroundColor:
+                layoutDraft.shellOverrides.emailBackgroundColor ??
+                emailBackgroundColor ??
+                theme.emailBackgroundColor,
+              emailTextColor:
+                layoutDraft.shellOverrides.emailTextColor ??
+                emailTextColor ??
+                theme.emailTextColor,
+            }}
+            onColorChange={onColorChange}
+            copy={shortCopy}
+            onCopyChange={changeShortCopy}
+            dayLabel={`${dayMeta.day} · ${dayMeta.label}`}
+          />
+        </div>
+        </div>
 
         <CustomizeDock
           visible={dockVisible}
