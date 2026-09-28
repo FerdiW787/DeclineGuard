@@ -64,12 +64,18 @@ const EVENT_HANDLER_ATTR_RE =
 
 /** Drop on* attributes so preview HTML cannot keep event handlers. */
 export function stripEventHandlerAttrs(html: string): string {
+  // HTML5 allows `<strong/onclick=…>` — `/` starts attrs with no whitespace.
   return html.replace(
-    /<([a-zA-Z][\w:-]*)(\s[^>]*?)?(\s*\/?)>/g,
-    (_full, tag: string, attrs: string | undefined, close: string) => {
-      if (!attrs) return `<${tag}${close}>`;
+    /<([a-zA-Z][\w:-]*)((?:[\s/][^>]*)?)>/g,
+    (_full, tag: string, rest: string | undefined) => {
+      const raw = rest ?? "";
+      const selfClose = /\/\s*$/.test(raw);
+      const attrs = raw.replace(/^\/*/, "").replace(/\/\s*$/, "");
       const cleaned = attrs.replace(EVENT_HANDLER_ATTR_RE, "");
-      return `<${tag}${cleaned}${close}>`;
+      if (!/[^\s/]/.test(cleaned)) {
+        return selfClose ? `<${tag} />` : `<${tag}>`;
+      }
+      return selfClose ? `<${tag}${cleaned} />` : `<${tag}${cleaned}>`;
     },
   );
 }
@@ -180,14 +186,14 @@ export function sanitizeEditorHtml(html: string): string {
 /** String/SSR sanitizer — used by preview when `document` is unavailable. */
 export function sanitizeEditorHtmlString(html: string): string {
   return stripEventHandlerAttrs(html)
-    .replace(/<br\s*\/?>/gi, "<br />")
-    .replace(/<\/?(?:b|strong)(?:\s[^>]*)?>/gi, (m) =>
+    .replace(/<br(?:[\s/][^>]*)?>/gi, "<br />")
+    .replace(/<\/?(?:b|strong)(?:[\s/][^>]*)?>/gi, (m) =>
       m.startsWith("</") ? "</strong>" : "<strong>",
     )
-    .replace(/<\/?(?:i|em)(?:\s[^>]*)?>/gi, (m) =>
+    .replace(/<\/?(?:i|em)(?:[\s/][^>]*)?>/gi, (m) =>
       m.startsWith("</") ? "</em>" : "<em>",
     )
-    .replace(/<u(?:\s[^>]*)?>/gi, "<u>")
+    .replace(/<u(?:[\s/][^>]*)?>/gi, "<u>")
     .replace(/<\/u>/gi, "</u>")
     .replace(/<span\b([^>]*)>([\s\S]*?)<\/span>/gi, (_, attrs: string, inner: string) => {
       const style = attrs.match(/style\s*=\s*"([^"]*)"/i)?.[1] ?? "";
