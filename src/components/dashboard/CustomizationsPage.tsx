@@ -712,7 +712,7 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
                   : "Click a block to edit copy, the button, or the link."}
               </p>
             </div>
-            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pb-4">
+            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto rounded-md bg-[#f7f8f8] px-3 py-5 md:px-6">
               <EmailBuilderCanvas
                 document={activeDoc}
                 device="desktop"

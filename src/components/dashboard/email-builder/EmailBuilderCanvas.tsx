@@ -1186,11 +1186,24 @@ function BlockContent({
       link: linkColor,
     });
     if (inlineEdit) {
+      if (!selected) {
+        return (
+          <p
+            style={face}
+            dangerouslySetInnerHTML={{
+              __html: styleEmailAnchors(
+                markersToHtml(applyCopyVars(block.html, vars)),
+                linkColor,
+              ),
+            }}
+          />
+        );
+      }
       return (
         <InlineRichText
           value={block.html}
           onChange={(html) => onPatch({ html })}
-          editable={selected}
+          editable
           showSelectionMenu
           brandColor={primary}
           emailColors={emailColors}
