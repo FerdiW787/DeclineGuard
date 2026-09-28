@@ -250,6 +250,7 @@ function divider(marginTop: number, marginBottom: number): EmailBlock {
 function blocksForSonos(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
   return [
     createTextBlock(copy.eyebrow, {
+      copySlot: "eyebrow",
       fontSize: spec.eyebrowSize,
       color: "muted",
       align: "center",
@@ -257,6 +258,7 @@ function blocksForSonos(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
       marginBottom: 10,
     }),
     createTextBlock(copy.headline, {
+      copySlot: "headline",
       fontSize: spec.headlineSize,
       color: "default",
       bold: true,
@@ -265,6 +267,7 @@ function blocksForSonos(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
       marginBottom: 14,
     }),
     createTextBlock(boldTokens(copy.body), {
+      copySlot: "body",
       fontSize: spec.bodySize,
       color: "muted",
       align: "center",
@@ -284,6 +287,7 @@ function blocksForSonos(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
 function blocksForAvocode(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
   return [
     createTextBlock(copy.eyebrow, {
+      copySlot: "eyebrow",
       fontSize: spec.eyebrowSize,
       color: "muted",
       align: "left",
@@ -291,6 +295,7 @@ function blocksForAvocode(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
       marginBottom: 8,
     }),
     createTextBlock(copy.headline, {
+      copySlot: "headline",
       fontSize: spec.headlineSize,
       color: "default",
       bold: true,
@@ -321,6 +326,7 @@ function blocksForAvocode(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
       marginBottom: 16,
     }),
     createTextBlock(boldTokens(copy.body), {
+      copySlot: "body",
       fontSize: spec.bodySize,
       color: "default",
       align: "left",
@@ -340,6 +346,7 @@ function blocksForAvocode(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
 function blocksForBenchmark(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
   return [
     createTextBlock(copy.eyebrow, {
+      copySlot: "eyebrow",
       fontSize: 11,
       color: "muted",
       align: "left",
@@ -348,6 +355,7 @@ function blocksForBenchmark(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
       marginBottom: 14,
     }),
     createTextBlock(copy.headline, {
+      copySlot: "headline",
       fontSize: spec.headlineSize,
       color: "default",
       bold: true,
@@ -356,6 +364,7 @@ function blocksForBenchmark(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
       marginBottom: 12,
     }),
     createTextBlock(boldTokens(copy.body), {
+      copySlot: "body",
       fontSize: spec.bodySize,
       color: "default",
       align: "left",
@@ -397,6 +406,7 @@ function blocksForBenchmark(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
 function blocksForFontbase(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
   return [
     createTextBlock(copy.eyebrow, {
+      copySlot: "eyebrow",
       fontSize: spec.eyebrowSize,
       color: "muted",
       align: "left",
@@ -404,6 +414,7 @@ function blocksForFontbase(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
       marginBottom: 10,
     }),
     createTextBlock(copy.headline, {
+      copySlot: "headline",
       fontSize: spec.headlineSize,
       color: "default",
       bold: true,
@@ -412,6 +423,7 @@ function blocksForFontbase(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
       marginBottom: 14,
     }),
     createTextBlock(boldTokens(copy.body), {
+      copySlot: "body",
       fontSize: spec.bodySize,
       color: "muted",
       align: "left",
@@ -460,6 +472,7 @@ function blocksForFontbase(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
 function blocksForNordvpn(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
   return [
     createTextBlock(copy.eyebrow, {
+      copySlot: "eyebrow",
       fontSize: spec.eyebrowSize,
       color: "muted",
       align: "left",
@@ -467,6 +480,7 @@ function blocksForNordvpn(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
       marginBottom: 8,
     }),
     createTextBlock(copy.headline, {
+      copySlot: "headline",
       fontSize: spec.headlineSize,
       color: "default",
       bold: true,
@@ -475,6 +489,7 @@ function blocksForNordvpn(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
       marginBottom: 12,
     }),
     createTextBlock(boldTokens(copy.body), {
+      copySlot: "body",
       fontSize: spec.bodySize,
       color: "default",
       align: "left",

@@ -37,7 +37,10 @@ import {
   shortCopyFromDocument,
   type ShortCopyField,
 } from "@/lib/emailBlockCopy";
-import { applyLayoutStructureToCopy } from "@/lib/emailLayoutStructure";
+import {
+  applyLayoutStructureToCopy,
+  seedEmptyDaysWithKit,
+} from "@/lib/emailLayoutStructure";
 import {
   kitCopyFromDocument,
   kitLogoAlign,
@@ -256,8 +259,8 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
 
     const [layoutDraft, setLayoutDraft] = useEmailLayoutDraft(serverTheme);
 
-    const [live, setLive] = useState(() =>
-      buildInitial({
+    const [live, setLive] = useState(() => {
+      const built = buildInitial({
         brandColor,
         secondaryColor,
         emailFont,
@@ -273,12 +276,19 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
         socialInstagram,
         emailCopy,
         storeName,
-      }),
-    );
+      });
+      return {
+        ...built,
+        emailCopy: seedEmptyDaysWithKit(
+          built.emailCopy,
+          layoutDraft.layoutPresetId,
+        ),
+      };
+    });
 
     const initial = useMemo(
-      () =>
-        buildInitial({
+      () => {
+        const built = buildInitial({
           brandColor,
           secondaryColor,
           emailFont,
@@ -294,7 +304,15 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
           socialInstagram,
           emailCopy,
           storeName,
-        }),
+        });
+        return {
+          ...built,
+          emailCopy: seedEmptyDaysWithKit(
+            built.emailCopy,
+            layoutDraft.layoutPresetId,
+          ),
+        };
+      },
       [
         brandColor,
         secondaryColor,
@@ -324,16 +342,6 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
       setPast([]);
       setFuture([]);
     }, [initial]);
-
-    useEffect(() => {
-      setLive((prev) => ({
-        ...prev,
-        emailCopy: applyLayoutStructureToCopy(
-          prev.emailCopy,
-          layoutDraft.layoutPresetId,
-        ),
-      }));
-    }, [layoutDraft.layoutPresetId]);
 
     useEffect(() => {
       onFocusModeChange?.(labMode);
@@ -684,6 +692,10 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
       pushEmailCopyHistory();
       setLayoutDraft((prev) => ({ ...prev, layoutPresetId: id }));
       onPersistTheme?.({ layoutPresetId: id });
+      setLive((prev) => ({
+        ...prev,
+        emailCopy: applyLayoutStructureToCopy(prev.emailCopy, id),
+      }));
     };
 
     const onStylingModeChange = (next: StylingMode) => {
