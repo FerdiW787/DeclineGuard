@@ -14,6 +14,8 @@ export type EmailBlock =
       italic?: boolean;
       underline?: boolean;
       align: BlockAlign;
+      /** FE Lab mapping — ignored by HTML render. */
+      copySlot?: "eyebrow" | "headline" | "body";
       marginTop: number;
       marginBottom: number;
     }

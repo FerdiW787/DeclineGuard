@@ -15,7 +15,7 @@ import {
   type EmailFontId,
 } from "./emailFonts";
 import { normalizeLayoutPresetId } from "./emailTheme";
-import { starterBlocksForKit } from "./recoveryBlockKits";
+import { kitShellSpec, starterBlocksForKit } from "./recoveryBlockKits";
 
 export type RecoveryTemplateId = "gentle" | "direct" | "urgent";
 
@@ -265,10 +265,11 @@ export function buildRecoveryEmail(input: RecoveryEmailVars): {
 } {
   const copy = resolveCopy(input.templateId, input.copyOverrides);
   const kit = normalizeLayoutPresetId(input.layoutPresetId);
-  const blocks =
-    copy.blocks && copy.blocks.length > 0
-      ? copy.blocks
-      : starterBlocksForKit(kit, input.templateId);
+  const seeded = !(copy.blocks && copy.blocks.length > 0);
+  const blocks = seeded
+    ? starterBlocksForKit(kit, input.templateId)
+    : copy.blocks!;
+  const seedShell = seeded ? kitShellSpec(kit) : null;
   const vars = {
     first_name: firstName(input.customerName, input.customerEmail),
     product: input.productName,
@@ -306,19 +307,22 @@ export function buildRecoveryEmail(input: RecoveryEmailVars): {
   const pad =
     typeof copy.emailPadding === "number" && Number.isFinite(copy.emailPadding)
       ? Math.max(0, Math.min(80, Math.round(copy.emailPadding)))
-      : 24;
+      : (seedShell?.emailPadding ?? 24);
   const cardBg = copy.shellBackground?.trim() || shellBg;
-  const cardBorderOn = copy.shellBorder !== false;
+  const cardBorderOn =
+    typeof copy.shellBorder === "boolean"
+      ? copy.shellBorder
+      : (seedShell?.shellBorder ?? true);
   const cardBorderColor = copy.shellBorderColor?.trim() || primary;
   const cardRadius =
     typeof copy.shellRadius === "number" && Number.isFinite(copy.shellRadius)
       ? Math.max(0, Math.min(48, Math.round(copy.shellRadius)))
-      : 0;
+      : (seedShell?.shellRadius ?? 0);
   const cardBorderWidth =
     typeof copy.shellBorderWidth === "number" &&
     Number.isFinite(copy.shellBorderWidth)
       ? Math.max(1, Math.min(8, Math.round(copy.shellBorderWidth)))
-      : 1;
+      : (seedShell?.shellBorderWidth ?? 1);
   const cardBox = [
     `background:${escapeAttr(cardBg)}`,
     cardBorderOn
