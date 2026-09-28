@@ -59,18 +59,64 @@ export function normalizeLinkUrl(raw: string): string | null {
   return allowHttpsUrl(withProto);
 }
 
+const EVENT_HANDLER_ATTR_RE =
+  /\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
+
+/** Drop on* attributes so preview HTML cannot keep event handlers. */
+export function stripEventHandlerAttrs(html: string): string {
+  return html.replace(
+    /<([a-zA-Z][\w:-]*)(\s[^>]*?)?(\s*\/?)>/g,
+    (_full, tag: string, attrs: string | undefined, close: string) => {
+      if (!attrs) return `<${tag}${close}>`;
+      const cleaned = attrs.replace(EVENT_HANDLER_ATTR_RE, "");
+      return `<${tag}${cleaned}${close}>`;
+    },
+  );
+}
+
+function hrefFromAttrs(attrs: string): string {
+  const match = attrs.match(
+    /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i,
+  );
+  return (match?.[1] ?? match?.[2] ?? match?.[3] ?? "").trim();
+}
+
+function rewriteAnchors(
+  html: string,
+  replace: (attrs: string, inner: string) => string,
+): string {
+  let current = html;
+  for (let i = 0; i < 4; i += 1) {
+    const next = current.replace(
+      /<a\b([^>]*)>([\s\S]*?)<\/a>/gi,
+      (_full, attrs: string, inner: string) => replace(attrs, inner),
+    );
+    if (next === current) break;
+    current = next;
+  }
+  return current.replace(/<a\b([^>]*)>/gi, (openTag, attrs: string) => {
+    const raw = hrefFromAttrs(attrs);
+    if (isPaymentUpdateHref(raw) || allowHttpsUrl(raw)) return openTag;
+    return "";
+  });
+}
+
+function hrefFromRaw(raw: string): string | null {
+  if (isPaymentUpdateHref(raw)) return PAYMENT_UPDATE_HREF;
+  return allowHttpsUrl(raw);
+}
+
 /** Inline link color + underline so email clients keep the style. */
 export function styleEmailAnchors(html: string, linkColor: string): string {
   const color = linkColor.trim() || "#2563eb";
-  return ensurePaymentLinkSpacing(html).replace(/<a\b([^>]*)>/gi, (full, attrs: string) => {
-    const hrefMatch = attrs.match(/\bhref\s*=\s*"([^"]*)"/i);
-    const raw = hrefMatch?.[1] ?? "";
-    const href = isPaymentUpdateHref(raw)
-      ? PAYMENT_UPDATE_HREF
-      : allowHttpsUrl(raw);
-    if (!href) return full;
-    return `<a href="${escapeHtml(href)}" style="color:${color};text-decoration:underline">`;
-  });
+  return rewriteAnchors(
+    stripEventHandlerAttrs(ensurePaymentLinkSpacing(html)),
+    (attrs, inner) => {
+      const href = hrefFromRaw(hrefFromAttrs(attrs));
+      if (!href) return inner;
+      return `<a href="${escapeHtml(href)}" style="color:${escapeHtml(color)};text-decoration:underline">${inner}</a>`;
+    },
+  );
 }
 
 export function stripTrailingBreaks(html: string): string {
@@ -105,34 +151,43 @@ export function richTextToPlain(text: string): string {
 
 /** Keep only email-safe tags from a contentEditable dump. */
 export function sanitizeEditorHtml(html: string): string {
+  const cleaned = stripEventHandlerAttrs(html);
   if (typeof document === "undefined") {
     return stripTrailingBreaks(
-      sanitizeEditorHtmlString(html).replace(/&nbsp;/g, " "),
+      sanitizeEditorHtmlString(cleaned).replace(/&nbsp;/g, " "),
     );
   }
   const host = document.createElement("div");
-  host.innerHTML = html;
+  host.innerHTML = cleaned;
   return stripTrailingBreaks(
     serializeSafe(host, true).replace(/&nbsp;/g, " "),
   );
 }
 
 function sanitizeEditorHtmlString(html: string): string {
-  return html
+  return stripEventHandlerAttrs(html)
     .replace(/<br\s*\/?>/gi, "<br />")
-    .replace(/<\/?(?:b|strong)>/gi, (m) =>
+    .replace(/<\/?(?:b|strong)(?:\s[^>]*)?>/gi, (m) =>
       m.startsWith("</") ? "</strong>" : "<strong>",
     )
-    .replace(/<\/?(?:i|em)>/gi, (m) => (m.startsWith("</") ? "</em>" : "<em>"))
-    .replace(/<\/?u>/gi, (m) => m.toLowerCase())
+    .replace(/<\/?(?:i|em)(?:\s[^>]*)?>/gi, (m) =>
+      m.startsWith("</") ? "</em>" : "<em>",
+    )
+    .replace(/<u(?:\s[^>]*)?>/gi, "<u>")
+    .replace(/<\/u>/gi, "</u>")
     .replace(/<span\b([^>]*)>([\s\S]*?)<\/span>/gi, (_, attrs: string, inner: string) => {
       const style = attrs.match(/style\s*=\s*"([^"]*)"/i)?.[1] ?? "";
       return wrapWithFace(inner, faceFromStyleText(style));
     })
-    .replace(
-      /<a\s+[^>]*href="((?:https:[^"]+)|#update-payment|#billing)"[^>]*>/gi,
-      '<a href="$1">',
-    )
+    .replace(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi, (_full, attrs: string, inner: string) => {
+      const href = hrefFromRaw(hrefFromAttrs(attrs));
+      if (!href) return inner;
+      return `<a href="${escapeHtml(href)}">${inner}</a>`;
+    })
+    .replace(/<a\b([^>]*)>/gi, (_open, attrs: string) => {
+      const href = hrefFromRaw(hrefFromAttrs(attrs));
+      return href ? `<a href="${escapeHtml(href)}">` : "";
+    })
     .replace(/<(?!\/?(?:strong|em|u|span|br|a)\b)[^>]+>/gi, "");
 }
 

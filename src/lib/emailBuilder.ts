@@ -751,20 +751,84 @@ export function markersToPlain(text: string): string {
   return richTextToPlain(text);
 }
 
+function isBillingLinkText(block: EmailBlock): block is TextBlock {
+  return block.type === "text" && block.html.includes(PAYMENT_UPDATE_HREF);
+}
+
+function copyTextBlocks(blocks: EmailBlock[]): TextBlock[] {
+  return blocks.filter(
+    (block): block is TextBlock =>
+      block.type === "text" && !isBillingLinkText(block),
+  );
+}
+
+function plainOfText(block: TextBlock): string {
+  return markersToPlain(block.html).trim();
+}
+
+/**
+ * Headline / body by copySlot, then by matching persisted legacy fields.
+ * Never treat the first text block as headline when it is an eyebrow.
+ */
+export function resolveHeadlineBodyBlocks(
+  blocks: EmailBlock[],
+  fallback?: Pick<LegacyEmailCopy, "headline" | "body">,
+): {
+  headline: TextBlock | undefined;
+  body: TextBlock | undefined;
+} {
+  const texts = copyTextBlocks(blocks);
+  const bySlot = (slot: "headline" | "body") =>
+    texts.find((block) => block.copySlot === slot);
+
+  let headline = bySlot("headline");
+  let body = bySlot("body");
+
+  const headlinePlain = fallback?.headline.trim() ?? "";
+  const bodySource = fallback?.body ?? "";
+  const bodyPlain = markersToPlain(bodySource).trim();
+  if (!headline && headlinePlain) {
+    headline = texts.find((block) => plainOfText(block) === headlinePlain);
+  }
+  if (!body && bodyPlain) {
+    body = texts.find(
+      (block) =>
+        block !== headline &&
+        (plainOfText(block) === bodyPlain ||
+          plainOfText(block) === bodySource.trim()),
+    );
+  }
+
+  if (!headline || !body) {
+    const mutedLead =
+      texts[0]?.color === "muted" &&
+      texts[0]?.copySlot !== "headline" &&
+      texts[0]?.copySlot !== "body" &&
+      texts.length >= 3;
+    if (mutedLead) {
+      headline = headline ?? texts[1];
+      body = body ?? texts[2];
+    } else {
+      headline = headline ?? texts[0];
+      body = body ?? texts[1] ?? texts[0];
+    }
+  }
+
+  return { headline, body };
+}
+
 /** Derive classic fields from blocks for backward-compatible persistence. */
 export function deriveLegacyFromBlocks(
   subject: string,
   blocks: EmailBlock[],
   fallback: LegacyEmailCopy,
 ): LegacyEmailCopy {
-  const texts = blocks.filter((b): b is TextBlock => b.type === "text");
+  const slots = resolveHeadlineBodyBlocks(blocks, fallback);
   const button = blocks.find((b): b is ButtonBlock => b.type === "button");
-  const headline = texts[0]?.html
-    ? markersToPlain(texts[0].html).trim()
+  const headline = slots.headline
+    ? plainOfText(slots.headline)
     : fallback.headline;
-  const bodyParts = texts.slice(1).map((t) => markersToPlain(t.html).trim());
-  const body =
-    bodyParts.filter(Boolean).join("\n\n") || fallback.body;
+  const body = slots.body ? plainOfText(slots.body) : fallback.body;
   return {
     subject: subject.trim() || fallback.subject,
     headline: headline || fallback.headline,
