@@ -117,11 +117,20 @@ const EVENT_HANDLER_ATTR_RE =
 
 function stripEventHandlerAttrs(html: string): string {
   return html.replace(
-    /<([a-zA-Z][\w:-]*)(\s[^>]*?)?(\s*\/?)>/g,
-    (_full, tag: string, attrs: string | undefined, close: string) => {
-      if (!attrs) return `<${tag}${close}>`;
+    /<(\/)?([a-zA-Z][\w:-]*)((?:[\s/][^>]*)?)>/g,
+    (
+      _full,
+      closing: string | undefined,
+      tag: string,
+      rest: string | undefined,
+    ) => {
+      if (closing) return `</${tag}>`;
+      const raw = rest ?? "";
+      const voidSlash = /^[\s/]*$/.test(raw);
+      const attrs = raw.replace(/\/\s*$/, "").replace(/^\//, " ");
       const cleaned = attrs.replace(EVENT_HANDLER_ATTR_RE, "");
-      return `<${tag}${cleaned}${close}>`;
+      const suffix = voidSlash && raw.includes("/") ? " /" : "";
+      return `<${tag}${cleaned}${suffix}>`;
     },
   );
 }
@@ -173,11 +182,11 @@ function rewriteAnchors(
 
 export function sanitizeStoredHtml(html: string): string {
   return stripEventHandlerAttrs(html)
-    .replace(/<br\s*\/?>/gi, "<br />")
-    .replace(/<\/?(?:b|strong)(?:\s[^>]*)?>/gi, (m) =>
+    .replace(/<br(?:[\s/][^>]*)?>/gi, "<br />")
+    .replace(/<\/?(?:b|strong)(?:[\s/][^>]*)?>/gi, (m) =>
       m.startsWith("</") ? "</strong>" : "<strong>",
     )
-    .replace(/<\/?(?:i|em)(?:\s[^>]*)?>/gi, (m) =>
+    .replace(/<\/?(?:i|em)(?:[\s/][^>]*)?>/gi, (m) =>
       m.startsWith("</") ? "</em>" : "<em>",
     )
     .replace(/<span\b([^>]*)>([\s\S]*?)<\/span>/gi, (_, attrs: string, inner: string) => {
@@ -194,17 +203,15 @@ export function sanitizeStoredHtml(html: string): string {
       if (color) out = `<span style="color:${color}">${out}</span>`;
       return out;
     })
-    .replace(/<u(?:\s[^>]*)?>/gi, "<u>")
-    .replace(/<\/u>/gi, "</u>")
+    .replace(/<u(?:[\s/][^>]*)?>/gi, "<u>")
+    .replace(/<\/u(?:[\s/][^>]*)?>/gi, "</u>")
     .replace(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi, (_full, attrs: string, inner: string) => {
       const raw = hrefFromAttrs(attrs);
       if (isPaymentPlaceholderHref(raw)) {
         return `<a href="${raw}">${inner}</a>`;
       }
-      if (/^https:/i.test(raw)) {
-        return `<a href="${escapeAttr(raw)}">${inner}</a>`;
-      }
-      return inner;
+      const href = allowHttpsUrl(raw);
+      return href ? `<a href="${escapeAttr(href)}">${inner}</a>` : inner;
     })
     .replace(/<a\b([^>]*)>/gi, (_open, attrs: string) =>
       rebuildOpenAnchor(attrs),

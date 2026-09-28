@@ -538,6 +538,78 @@ if (feEditor.includes("onclick") || feEditor.includes("alert(1)")) {
   throw new Error("FAIL: FE sanitizeEditorHtml must drop glued onclick");
 }
 
+function renderTextHtml(html: string): string {
+  return renderBlocksHtml(
+    [
+      {
+        id: "probe",
+        type: "text",
+        html,
+        fontSize: 16,
+        color: "default",
+        align: "left",
+        marginTop: 0,
+        marginBottom: 0,
+      },
+    ],
+    {
+      primaryColor: "#112233",
+      linkColor: "#112233",
+      mutedColor: "#667788",
+      ctaUrl: "https://app.lemonsqueezy.com/my-orders",
+    },
+  );
+}
+
+const slashGlueCases = [
+  { html: "<strong/onclick=alert(1)>x</strong>", text: "x", handler: "onclick" },
+  { html: "<em/onmouseover=alert(2)>y</em>", text: "y", handler: "onmouseover" },
+  { html: "<u/onclick=alert(3)>z</u>", text: "z", handler: "onclick" },
+] as const;
+
+for (const probe of slashGlueCases) {
+  const beSaved = persistTextBlockHtml(probe.html);
+  const beRendered = renderTextHtml(probe.html);
+  const feSanitized = sanitizeEditorHtml(probe.html);
+  const feStyled = styleEmailAnchors(probe.html, "#112233");
+  const feStripped = stripEventHandlerAttrs(probe.html);
+  for (const [label, out] of [
+    ["BE save", beSaved],
+    ["BE render", beRendered],
+    ["FE sanitizeEditorHtml", feSanitized],
+    ["FE styleEmailAnchors", feStyled],
+    ["FE stripEventHandlerAttrs", feStripped],
+  ] as const) {
+    assertSafeHrefs(out, `${label} ${probe.handler} slash-glue`);
+    if (!out.includes(probe.text)) {
+      throw new Error(`FAIL: ${label} must keep text from ${probe.html}`);
+    }
+    if (out.includes(probe.handler) || /alert\(\d+\)/.test(out)) {
+      throw new Error(`FAIL: ${label} leaked slash-glued ${probe.handler} (got ${out})`);
+    }
+    if (out.includes(`/${probe.handler}`)) {
+      throw new Error(`FAIL: ${label} kept slash-glued /${probe.handler}`);
+    }
+  }
+}
+
+const credsHref = '<a href="https://user:pass@safe.example">creds</a>';
+const credsSaved = persistTextBlockHtml(credsHref);
+const credsRendered = renderTextHtml(credsHref);
+const credsFe = sanitizeEditorHtml(credsHref);
+for (const [label, out] of [
+  ["BE save", credsSaved],
+  ["BE render", credsRendered],
+  ["FE sanitizeEditorHtml", credsFe],
+] as const) {
+  if (out.includes("user:pass") || /href\s*=\s*["']https:\/\/user:pass/i.test(out)) {
+    throw new Error(`FAIL: ${label} must reject credentialed https via allowHttpsUrl`);
+  }
+  if (!out.includes("creds")) {
+    throw new Error(`FAIL: ${label} must unwrap credentialed https to text`);
+  }
+}
+
 type ShapeBlock = {
   type: string;
   html?: string;
@@ -674,5 +746,5 @@ if (!day0.html.includes("Open the billing page") || !day0.html.includes("to cont
 }
 
 console.log(
-  "asserts green: configured-legacy #112233, quiet-verify→sonos, 5 kit ids, FE normalize sonos, unset→configured, D0/D2/D5, blocks+theme send, no layout-table body, shared soft-expire map, socials, ignoreNote, shell chrome, block href/attr sanitizer, FE/BE starter kit parity, copySlot persist, glued onclick + dangling open, FE sanitizer parity",
+  "asserts green: configured-legacy #112233, quiet-verify→sonos, 5 kit ids, FE normalize sonos, unset→configured, D0/D2/D5, blocks+theme send, no layout-table body, shared soft-expire map, socials, ignoreNote, shell chrome, block href/attr sanitizer, FE/BE starter kit parity, copySlot persist, glued onclick + dangling open, FE sanitizer parity, slash-glue on* + allowHttpsUrl closed-a",
 );
