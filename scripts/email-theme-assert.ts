@@ -514,9 +514,12 @@ if (!feStyled.includes("https://safe.example")) {
 if (feStyled.includes("onclick") || feStyled.includes("alert(1)")) {
   throw new Error("FAIL: FE styleEmailAnchors must drop glued onclick");
 }
-if (!/<a href="https:\/\/safe\.example\/?">/.test(feStyled)) {
+if (
+  !/<a href="https:\/\/safe\.example\/?"(?:\s+style="[^"]*")?>/.test(feStyled) ||
+  /onclick|target=/i.test(feStyled)
+) {
   throw new Error(
-    `FAIL: FE styleEmailAnchors must rebuild dangling open to href-only tag (got ${feStyled})`,
+    `FAIL: FE styleEmailAnchors must rebuild dangling open without raw attrs (got ${feStyled})`,
   );
 }
 
@@ -595,21 +598,41 @@ for (const probe of slashGlueCases) {
 }
 
 const slashAttrAnchor = '<a/href="https://safe.example">x</a>';
+const slashAttrOnclick =
+  '<a/href="https://safe.example"onclick="alert(1)">x</a>';
 const slashAttrSpan = '<span/style="color:red">x</span>';
+const slashAttrSpanHex = '<span/style="color:#f00">x</span>';
 for (const [label, strip] of [
   ["FE", stripEventHandlerAttrs],
   ["BE", beStripEventHandlerAttrs],
 ] as const) {
   const aOut = strip(slashAttrAnchor);
-  if (/<ahref=/i.test(aOut) || !/<a href="https:\/\/safe\.example">x<\/a>/.test(aOut)) {
+  if (/<ahref=/i.test(aOut) || !/<a href="https:\/\/safe\.example\/?">x<\/a>/.test(aOut)) {
     throw new Error(
       `FAIL: ${label} strip must turn <a/href> into <a href="https://safe.example">x</a> (got ${aOut})`,
     );
   }
-  const spanOut = strip(slashAttrSpan);
-  if (/<spanstyle=/i.test(spanOut) || !/<span style="color:red">x<\/span>/.test(spanOut)) {
+  const aClick = strip(slashAttrOnclick);
+  if (/onclick|alert\(1\)|<ahref=/i.test(aClick) || !aClick.includes("https://safe.example")) {
     throw new Error(
-      `FAIL: ${label} strip must turn <span/style> into <span style="color:red">x</span> (got ${spanOut})`,
+      `FAIL: ${label} strip must keep a/href and drop onclick (got ${aClick})`,
+    );
+  }
+  const spanOut = strip(slashAttrSpan);
+  if (/<spanstyle=/i.test(spanOut) || /style="color:red"/i.test(spanOut)) {
+    throw new Error(
+      `FAIL: ${label} strip must not passthrough non-hex span/style (got ${spanOut})`,
+    );
+  }
+  if (!/<span>x<\/span>/.test(spanOut)) {
+    throw new Error(
+      `FAIL: ${label} strip must rebuild span/style="color:red" as <span>x</span> (got ${spanOut})`,
+    );
+  }
+  const spanHex = strip(slashAttrSpanHex);
+  if (!/<span style="color:#ff0000">x<\/span>/.test(spanHex)) {
+    throw new Error(
+      `FAIL: ${label} strip must keep hex-only span color (got ${spanHex})`,
     );
   }
 }
@@ -624,6 +647,44 @@ for (const [label, out] of [
   }
   if (!out.includes("x") || !out.includes("https://safe.example")) {
     throw new Error(`FAIL: ${label} must keep slash-href text and https href`);
+  }
+}
+
+const invalidHrefCases = [
+  { html: '<a href="javascript:alert(1)">js</a>', text: "js" },
+  { html: '<a href="http://insecure.example">http</a>', text: "http" },
+  { html: "<a href=bare>bare</a>", text: "bare" },
+] as const;
+for (const probe of invalidHrefCases) {
+  const beSaved = persistTextBlockHtml(probe.html);
+  const beRendered = renderTextHtml(probe.html);
+  const feSanitized = sanitizeEditorHtml(probe.html);
+  const feStyled = styleEmailAnchors(probe.html, "#112233");
+  const feStrip = stripEventHandlerAttrs(probe.html);
+  const beStrip = beStripEventHandlerAttrs(probe.html);
+  if (!feStrip.startsWith("<a>") || !feStrip.includes(`>${probe.text}</a>`)) {
+    throw new Error(
+      `FAIL: FE strip must keep bare <a> for invalid href (got ${feStrip})`,
+    );
+  }
+  if (!beStrip.startsWith("<a>") || !beStrip.includes(`>${probe.text}</a>`)) {
+    throw new Error(
+      `FAIL: BE strip must keep bare <a> for invalid href (got ${beStrip})`,
+    );
+  }
+  for (const [label, out] of [
+    ["BE save", beSaved],
+    ["BE render", beRendered],
+    ["FE sanitizeEditorHtml", feSanitized],
+    ["FE styleEmailAnchors", feStyled],
+  ] as const) {
+    assertSafeHrefs(out, `${label} invalid href`);
+    if (!out.includes(probe.text)) {
+      throw new Error(`FAIL: ${label} must keep text from ${probe.html}`);
+    }
+    if (out.includes("</a>")) {
+      throw new Error(`FAIL: ${label} left orphan </a> for ${probe.html} (got ${out})`);
+    }
   }
 }
 
@@ -780,5 +841,5 @@ if (!day0.html.includes("Open the billing page") || !day0.html.includes("to cont
 }
 
 console.log(
-  "asserts green: configured-legacy #112233, quiet-verify→sonos, 5 kit ids, FE normalize sonos, unset→configured, D0/D2/D5, blocks+theme send, no layout-table body, shared soft-expire map, socials, ignoreNote, shell chrome, block href/attr sanitizer, FE/BE starter kit parity, copySlot persist, glued onclick + dangling open, FE sanitizer parity, slash-glue on* + allowHttpsUrl closed-a, slash-attr space after tag",
+  "asserts green: configured-legacy #112233, quiet-verify→sonos, 5 kit ids, FE normalize sonos, unset→configured, D0/D2/D5, blocks+theme send, no layout-table body, shared soft-expire map, socials, ignoreNote, shell chrome, block href/attr sanitizer, FE/BE starter kit parity, copySlot persist, glued onclick + dangling open, FE sanitizer parity, slash-glue on* + allowHttpsUrl closed-a, slash-attr space after tag, invalid href no orphan </a>",
 );
