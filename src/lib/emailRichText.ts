@@ -151,14 +151,16 @@ export function richTextToPlain(text: string): string {
 
 /** Keep only email-safe tags from a contentEditable dump. */
 export function sanitizeEditorHtml(html: string): string {
-  const cleaned = stripEventHandlerAttrs(html);
+  // String sanitizer is the SSR / preview contract — do not rely on
+  // document.serializeSafe alone (jsdom, Astro SSR, and Node have no DOM).
+  const fromString = stripTrailingBreaks(
+    sanitizeEditorHtmlString(html).replace(/&nbsp;/g, " "),
+  );
   if (typeof document === "undefined") {
-    return stripTrailingBreaks(
-      sanitizeEditorHtmlString(cleaned).replace(/&nbsp;/g, " "),
-    );
+    return fromString;
   }
   const host = document.createElement("div");
-  host.innerHTML = cleaned;
+  host.innerHTML = fromString;
   return stripTrailingBreaks(
     serializeSafe(host, true).replace(/&nbsp;/g, " "),
   );
