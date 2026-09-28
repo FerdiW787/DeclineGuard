@@ -203,10 +203,10 @@ function EmailLabKitPreview({
         borderRadius: spec.shellRadius,
       }}
     >
-      <div
-        className={cn("px-3 py-3", centered && "text-center")}
-        style={{ color: theme.emailTextColor }}
-      >
+        {spec.showAccentBar ? (
+          <div className="h-1 w-full" style={{ background: theme.brandColor }} />
+        ) : null}
+        <div className={cn("px-3 py-3", centered && "text-center")}>
         <EmailStoreHeader
           storeName={storeName}
           storeLogoUrl={storeLogoUrl}
@@ -217,15 +217,59 @@ function EmailLabKitPreview({
           showName={kitShowsStoreName(kitId)}
           className="mb-3"
         />
-        <p
-          className="text-[8px] font-medium uppercase tracking-[0.14em]"
-          style={{ color: theme.mutedTextColor }}
-        >
-          {copy.eyebrow}
-        </p>
+        {kitId === "benchmark" ? (
+          <p
+            className="mb-1 text-[8px] font-semibold"
+            style={{ color: theme.brandColor }}
+          >
+            {copy.eyebrow}
+          </p>
+        ) : (
+          <p
+            className="text-[8px] font-medium uppercase tracking-[0.14em]"
+            style={{ color: theme.mutedTextColor }}
+          >
+            {copy.eyebrow}
+          </p>
+        )}
         <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-snug tracking-tight">
           {copy.headline}
         </p>
+        {kitId === "avocode" ? (
+          <div
+            className="mt-1.5 rounded border px-1.5 py-1"
+            style={{ borderColor: `${theme.brandColor}33` }}
+          >
+            <p className="text-[7px]" style={{ color: theme.mutedTextColor }}>
+              What’s ending
+            </p>
+            <p className="text-[8px] font-semibold">Pro Monthly</p>
+          </div>
+        ) : null}
+        {kitId === "fontbase" ? (
+          <p
+            className="mt-1 text-[8px]"
+            style={{ color: theme.mutedTextColor }}
+          >
+            What’s included · plan · card
+          </p>
+        ) : null}
+        {kitId === "nordvpn-structure" ? (
+          <p
+            className="mt-1 text-[8px] font-semibold"
+            style={{ color: theme.brandColor }}
+          >
+            1 Update billing · 2 Keep access
+          </p>
+        ) : null}
+        {kitId === "benchmark" ? (
+          <p
+            className="mt-1 text-[8px]"
+            style={{ color: theme.mutedTextColor }}
+          >
+            Nothing here is gone
+          </p>
+        ) : null}
         <p
           className="mt-1 line-clamp-2 text-[9px] leading-relaxed"
           style={{ color: theme.mutedTextColor }}
@@ -245,7 +289,7 @@ function EmailLabKitPreview({
         >
           {copy.cta}
         </span>
-      </div>
+        </div>
     </div>
   );
 }

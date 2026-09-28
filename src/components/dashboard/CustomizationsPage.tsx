@@ -41,6 +41,7 @@ import { applyLayoutStructureToCopy } from "@/lib/emailLayoutStructure";
 import {
   kitCopyFromDocument,
   kitLogoAlign,
+  kitShowsAccentBar,
   kitShowsGreeting,
   kitShowsStoreName,
 } from "@/lib/emailBlockKits";
@@ -820,6 +821,7 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
                 logoAlign={kitLogoAlign(layoutDraft.layoutPresetId)}
                 showStoreName={kitShowsStoreName(layoutDraft.layoutPresetId)}
                 showGreeting={kitShowsGreeting(layoutDraft.layoutPresetId)}
+                showAccentBar={kitShowsAccentBar(layoutDraft.layoutPresetId)}
               />
             </div>
           </Panel>
@@ -874,7 +876,12 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
                 storeName={storeName}
                 storeLogoUrl={storeLogoUrl}
                 previewCopy={labPreviewCopy}
-                onSelectKit={onLayoutPresetChange}
+                onSelectKit={(id) => {
+                  onLayoutPresetChange(id);
+                  if (layoutDraft.stylingMode !== "preset") {
+                    onStylingModeChange("preset");
+                  }
+                }}
                 onStylingModeChange={onStylingModeChange}
               />
             </div>

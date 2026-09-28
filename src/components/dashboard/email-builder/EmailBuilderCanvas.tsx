@@ -125,6 +125,8 @@ type Props = {
   logoAlign?: "left" | "center" | "right";
   showStoreName?: boolean;
   showGreeting?: boolean;
+  /** NordVPN-style top accent stripe. */
+  showAccentBar?: boolean;
 };
 
 const ADDABLE: EmailBlockType[] = [
@@ -174,6 +176,7 @@ export default function EmailBuilderCanvas({
   logoAlign = "left",
   showStoreName = true,
   showGreeting = true,
+  showAccentBar = false,
 }: Props) {
   useEmailFontLoader(emailFont);
   const shellBg = resolveShellBackground(
@@ -400,6 +403,14 @@ export default function EmailBuilderCanvas({
               {subject}
             </p>
           </div>
+        ) : null}
+
+        {showAccentBar ? (
+          <div
+            aria-hidden
+            className="h-1.5 w-full"
+            style={{ background: primary }}
+          />
         ) : null}
 
         <div
