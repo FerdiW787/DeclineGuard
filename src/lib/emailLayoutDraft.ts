@@ -139,7 +139,7 @@ export function persistEmailLayoutSettings(input: {
   configured: Partial<EmailThemeTokens>;
 }): {
   persisted: PersistableEmailLayoutFields | null;
-  localOnly: Pick<EmailLayoutDraft, "layoutPresetId" | "stylingMode" | "copyOverrides" | "shellOverrides">;
+  localOnly: Pick<EmailLayoutDraft, "stylingMode" | "copyOverrides" | "shellOverrides">;
   convexGap: readonly string[];
 } {
   writeEmailLayoutDraft(input.draft);
@@ -162,13 +162,11 @@ export function persistEmailLayoutSettings(input: {
   return {
     persisted,
     localOnly: {
-      layoutPresetId: input.draft.layoutPresetId,
       stylingMode: input.draft.stylingMode,
       copyOverrides: input.draft.copyOverrides,
       shellOverrides: input.draft.shellOverrides,
     },
     convexGap: [
-      "layoutPresetId",
       "stylingMode",
       "copyOverrides (lifecycle short copy)",
       "emailBackgroundColor",
