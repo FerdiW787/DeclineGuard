@@ -18,3 +18,5 @@ Astro + React + Clerk + Convex. Recovers failed Lemon Squeezy subscription payme
 ## Flow
 
 Homepage → Sign up → Connect Lemon Squeezy → Import brand → Recoveries dashboard.
+
+Merchant **store** recovery stays on Lemon Squeezy. DeclineGuard **Pro + fee** billing can cut over to Dodo Payments behind `BILLING_PROVIDER` (default `lemon`). See `docs/dodo-payments-billing.md`.

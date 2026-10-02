@@ -21,21 +21,24 @@ import {
   PRO_CHECKOUT_NONCE_TTL_MS,
   shouldIgnoreLsTestEvent,
 } from "../lib/billingPlan";
-import { planValidator } from "../schema";
+import { shouldSkipLemonPlatformCharge } from "../lib/billingProvider";
+import {
+  billingProviderForUser,
+  userHasActivePro,
+} from "./dodoBilling";
+import { billingProviderValidator, planValidator } from "../schema";
 
 const billingStatusValidator = v.object({
   plan: planValidator,
+  billingProvider: billingProviderValidator,
   lsSubscriptionId: v.union(v.string(), v.null()),
   lsSubscriptionStatus: v.union(v.string(), v.null()),
+  dodoCustomerId: v.union(v.string(), v.null()),
+  dodoSubscriptionId: v.union(v.string(), v.null()),
+  dodoSubscriptionStatus: v.union(v.string(), v.null()),
   hasActivePro: v.boolean(),
+  portalAvailable: v.boolean(),
 });
-
-function hasActivePro(user: Doc<"users">): boolean {
-  return (
-    resolvePlan(user) === "pro" &&
-    (user.lsSubscriptionStatus ?? "").toLowerCase() === "active"
-  );
-}
 
 /** Viewer (signed-in user), never the takeover merchant. Used for checkout. */
 export const getViewerForCheckout = internalQuery({
@@ -44,13 +47,18 @@ export const getViewerForCheckout = internalQuery({
     _id: v.id("users"),
     clerkUserId: v.string(),
     plan: planValidator,
+    billingProvider: billingProviderValidator,
     lsSubscriptionId: v.union(v.string(), v.null()),
     lsSubscriptionStatus: v.union(v.string(), v.null()),
+    dodoCustomerId: v.union(v.string(), v.null()),
+    dodoSubscriptionId: v.union(v.string(), v.null()),
+    dodoSubscriptionStatus: v.union(v.string(), v.null()),
     accountStatus: v.union(
       v.literal("active"),
       v.literal("frozen"),
       v.literal("disabled"),
     ),
+    hasActivePro: v.boolean(),
   }),
   handler: async (ctx) => {
     const user = await getAuthenticatedUser(ctx);
@@ -58,9 +66,14 @@ export const getViewerForCheckout = internalQuery({
       _id: user._id,
       clerkUserId: user.userId,
       plan: resolvePlan(user),
+      billingProvider: billingProviderForUser(user),
       lsSubscriptionId: user.lsSubscriptionId ?? null,
       lsSubscriptionStatus: user.lsSubscriptionStatus ?? null,
+      dodoCustomerId: user.dodoCustomerId ?? null,
+      dodoSubscriptionId: user.dodoSubscriptionId ?? null,
+      dodoSubscriptionStatus: user.dodoSubscriptionStatus ?? null,
       accountStatus: user.accountStatus ?? "active",
+      hasActivePro: userHasActivePro(user),
     };
   },
 });
@@ -77,11 +90,21 @@ export const getMyBilling = query({
       .withIndex("by_userId", (q) => q.eq("userId", identity.subject))
       .unique();
     if (!user) return null;
+    const billingProvider = billingProviderForUser(user);
+    const hasActivePro = userHasActivePro(user);
     return {
       plan: resolvePlan(user),
+      billingProvider,
       lsSubscriptionId: user.lsSubscriptionId ?? null,
       lsSubscriptionStatus: user.lsSubscriptionStatus ?? null,
-      hasActivePro: hasActivePro(user),
+      dodoCustomerId: user.dodoCustomerId ?? null,
+      dodoSubscriptionId: user.dodoSubscriptionId ?? null,
+      dodoSubscriptionStatus: user.dodoSubscriptionStatus ?? null,
+      hasActivePro,
+      portalAvailable:
+        billingProvider === "dodo"
+          ? Boolean(user.dodoCustomerId)
+          : Boolean(user.lsSubscriptionId),
     };
   },
 });
@@ -166,6 +189,14 @@ export const applyPlatformSubscription = internalMutation({
     const config = getPlatformBillingConfig();
     if (!config) {
       return { applied: false, reason: "platform_billing_not_configured" };
+    }
+
+    const previewUser = await findPlatformBillingUser(ctx, args);
+    if (
+      previewUser &&
+      shouldSkipLemonPlatformCharge(billingProviderForUser(previewUser))
+    ) {
+      return { applied: false, reason: "provider_dodo" };
     }
 
     if (shouldIgnoreLsTestEvent(args.testMode)) {

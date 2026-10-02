@@ -379,6 +379,24 @@ async function handleBillingOrderWebhook(
       );
     }
 
+    const invoiceMeta = await ctx.runQuery(
+      internal.functions.feeBilling.getInvoiceProvider,
+      { invoiceId },
+    );
+    if (invoiceMeta?.billingProvider === "dodo") {
+      return new Response("Ignored dodo invoice", { status: 200 });
+    }
+
+    const userProvider = invoiceMeta
+      ? await ctx.runQuery(
+          internal.functions.dodoBilling.getUserBillingProvider,
+          { userId: invoiceMeta.userId },
+        )
+      : null;
+    if (userProvider?.billingProvider === "dodo") {
+      return new Response("Ignored dodo merchant", { status: 200 });
+    }
+
     const orderStatus =
       typeof args.attrs.status === "string" ? args.attrs.status : "";
     const testMode = args.attrs.test_mode === true;

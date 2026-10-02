@@ -10,6 +10,14 @@ import {
   feeInvoiceClaimKey,
   utcPeriodKey,
 } from "../lib/feeBilling";
+import { lemonPlatformPathBlocked } from "../lib/billingProvider";
+import {
+  createDodoCheckoutSession,
+  createDodoCustomerPortal,
+  dodoUsageEventId,
+  getDodoPaymentsConfig,
+  ingestDodoUsageEvents,
+} from "../lib/dodoPayments";
 import { allowHttpsUrl } from "../lib/safeUrl";
 import { resolveFromAddress } from "../lib/recoveryEmailFrom";
 
@@ -277,6 +285,20 @@ async function invoiceMerchant(
   nowMs: number,
   actorUserId: Id<"users"> | null,
 ): Promise<InvoiceMerchantResult> {
+  const targetProvider = await ctx.runQuery(
+    internal.functions.dodoBilling.getUserBillingProvider,
+    { userId },
+  );
+  if (targetProvider && lemonPlatformPathBlocked(targetProvider.billingProvider)) {
+    return await invoiceMerchantViaDodo(
+      ctx,
+      userId,
+      periodKey,
+      nowMs,
+      actorUserId,
+    );
+  }
+
   const config = platformLsConfig();
   if (!config) {
     console.error(
@@ -524,6 +546,235 @@ async function invoiceMerchant(
   };
 }
 
+async function invoiceMerchantViaDodo(
+  ctx: ActionCtx,
+  userId: Id<"users">,
+  periodKey: string,
+  nowMs: number,
+  actorUserId: Id<"users"> | null,
+): Promise<InvoiceMerchantResult> {
+  const config = getDodoPaymentsConfig();
+  if (!config) {
+    console.error(
+      "Fee invoice skipped: DODO_PAYMENTS_API_KEY / DODO_PAYMENTS_PRO_PRODUCT_ID not set",
+    );
+    return {
+      outcome: "skipped_unconfigured",
+      invoiceId: null,
+      totalCents: 0,
+      feeCount: 0,
+      error: "not_configured",
+      ...emptyCheckoutFields(),
+    };
+  }
+
+  const claim = await ctx.runMutation(
+    internal.functions.feeBilling.claimBillingPeriod,
+    {
+      userId,
+      periodKey,
+      storeCurrency: "USD",
+      nowMs,
+    },
+  );
+
+  const target = await ctx.runQuery(
+    internal.functions.feeBilling.getUserBillingTarget,
+    { userId },
+  );
+  const provider = await ctx.runQuery(
+    internal.functions.dodoBilling.getUserBillingProvider,
+    { userId },
+  );
+  const email = target
+    ? await lookupClerkEmail(target.clerkUserId)
+    : undefined;
+
+  if (claim.skippedZero) {
+    return {
+      outcome: "skipped_zero",
+      invoiceId: claim.invoiceId,
+      totalCents: 0,
+      feeCount: 0,
+      error: null,
+      ...emptyCheckoutFields(),
+    };
+  }
+  if (claim.currencyMixed || claim.currencyMismatch) {
+    return {
+      outcome: "skipped_currency",
+      invoiceId: claim.invoiceId,
+      totalCents: 0,
+      feeCount: 0,
+      error: claim.reason,
+      ...emptyCheckoutFields(),
+    };
+  }
+  if (!claim.claimed || !claim.invoiceId) {
+    const existing = claim.invoiceId
+      ? await ctx.runQuery(
+          internal.functions.feeBilling.getInvoiceCheckoutFields,
+          { invoiceId: claim.invoiceId },
+        )
+      : null;
+    return {
+      outcome: "skipped_claimed",
+      invoiceId: claim.invoiceId,
+      totalCents: claim.totalCents,
+      feeCount: claim.feeCount,
+      error: claim.reason,
+      lsCheckoutId: existing?.lsCheckoutId ?? null,
+      lsCheckoutUrl: existing?.lsCheckoutUrl ?? null,
+      checkoutEmailSent: false,
+    };
+  }
+
+  const invoiceId = claim.invoiceId;
+  const claimKey = feeInvoiceClaimKey(userId, periodKey);
+  const expiresAt = nowMs + FEE_INVOICE_CHECKOUT_TTL_MS;
+
+  // One charge only: usage-on-sub when Pro + meter are ready; else one-time checkout.
+  const canReportUsage =
+    Boolean(config.usageEventName) && Boolean(provider?.dodoCustomerId);
+  const canCheckout = Boolean(config.feeProductId);
+
+  try {
+    if (canReportUsage && config.usageEventName && provider?.dodoCustomerId) {
+      const eventId = dodoUsageEventId({
+        invoiceId,
+        claimKey,
+      });
+      await ingestDodoUsageEvents(config, [
+        {
+          eventId,
+          customerId: provider.dodoCustomerId,
+          eventName: config.usageEventName,
+          metadata: {
+            claim_key: claimKey,
+            billing_invoice_id: invoiceId,
+            fee_cents: String(claim.totalCents),
+            period_key: periodKey,
+            billing_kind: "fee",
+          },
+        },
+      ]);
+
+      let portalUrl: string | null = null;
+      try {
+        const portal = await createDodoCustomerPortal(config, {
+          customerId: provider.dodoCustomerId,
+          returnUrl: null,
+        });
+        portalUrl = allowHttpsUrl(portal.portalUrl);
+      } catch (err) {
+        console.warn("Fee invoice: Dodo portal URL unavailable", err);
+      }
+
+      await ctx.runMutation(internal.functions.feeBilling.attachDodoCheckout, {
+        invoiceId,
+        dodoCheckoutId: eventId,
+        checkoutUrl: portalUrl ?? undefined,
+        expiresAt,
+        nowMs,
+      });
+      await ctx.runMutation(internal.functions.feeBilling.recordFeeInvoiceCreated, {
+        invoiceId,
+        actorUserId,
+      });
+      return {
+        outcome: "created",
+        invoiceId,
+        totalCents: claim.totalCents,
+        feeCount: claim.feeCount,
+        error: null,
+        lsCheckoutId: eventId,
+        lsCheckoutUrl: portalUrl,
+        checkoutEmailSent: false,
+      };
+    }
+
+    if (!canCheckout || !config.feeProductId) {
+      throw new Error(
+        "Dodo fee product is not configured. Set DODO_PAYMENTS_FEE_PRODUCT_ID (or usage meter + customer).",
+      );
+    }
+
+    const session = await createDodoCheckoutSession(config, {
+      kind: "fee",
+      productId: config.feeProductId,
+      quantity: 1,
+      amountCents: claim.totalCents,
+      returnUrl: null,
+      email,
+      name: target?.userName,
+      metadata: {
+        claim_key: claimKey,
+        billing_invoice_id: invoiceId,
+        convex_user_id: userId,
+        billing_kind: "fee",
+        period_key: periodKey,
+      },
+    });
+    const checkoutUrl = allowHttpsUrl(session.checkoutUrl);
+    await ctx.runMutation(internal.functions.feeBilling.attachDodoCheckout, {
+      invoiceId,
+      dodoCheckoutId: session.checkoutId,
+      checkoutUrl: checkoutUrl ?? undefined,
+      expiresAt,
+      nowMs,
+    });
+    await ctx.runMutation(internal.functions.feeBilling.recordFeeInvoiceCreated, {
+      invoiceId,
+      actorUserId,
+    });
+
+    let checkoutEmailSent = false;
+    if (checkoutUrl && email) {
+      checkoutEmailSent = await sendFeeInvoiceEmail({
+        to: email,
+        merchantName: target?.userName ?? "there",
+        periodKey,
+        totalCents: claim.totalCents,
+        currency: claim.currency ?? "USD",
+        checkoutUrl,
+      });
+      if (checkoutEmailSent) {
+        await ctx.runMutation(
+          internal.functions.feeBilling.recordCheckoutEmailSent,
+          { invoiceId, nowMs },
+        );
+      }
+    }
+
+    return {
+      outcome: "created",
+      invoiceId,
+      totalCents: claim.totalCents,
+      feeCount: claim.feeCount,
+      error: checkoutUrl ? null : "missing_checkout_url",
+      lsCheckoutId: session.checkoutId,
+      lsCheckoutUrl: checkoutUrl,
+      checkoutEmailSent,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Dodo Payments error";
+    console.error(`Fee invoice Dodo create failed for ${userId}:`, message);
+    await ctx.runMutation(internal.functions.feeBilling.markBillingClaimFailed, {
+      invoiceId,
+      error: message,
+      unlinkFees: true,
+    });
+    return {
+      outcome: "failed",
+      invoiceId,
+      totalCents: claim.totalCents,
+      feeCount: claim.feeCount,
+      error: message,
+      ...emptyCheckoutFields(),
+    };
+  }
+}
+
 export const runMonthlyFeeInvoices = internalAction({
   args: {},
   returns: v.object({
@@ -536,9 +787,9 @@ export const runMonthlyFeeInvoices = internalAction({
     unconfigured: v.boolean(),
   }),
   handler: async (ctx): Promise<MonthlyFeeInvoiceSummary> => {
-    if (!platformLsConfig()) {
+    if (!platformLsConfig() && !getDodoPaymentsConfig()) {
       console.error(
-        "Monthly fee invoice job skipped — platform Lemon Squeezy env is not configured",
+        "Monthly fee invoice job skipped — neither Lemon Squeezy nor Dodo platform billing is configured",
       );
       return {
         merchants: 0,

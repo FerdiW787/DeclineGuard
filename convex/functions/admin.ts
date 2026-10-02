@@ -18,7 +18,8 @@ import {
   isReversibleAuditAction,
 } from "../lib/admin";
 import { accountStatusOf, isSoftDeleted, resolvePlan } from "../lib/accountGuard";
-import { planValidator } from "../schema";
+import { billingProviderValidator, planValidator } from "../schema";
+import { parseBillingProvider } from "../lib/billingProvider";
 
 const accountStatusValidator = v.union(
   v.literal("active"),
@@ -1025,6 +1026,46 @@ export const setUserPlan = mutation({
         priorPlan,
         lsSubscriptionId: user.lsSubscriptionId ?? null,
         lsSubscriptionStatus: user.lsSubscriptionStatus ?? null,
+      },
+    });
+    return null;
+  },
+});
+
+/**
+ * Staff/admin: pin a merchant to lemon or dodo.
+ * Existing Lemon Pro stays lemon until this is set to dodo (after they
+ * cancel LS or complete a Dodo checkout). Dodo has no subscription import.
+ */
+export const adminSetBillingProvider = mutation({
+  args: {
+    userId: v.id("users"),
+    billingProvider: billingProviderValidator,
+    reason: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const actor = await requireStaff(ctx);
+    const user = await ctx.db.get(args.userId);
+    if (!user) throw new Error("User not found");
+    assertCanActOnTarget(actor, user);
+
+    const reason = requireActionReason(args.reason);
+    const next = parseBillingProvider(args.billingProvider);
+    if (!next) throw new Error("Invalid billing provider");
+    const prior = user.billingProvider ?? null;
+    if (prior === next) return null;
+
+    await ctx.db.patch(args.userId, { billingProvider: next });
+    await writeAuditLog(ctx, {
+      actorUserId: actor._id,
+      targetUserId: user._id,
+      action: `billing_provider:${next}`,
+      reason,
+      metadata: {
+        priorProvider: prior,
+        lsSubscriptionId: user.lsSubscriptionId ?? null,
+        dodoSubscriptionId: user.dodoSubscriptionId ?? null,
       },
     });
     return null;

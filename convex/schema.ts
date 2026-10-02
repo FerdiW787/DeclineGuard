@@ -31,6 +31,12 @@ export const accountStatusValidator = v.union(
 /** Billing plan: free (10% recovery fee) or pro (4% recovery fee). */
 export const planValidator = v.union(v.literal("free"), v.literal("pro"));
 
+/** MoR for DeclineGuard charging this merchant. Unset = resolve from env + grandfather. */
+export const billingProviderValidator = v.union(
+  v.literal("lemon"),
+  v.literal("dodo"),
+);
+
 /** user = merchant; staff = help desk; admin = full control. `standard` is legacy user. */
 export const roleValidator = v.union(
   v.literal("user"),
@@ -50,9 +56,15 @@ export default defineSchema({
     frozenAt: v.optional(v.number()),
     frozenReason: v.optional(v.string()),
     /** Billing plan: free (10% fee) or pro (4% fee). Defaults to free if unset.
-     * Merchants cannot self-set this. Source of truth is the LS Pro webhook
-     * (or staff `setUserPlan` with audit). */
+     * Merchants cannot self-set this. Source of truth is the LS / Dodo Pro
+     * webhook (or staff `setUserPlan` with audit). */
     plan: v.optional(planValidator),
+    /**
+     * Soft MoR flag. Unset = resolveBillingProvider (env + grandfather).
+     * lemon: existing LS Pro until migrate-on-next-renewal / admin-assisted.
+     * dodo: Lemon platform checkout + fee paths no-op (no dual charge).
+     */
+    billingProvider: v.optional(billingProviderValidator),
     /** Lemon Squeezy subscription id for the DeclineGuard Pro plan. */
     lsSubscriptionId: v.optional(v.string()),
     /** Last LS subscription/invoice status applied to this user. */
@@ -60,9 +72,18 @@ export default defineSchema({
     /** One-time nonce from createProCheckout; proves a webhook is our checkout. */
     lsCheckoutNonce: v.optional(v.string()),
     lsCheckoutNonceExpiresAt: v.optional(v.number()),
+    /** Dodo Payments customer id (hosted checkout / portal / usage). */
+    dodoCustomerId: v.optional(v.string()),
+    /** Dodo Payments subscription id for DeclineGuard Pro. */
+    dodoSubscriptionId: v.optional(v.string()),
+    dodoSubscriptionStatus: v.optional(v.string()),
+    dodoCheckoutNonce: v.optional(v.string()),
+    dodoCheckoutNonceExpiresAt: v.optional(v.number()),
   })
     .index("by_userId", ["userId"])
-    .index("by_lsSubscriptionId", ["lsSubscriptionId"]),
+    .index("by_lsSubscriptionId", ["lsSubscriptionId"])
+    .index("by_dodoSubscriptionId", ["dodoSubscriptionId"])
+    .index("by_dodoCustomerId", ["dodoCustomerId"]),
 
   /** One Lemon Squeezy account connection per DeclineGuard user (pick active store) */
   lemonConnections: defineTable({
@@ -137,6 +158,13 @@ export default defineSchema({
   })
     .index("by_eventKey", ["eventKey"])
     .index("by_store_received", ["storeId", "receivedAt"]),
+
+  /** Idempotency log for Dodo Payments webhook deliveries (webhook-id). */
+  dodoWebhookEvents: defineTable({
+    eventKey: v.string(),
+    eventName: v.string(),
+    receivedAt: v.number(),
+  }).index("by_eventKey", ["eventKey"]),
 
   /** Open / recovered failed subscription renewals */
   failedPayments: defineTable({
@@ -302,10 +330,13 @@ export default defineSchema({
       v.literal("paid"),
       v.literal("failed"),
     ),
+    billingProvider: v.optional(billingProviderValidator),
     lsCheckoutId: v.optional(v.string()),
     /** HTTPS checkout URL only (sanitized via allowHttpsUrl). */
     lsCheckoutUrl: v.optional(v.string()),
     lsOrderId: v.optional(v.string()),
+    dodoCheckoutId: v.optional(v.string()),
+    dodoPaymentId: v.optional(v.string()),
     lastError: v.optional(v.string()),
     createdAt: v.number(),
     createdLsAt: v.optional(v.number()),
@@ -318,6 +349,8 @@ export default defineSchema({
     .index("by_user_period", ["userId", "periodKey"])
     .index("by_lsOrderId", ["lsOrderId"])
     .index("by_lsCheckoutId", ["lsCheckoutId"])
+    .index("by_dodoCheckoutId", ["dodoCheckoutId"])
+    .index("by_dodoPaymentId", ["dodoPaymentId"])
     .index("by_status_createdAt", ["status", "createdAt"]),
 
   /**

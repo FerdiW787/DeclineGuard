@@ -5,6 +5,11 @@ import { action, internalAction, type ActionCtx } from "../_generated/server";
 import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { getPlatformBillingConfig } from "../lib/billingPlan";
+import {
+  createDodoCheckoutSession,
+  createDodoCustomerPortal,
+  getDodoPaymentsConfig,
+} from "../lib/dodoPayments";
 import { apiKeyLast4, decryptApiKey, encryptApiKey } from "../lib/lsCrypto";
 import { allowAppHttpsUrl, allowHttpsUrl } from "../lib/safeUrl";
 
@@ -912,10 +917,7 @@ export const createProCheckout = action({
         "This account is frozen. Contact DeclineGuard support to restore access before upgrading.",
       );
     }
-    if (
-      viewer.plan === "pro" &&
-      (viewer.lsSubscriptionStatus ?? "").toLowerCase() === "active"
-    ) {
+    if (viewer.hasActivePro) {
       throw new Error("You already have an active Pro subscription.");
     }
 
@@ -924,6 +926,39 @@ export const createProCheckout = action({
       limit: 5,
       windowMs: 60_000,
     });
+
+    if (viewer.billingProvider === "dodo") {
+      const dodo = getDodoPaymentsConfig();
+      if (!dodo) {
+        throw new Error(
+          "Pro checkout is not configured. Set DODO_PAYMENTS_API_KEY and DODO_PAYMENTS_PRO_PRODUCT_ID.",
+        );
+      }
+      const checkoutNonce = crypto.randomUUID();
+      await ctx.runMutation(
+        internal.functions.dodoBilling.reserveDodoCheckoutNonce,
+        { nonce: checkoutNonce },
+      );
+      const session = await createDodoCheckoutSession(dodo, {
+        kind: "pro",
+        productId: dodo.proProductId,
+        quantity: 1,
+        returnUrl: allowAppHttpsUrl(args.returnUrl),
+        email: identity.email ?? undefined,
+        name: identity.name ?? undefined,
+        metadata: {
+          convex_user_id: viewer._id,
+          clerk_user_id: identity.subject,
+          checkout_nonce: checkoutNonce,
+          billing_kind: "pro",
+        },
+      });
+      const dodoUrl = allowHttpsUrl(session.checkoutUrl);
+      if (!dodoUrl) {
+        throw new Error("Dodo Payments returned an invalid checkout URL");
+      }
+      return { checkoutUrl: dodoUrl };
+    }
 
     const config = getPlatformBillingConfig();
     const apiKey = config?.apiKey ?? process.env.LEMONSQUEEZY_API_KEY?.trim();
@@ -988,5 +1023,93 @@ export const createProCheckout = action({
       throw new Error("Lemon Squeezy returned an invalid checkout URL");
     }
     return { checkoutUrl };
+  },
+});
+
+/**
+ * Customer portal URL for the viewer's current MoR.
+ * Jules contract: `{ portalUrl }` — same shape as checkout.
+ */
+export const createBillingPortal = action({
+  args: {
+    returnUrl: v.optional(v.string()),
+  },
+  returns: v.object({
+    portalUrl: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    await ctx.runMutation(api.functions.user.ensureCurrentUser, {});
+    const viewer = await ctx.runQuery(
+      internal.functions.billing.getViewerForCheckout,
+      {},
+    );
+    if (viewer.accountStatus === "disabled") {
+      throw new Error("This account is disabled. Contact DeclineGuard support.");
+    }
+    if (viewer.accountStatus === "frozen") {
+      throw new Error(
+        "This account is frozen. Contact DeclineGuard support to restore access.",
+      );
+    }
+
+    if (viewer.billingProvider === "dodo") {
+      if (!viewer.dodoCustomerId) {
+        throw new Error("No Dodo Payments customer is on file for this account.");
+      }
+      const dodo = getDodoPaymentsConfig();
+      if (!dodo) {
+        throw new Error(
+          "Billing portal is not configured. Set DODO_PAYMENTS_API_KEY.",
+        );
+      }
+      const session = await createDodoCustomerPortal(dodo, {
+        customerId: viewer.dodoCustomerId,
+        returnUrl: allowAppHttpsUrl(args.returnUrl),
+      });
+      const portalUrl = allowHttpsUrl(session.portalUrl);
+      if (!portalUrl) {
+        throw new Error("Dodo Payments returned an invalid portal URL");
+      }
+      return { portalUrl };
+    }
+
+    const config = getPlatformBillingConfig();
+    const apiKey = config?.apiKey ?? process.env.LEMONSQUEEZY_API_KEY?.trim();
+    if (!config || !apiKey || !viewer.lsSubscriptionId) {
+      throw new Error("No Lemon Squeezy subscription is on file for this account.");
+    }
+
+    const json = await lsFetch(
+      apiKey,
+      `/subscriptions/${viewer.lsSubscriptionId}`,
+    );
+    const data = json.data;
+    const attrs =
+      data &&
+      typeof data === "object" &&
+      !Array.isArray(data) &&
+      "attributes" in data &&
+      data.attributes &&
+      typeof data.attributes === "object"
+        ? (data.attributes as Record<string, unknown>)
+        : null;
+    const urls =
+      attrs?.urls && typeof attrs.urls === "object"
+        ? (attrs.urls as Record<string, unknown>)
+        : null;
+    const raw =
+      typeof urls?.customer_portal === "string"
+        ? urls.customer_portal
+        : typeof urls?.update_payment_method === "string"
+          ? urls.update_payment_method
+          : null;
+    const portalUrl = allowHttpsUrl(raw);
+    if (!portalUrl) {
+      throw new Error("Lemon Squeezy returned an invalid portal URL");
+    }
+    return { portalUrl };
   },
 });

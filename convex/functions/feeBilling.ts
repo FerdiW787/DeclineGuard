@@ -214,7 +214,8 @@ export const claimBillingPeriod = internalMutation({
       existingClaimBlocksNewCharge(
         existingWinner.status,
         existingWinner.feeIds.length,
-        existingWinner.lsCheckoutId != null,
+        existingWinner.lsCheckoutId != null ||
+          existingWinner.dodoCheckoutId != null,
       )
     ) {
       return {
@@ -292,9 +293,12 @@ export const claimBillingPeriod = internalMutation({
         feeIds: [],
         totalCents,
         status: "claiming",
+        billingProvider: undefined,
         lsCheckoutId: undefined,
         lsCheckoutUrl: undefined,
         lsOrderId: undefined,
+        dodoCheckoutId: undefined,
+        dodoPaymentId: undefined,
         lastError: undefined,
         createdAt: args.nowMs,
         createdLsAt: undefined,
@@ -304,7 +308,8 @@ export const claimBillingPeriod = internalMutation({
       existingWinner &&
       existingWinner.status === "claiming" &&
       existingWinner.feeIds.length === 0 &&
-      existingWinner.lsCheckoutId == null
+      existingWinner.lsCheckoutId == null &&
+      existingWinner.dodoCheckoutId == null
     ) {
       invoiceId = existingWinner._id;
       await ctx.db.patch(invoiceId, {
@@ -411,8 +416,44 @@ export const attachLsCheckout = internalMutation({
     const safeUrl = allowHttpsUrl(args.lsCheckoutUrl);
     await ctx.db.patch(args.invoiceId, {
       status: "created",
+      billingProvider: "lemon",
       lsCheckoutId: args.lsCheckoutId,
       lsCheckoutUrl: safeUrl ?? undefined,
+      expiresAt: args.expiresAt,
+      createdLsAt: args.nowMs,
+      lastError: safeUrl ? undefined : "missing_checkout_url",
+    });
+    return true;
+  },
+});
+
+export const attachDodoCheckout = internalMutation({
+  args: {
+    invoiceId: v.id("billingInvoices"),
+    dodoCheckoutId: v.string(),
+    checkoutUrl: v.optional(v.string()),
+    expiresAt: v.optional(v.number()),
+    nowMs: v.number(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.invoiceId);
+    if (!invoice) return false;
+    if (invoice.status === "paid") return false;
+    if (
+      invoice.dodoCheckoutId != null &&
+      invoice.dodoCheckoutId !== args.dodoCheckoutId
+    ) {
+      return false;
+    }
+
+    const safeUrl = allowHttpsUrl(args.checkoutUrl);
+    await ctx.db.patch(args.invoiceId, {
+      status: "created",
+      billingProvider: "dodo",
+      dodoCheckoutId: args.dodoCheckoutId,
+      // Pay URL field is provider-agnostic for merchant/staff lists.
+      lsCheckoutUrl: safeUrl ?? invoice.lsCheckoutUrl,
       expiresAt: args.expiresAt,
       createdLsAt: args.nowMs,
       lastError: safeUrl ? undefined : "missing_checkout_url",
@@ -432,6 +473,25 @@ export const recordCheckoutEmailSent = internalMutation({
     if (!invoice) return null;
     await ctx.db.patch(args.invoiceId, { checkoutEmailSentAt: args.nowMs });
     return null;
+  },
+});
+
+export const getInvoiceProvider = internalQuery({
+  args: { invoiceId: v.id("billingInvoices") },
+  returns: v.union(
+    v.object({
+      billingProvider: v.union(v.literal("lemon"), v.literal("dodo"), v.null()),
+      userId: v.id("users"),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.invoiceId);
+    if (!row) return null;
+    return {
+      billingProvider: row.billingProvider ?? null,
+      userId: row.userId,
+    };
   },
 });
 
@@ -533,6 +593,8 @@ export const findBillingInvoiceForPaidOrder = internalQuery({
     billingInvoiceId: v.optional(v.string()),
     lsCheckoutId: v.optional(v.string()),
     lsOrderId: v.optional(v.string()),
+    dodoCheckoutId: v.optional(v.string()),
+    dodoPaymentId: v.optional(v.string()),
   },
   returns: v.union(v.id("billingInvoices"), v.null()),
   handler: async (ctx, args) => {
@@ -570,6 +632,26 @@ export const findBillingInvoiceForPaidOrder = internalQuery({
       if (byOrder) return byOrder._id;
     }
 
+    if (args.dodoCheckoutId) {
+      const byDodoCheckout = await ctx.db
+        .query("billingInvoices")
+        .withIndex("by_dodoCheckoutId", (q) =>
+          q.eq("dodoCheckoutId", args.dodoCheckoutId),
+        )
+        .first();
+      if (byDodoCheckout) return byDodoCheckout._id;
+    }
+
+    if (args.dodoPaymentId) {
+      const byDodoPayment = await ctx.db
+        .query("billingInvoices")
+        .withIndex("by_dodoPaymentId", (q) =>
+          q.eq("dodoPaymentId", args.dodoPaymentId),
+        )
+        .first();
+      if (byDodoPayment) return byDodoPayment._id;
+    }
+
     return null;
   },
 });
@@ -585,6 +667,8 @@ export const markBillingInvoicePaid = internalMutation({
     invoiceId: v.id("billingInvoices"),
     lsOrderId: v.string(),
     lsCheckoutId: v.optional(v.string()),
+    dodoPaymentId: v.optional(v.string()),
+    dodoCheckoutId: v.optional(v.string()),
     orderStatus: v.string(),
     subtotalCents: v.number(),
     totalCents: v.number(),
@@ -698,6 +782,8 @@ export const markBillingInvoicePaid = internalMutation({
       status: "paid",
       lsOrderId: args.lsOrderId,
       lsCheckoutId: args.lsCheckoutId ?? invoice.lsCheckoutId,
+      dodoPaymentId: args.dodoPaymentId ?? invoice.dodoPaymentId,
+      dodoCheckoutId: args.dodoCheckoutId ?? invoice.dodoCheckoutId,
       paidAt: args.paidAt,
       lastError: undefined,
     });
