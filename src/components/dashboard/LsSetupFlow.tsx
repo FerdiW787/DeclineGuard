@@ -530,7 +530,6 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
     if (!preview) {
       await persistEmailTheme({
         stylingMode: draft.stylingMode,
-        layoutPresetId: draft.layoutPresetId,
       });
     }
     if (

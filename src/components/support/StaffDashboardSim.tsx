@@ -711,7 +711,6 @@ export default function StaffDashboardSim({
                       ? {
                           fromAddress: data.emailSetup.fromAddress,
                           isProduction: data.emailSetup.isProduction,
-                          hasApiKey: data.emailSetup.hasApiKey,
                         }
                       : data.emailSetup
                 }

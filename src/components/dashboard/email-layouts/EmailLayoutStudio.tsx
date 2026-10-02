@@ -1,21 +1,18 @@
 import { useState } from "react";
-import LayoutPresetPicker from "./LayoutPresetPicker";
 import EmailLayoutPreview from "./EmailLayoutPreview";
 import SegmentedControl from "../SegmentedControl";
 import {
-  DEFAULT_RECOVERY_DAY,
-  RECOVERY_DAY_META,
-  RECOVERY_DAY_OPTIONS,
-  layoutPresetMeta,
-  type RecoveryDayId,
+  DEFAULT_LIFECYCLE_EMAIL_TYPE,
+  LIFECYCLE_EMAIL_META,
+  LIFECYCLE_EMAIL_TYPES,
+  type LifecycleEmailType,
 } from "@/lib/emailLayoutPresets";
 import {
   resolveTheme,
   type EmailThemeTokens,
-  type LayoutPresetId,
   type StylingMode,
 } from "@/lib/emailTheme";
-import { applyCopyVars, DEFAULT_EMAIL_COPY } from "@/lib/recoveryEmailCopy";
+import { buildLifecycleEmail } from "@/lib/lifecycleEmailTemplate";
 import { useEmailLayoutDraft } from "@/lib/useEmailLayoutDraft";
 import type { EmailFontId } from "@/lib/emailFonts";
 import { cn } from "@/lib/utils";
@@ -60,6 +57,11 @@ type Props = {
   className?: string;
 };
 
+const TYPE_OPTIONS = LIFECYCLE_EMAIL_TYPES.map((id) => ({
+  id,
+  label: LIFECYCLE_EMAIL_META[id].label,
+}));
+
 const STYLING_OPTIONS = [
   { id: "preset" as const, label: "Use preset" },
   { id: "configured" as const, label: "Configured" },
@@ -80,8 +82,9 @@ export default function EmailLayoutStudio({
   className,
 }: Props) {
   const [draft, setDraft] = useEmailLayoutDraft(serverTheme);
-  const [recoveryDay, setRecoveryDay] =
-    useState<RecoveryDayId>(DEFAULT_RECOVERY_DAY);
+  const [emailType, setEmailType] = useState<LifecycleEmailType>(
+    DEFAULT_LIFECYCLE_EMAIL_TYPE,
+  );
 
   const mergedConfigured: Partial<EmailThemeTokens> = {
     ...configured,
@@ -102,17 +105,18 @@ export default function EmailLayoutStudio({
     configured: mergedConfigured,
   });
   const theme = resolved.tokens;
-  const subject = applyCopyVars(
-    DEFAULT_EMAIL_COPY[recoveryDay].subject,
-    {
-      product: previewVars?.product ?? "your subscription",
-      amount: previewVars?.amount ?? "your plan",
-      firstName: previewVars?.firstName,
-    },
-  );
+  const built = buildLifecycleEmail({
+    emailType,
+    storeName,
+    productName: previewVars?.product ?? "your subscription",
+    amountLabel: previewVars?.amount ?? "your plan",
+    customerName: previewVars?.firstName ?? null,
+    ctaUrl: "#",
+    supportEmail: footerSupport ?? null,
+    theme: resolved,
+  });
 
-  const meta = layoutPresetMeta(draft.layoutPresetId);
-  const copyOverride = draft.copyOverrides[recoveryDay];
+  const copyOverride = draft.copyOverrides[emailType];
   const showFields = variant === "page" || variant === "onboarding";
 
   const updateCopy = (
@@ -123,8 +127,8 @@ export default function EmailLayoutStudio({
       ...prev,
       copyOverrides: {
         ...prev.copyOverrides,
-        [recoveryDay]: {
-          ...prev.copyOverrides[recoveryDay],
+        [emailType]: {
+          ...prev.copyOverrides[emailType],
           [field]: value,
         },
       },
@@ -153,11 +157,11 @@ export default function EmailLayoutStudio({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8a8f98]">
-            Recovery layout
+            Email layout
           </p>
           <p className="mt-1 text-[13px] text-[#6b6f76]">
-            {meta.label} styles Day 0, Day 2, and Day 5. Pick one layout for
-            every recovery send.
+            Same layout on every lifecycle email. Brand colors and the CTA
+            stay yours — we assign the kit.
           </p>
         </div>
         <SegmentedControl
@@ -172,15 +176,6 @@ export default function EmailLayoutStudio({
         />
       </div>
 
-      <LayoutPresetPicker
-        value={draft.layoutPresetId}
-        onChange={(id: LayoutPresetId) => {
-          setDraft((prev) => ({ ...prev, layoutPresetId: id }));
-          onPersistTheme?.({ layoutPresetId: id });
-        }}
-        className="mt-4"
-      />
-
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
         <p className="text-[11px] text-[#8a8f98]">
           {draft.stylingMode === "preset"
@@ -188,11 +183,11 @@ export default function EmailLayoutStudio({
             : "Showing your store colors, buttons, and links."}
         </p>
         <SegmentedControl
-          options={RECOVERY_DAY_OPTIONS}
-          value={recoveryDay}
-          onChange={setRecoveryDay}
-          ariaLabel="Recovery day"
-          idPrefix="recovery-day"
+          options={TYPE_OPTIONS}
+          value={emailType}
+          onChange={setEmailType}
+          ariaLabel="Lifecycle email type"
+          idPrefix="lifecycle-type"
         />
       </div>
 
@@ -207,19 +202,20 @@ export default function EmailLayoutStudio({
         <div className="overflow-hidden rounded-lg border border-black/8">
           <div className="border-b border-black/6 px-3 py-2">
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8a8f98]">
-              Preview · {RECOVERY_DAY_META[recoveryDay].label}
+              Preview · {LIFECYCLE_EMAIL_META[emailType].label}
             </p>
             <p className="mt-0.5 truncate text-[11px] text-[#6b6f76]">
-              {subject}
+              {built.subject}
             </p>
           </div>
           <EmailLayoutPreview
             layoutPresetId={draft.layoutPresetId}
-            recoveryDay={recoveryDay}
+            emailType={emailType}
             theme={theme}
             storeName={storeName}
             storeLogoUrl={storeLogoUrl}
             copyOverride={copyOverride}
+            emailFont={theme.emailFont}
             footerSupport={footerSupport}
             previewVars={previewVars}
             showDeclineGuardBadge={showDeclineGuardBadge}
@@ -234,7 +230,7 @@ export default function EmailLayoutStudio({
               </legend>
               <p className="text-[11px] leading-relaxed text-[#8a8f98]">
                 {draft.stylingMode === "preset"
-                  ? "Edits apply when you switch to Configured. The selected layout stays."
+                  ? "Edits apply when you switch to Configured. The layout stays."
                   : "These are your store tokens."}
               </p>
               <ColorField
@@ -286,12 +282,12 @@ export default function EmailLayoutStudio({
                 Short copy
               </legend>
               <p className="text-[11px] text-[#8a8f98]">
-                Overrides for {RECOVERY_DAY_META[recoveryDay].label} only.
+                Overrides for {LIFECYCLE_EMAIL_META[emailType].label} only.
               </p>
               <TextField
                 label="Headline"
                 value={copyOverride?.headline ?? ""}
-                placeholder={copyOverride?.headline ? "" : "Default for this day"}
+                placeholder={copyOverride?.headline ? "" : "Default for this type"}
                 onChange={(v) => updateCopy("headline", v)}
               />
               <TextField

@@ -27,62 +27,69 @@ export type BlockKitSpec = {
   bodySize: number;
 };
 
-/** Mirror of FE `BLOCK_KIT_SPEC` chrome that send can apply. */
+/**
+ * Set A chrome — matches FE `src/lib/emailBlockKits.ts` (Jules 59b1ba6).
+ *   poster-notice     one announcement, then the button
+ *   amount-due        money first, then the problem
+ *   plain-letter      a short letter, then the ask
+ *   what-happened     two beats: happened, then do
+ *   quiet-column      wide type, almost nothing else
+ */
 export const BLOCK_KIT_SPEC: Record<LayoutPresetId, BlockKitSpec> = {
-  sonos: {
+  "poster-notice": {
     align: "center",
     ctaAlign: "center",
-    emailPadding: 48,
+    emailPadding: 64,
     shellBorder: false,
     shellBorderWidth: 1,
     shellRadius: 0,
     eyebrowSize: 11,
-    headlineSize: 28,
-    bodySize: 15,
+    headlineSize: 34,
+    bodySize: 16,
   },
-  avocode: {
+  "amount-due": {
     align: "left",
     ctaAlign: "left",
-    emailPadding: 28,
+    emailPadding: 40,
     shellBorder: false,
     shellBorderWidth: 1,
     shellRadius: 0,
-    eyebrowSize: 13,
-    headlineSize: 22,
+    eyebrowSize: 11,
+    headlineSize: 20,
     bodySize: 15,
   },
-  benchmark: {
+  "plain-letter": {
+    align: "left",
+    ctaAlign: "left",
+    emailPadding: 44,
+    shellBorder: false,
+    shellBorderWidth: 1,
+    shellRadius: 0,
+    eyebrowSize: 11,
+    headlineSize: 22,
+    bodySize: 16,
+  },
+  "what-happened": {
     align: "left",
     ctaAlign: "left",
     emailPadding: 32,
     shellBorder: false,
     shellBorderWidth: 1,
-    shellRadius: 12,
-    eyebrowSize: 12,
+    shellRadius: 0,
+    eyebrowSize: 11,
     headlineSize: 22,
     bodySize: 15,
   },
-  fontbase: {
+  "quiet-column": {
     align: "left",
     ctaAlign: "left",
-    emailPadding: 32,
+    emailPadding: 64,
     shellBorder: false,
     shellBorderWidth: 1,
     shellRadius: 0,
     eyebrowSize: 11,
-    headlineSize: 28,
-    bodySize: 15,
-  },
-  "nordvpn-structure": {
-    align: "left",
-    ctaAlign: "left",
-    emailPadding: 28,
-    shellBorder: true,
-    shellBorderWidth: 4,
-    shellRadius: 0,
-    eyebrowSize: 11,
-    headlineSize: 22,
-    bodySize: 15,
+    headlineSize: 32,
+    bodySize: 18,
   },
 };
 
@@ -165,6 +172,16 @@ function buttonBlock(
   };
 }
 
+function spacerBlock(id: string, height: number): EmailBlock {
+  return {
+    id,
+    type: "spacer",
+    height,
+    marginTop: 0,
+    marginBottom: 0,
+  };
+}
+
 function billingLink(
   id: string,
   prefix: string,
@@ -183,182 +200,148 @@ function billingLink(
   });
 }
 
-function blocksForSonos(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
+function blocksForPosterNotice(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
   return [
-    textBlock("sonos-eyebrow", copy.eyebrow, spec.eyebrowSize, {
-      copySlot: "eyebrow",
-      color: "muted",
-      align: "center",
-      marginTop: 8,
-      marginBottom: 10,
-    }),
-    textBlock("sonos-headline", copy.headline, spec.headlineSize, {
+    spacerBlock("poster-notice-spacer-top", 8),
+    textBlock("poster-notice-headline", copy.headline, spec.headlineSize, {
       copySlot: "headline",
       bold: true,
       align: "center",
       marginBottom: 14,
     }),
-    textBlock("sonos-body", boldTokens(copy.body), spec.bodySize, {
+    textBlock("poster-notice-body", boldTokens(copy.body), spec.bodySize, {
       copySlot: "body",
       color: "muted",
       align: "center",
-      marginBottom: 28,
+      marginBottom: 0,
     }),
-    buttonBlock("sonos-cta", copy.cta, "center", 20),
-    billingLink("sonos-billing", "Or", copy.link, "to continue.", "center"),
+    spacerBlock("poster-notice-spacer-cta", 36),
+    buttonBlock("poster-notice-cta", copy.cta, "center", 16),
+    billingLink("poster-notice-billing", "", copy.link, "", "center"),
   ];
 }
 
-function blocksForAvocode(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
+function blocksForAmountDue(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
   return [
-    textBlock("avocode-eyebrow", copy.eyebrow, spec.eyebrowSize, {
-      copySlot: "eyebrow",
+    textBlock("amount-due-label", "Amount due", spec.eyebrowSize, {
       color: "muted",
-      align: "left",
-      marginBottom: 8,
-    }),
-    textBlock("avocode-headline", copy.headline, spec.headlineSize, {
-      copySlot: "headline",
-      bold: true,
-      align: "left",
-      marginBottom: 16,
-    }),
-    textBlock("avocode-ending", "What's ending", 12, {
-      color: "muted",
-      marginTop: 4,
       marginBottom: 6,
     }),
-    textBlock("avocode-product", "{{product}}", 15, {
+    textBlock("amount-due-amount", "{{amount}}", 42, {
       bold: true,
-      marginBottom: 2,
-    }),
-    textBlock("avocode-amount", "{{amount}}", 13, {
-      color: "muted",
-      marginBottom: 16,
-    }),
-    textBlock("avocode-body", boldTokens(copy.body), spec.bodySize, {
-      copySlot: "body",
-      marginBottom: 24,
-    }),
-    buttonBlock("avocode-cta", copy.cta, "left", 16),
-    billingLink("avocode-billing", "", copy.link, "", "left"),
-  ];
-}
-
-function blocksForBenchmark(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
-  return [
-    textBlock("benchmark-eyebrow", copy.eyebrow, 11, {
-      copySlot: "eyebrow",
-      color: "muted",
-      hexColor: "#1f7a4d",
-      marginBottom: 14,
-    }),
-    textBlock("benchmark-headline", copy.headline, spec.headlineSize, {
-      copySlot: "headline",
-      bold: true,
-      marginBottom: 12,
-    }),
-    textBlock("benchmark-body", boldTokens(copy.body), spec.bodySize, {
-      copySlot: "body",
-      marginBottom: 18,
-    }),
-    textBlock("benchmark-safe", "Nothing here is gone", 13, {
-      bold: true,
-      marginTop: 4,
-      marginBottom: 6,
-    }),
-    textBlock("benchmark-access", "Access stays on while you update.", 13, {
-      color: "muted",
-      marginBottom: 2,
-    }),
-    textBlock(
-      "benchmark-card",
-      "Card details stay on your billing page.",
-      13,
-      { color: "muted", marginBottom: 24 },
-    ),
-    buttonBlock("benchmark-cta", copy.cta, "left", 16),
-    billingLink("benchmark-billing", "", copy.link, "", "left"),
-  ];
-}
-
-function blocksForFontbase(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
-  return [
-    textBlock("fontbase-eyebrow", copy.eyebrow, spec.eyebrowSize, {
-      copySlot: "eyebrow",
-      color: "muted",
-      marginBottom: 10,
-    }),
-    textBlock("fontbase-headline", copy.headline, spec.headlineSize, {
-      copySlot: "headline",
-      bold: true,
-      marginBottom: 14,
-    }),
-    textBlock("fontbase-body", boldTokens(copy.body), spec.bodySize, {
-      copySlot: "body",
-      color: "muted",
-      marginBottom: 8,
-    }),
-    {
-      id: "fontbase-rule",
-      type: "divider",
-      marginTop: 12,
-      marginBottom: 16,
-    },
-    textBlock("fontbase-included", "What's included", 12, {
-      color: "muted",
-      marginBottom: 8,
-    }),
-    textBlock("fontbase-plan", "Same plan and workspace", 14, {
       marginBottom: 4,
     }),
-    textBlock(
-      "fontbase-card",
-      "Change the card anytime before renewal",
-      14,
-      { marginBottom: 16 },
-    ),
-    textBlock("fontbase-meta", "{{product}}  ·  {{amount}}", 13, {
+    textBlock("amount-due-product", "{{product}}", 14, {
       color: "muted",
-      marginBottom: 24,
+      marginBottom: 28,
     }),
-    buttonBlock("fontbase-cta", copy.cta, "left", 16),
-    billingLink("fontbase-billing", "", copy.link, "", "left"),
+    textBlock("amount-due-headline", copy.headline, spec.headlineSize, {
+      copySlot: "headline",
+      bold: true,
+      marginBottom: 8,
+    }),
+    textBlock(
+      "amount-due-body",
+      "Update the card to keep access on — about a minute.",
+      spec.bodySize,
+      {
+        copySlot: "body",
+        color: "muted",
+        marginBottom: 24,
+      },
+    ),
+    buttonBlock("amount-due-cta", copy.cta, "left", 14),
+    billingLink("amount-due-billing", "", copy.link, "", "left"),
   ];
 }
 
-function blocksForNordvpn(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
+function blocksForPlainLetter(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
   return [
-    textBlock("nordvpn-eyebrow", copy.eyebrow, spec.eyebrowSize, {
-      copySlot: "eyebrow",
-      color: "muted",
-      marginBottom: 8,
-    }),
-    textBlock("nordvpn-headline", copy.headline, spec.headlineSize, {
+    textBlock("plain-letter-headline", copy.headline, spec.headlineSize, {
       copySlot: "headline",
       bold: true,
-      marginBottom: 12,
+      marginBottom: 16,
     }),
-    textBlock("nordvpn-body", boldTokens(copy.body), spec.bodySize, {
+    textBlock("plain-letter-body", boldTokens(copy.body), spec.bodySize, {
       copySlot: "body",
-      marginBottom: 18,
+      marginBottom: 16,
     }),
-    textBlock("nordvpn-step1", "1. Update billing", 14, {
-      bold: true,
-      marginBottom: 6,
+    textBlock(
+      "plain-letter-keep",
+      "Updating the card keeps **{{product}}** on. Nothing else changes.",
+      spec.bodySize,
+      {
+        color: "muted",
+        marginBottom: 20,
+      },
+    ),
+    textBlock("plain-letter-thanks", "Thanks,", spec.bodySize, {
+      marginBottom: 0,
     }),
-    textBlock("nordvpn-step2", "2. Keep access on", 14, {
+    spacerBlock("plain-letter-spacer", 28),
+    buttonBlock("plain-letter-cta", copy.cta, "left", 14),
+    billingLink("plain-letter-billing", "", copy.link, "", "left"),
+  ];
+}
+
+function blocksForWhatHappened(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
+  return [
+    textBlock("what-happened-headline", copy.headline, spec.headlineSize, {
+      copySlot: "headline",
       bold: true,
       marginBottom: 24,
     }),
-    buttonBlock("nordvpn-cta", copy.cta, "left", 16),
-    billingLink("nordvpn-billing", "", copy.link, "", "left"),
+    textBlock("what-happened-label", "WHAT HAPPENED", 11, {
+      color: "muted",
+      marginBottom: 6,
+    }),
+    textBlock("what-happened-body", boldTokens(copy.body), spec.bodySize, {
+      copySlot: "body",
+      marginBottom: 0,
+    }),
+    {
+      id: "what-happened-rule",
+      type: "divider",
+      marginTop: 18,
+      marginBottom: 18,
+    },
+    textBlock("what-happened-do-label", "WHAT TO DO", 11, {
+      color: "muted",
+      marginBottom: 6,
+    }),
+    textBlock(
+      "what-happened-do",
+      "Open billing and update the card.",
+      spec.bodySize,
+      { marginBottom: 24 },
+    ),
+    buttonBlock("what-happened-cta", copy.cta, "left", 14),
+    billingLink("what-happened-billing", "", copy.link, "", "left"),
+  ];
+}
+
+function blocksForQuietColumn(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
+  return [
+    textBlock("quiet-column-headline", copy.headline, spec.headlineSize, {
+      copySlot: "headline",
+      bold: true,
+      marginTop: 8,
+      marginBottom: 16,
+    }),
+    textBlock("quiet-column-body", boldTokens(copy.body), spec.bodySize, {
+      copySlot: "body",
+      color: "muted",
+      marginBottom: 0,
+    }),
+    spacerBlock("quiet-column-spacer", 32),
+    buttonBlock("quiet-column-cta", copy.cta, "left", 16),
+    billingLink("quiet-column-billing", "", copy.link, "", "left"),
   ];
 }
 
 /**
  * Starter block kits — same shapes as FE `emailBlockKits`.
- * Same structure across Day 0 / 2 / 5; copy/step labels change.
+ * Send always uses these kits (merchant blocks are not a control surface).
  */
 export function starterBlocksForKit(
   layoutPresetId: string | null | undefined,
@@ -368,16 +351,16 @@ export function starterBlocksForKit(
   const spec = BLOCK_KIT_SPEC[kit];
   const copy = DAY_COPY[templateId] ?? DAY_COPY.gentle;
   switch (kit) {
-    case "sonos":
-      return blocksForSonos(spec, copy);
-    case "avocode":
-      return blocksForAvocode(spec, copy);
-    case "benchmark":
-      return blocksForBenchmark(spec, copy);
-    case "fontbase":
-      return blocksForFontbase(spec, copy);
-    case "nordvpn-structure":
-      return blocksForNordvpn(spec, copy);
+    case "poster-notice":
+      return blocksForPosterNotice(spec, copy);
+    case "amount-due":
+      return blocksForAmountDue(spec, copy);
+    case "plain-letter":
+      return blocksForPlainLetter(spec, copy);
+    case "what-happened":
+      return blocksForWhatHappened(spec, copy);
+    case "quiet-column":
+      return blocksForQuietColumn(spec, copy);
     default: {
       const _exhaustive: never = kit;
       return _exhaustive;
@@ -391,16 +374,16 @@ export function kitShellSpec(layoutPresetId: string | null | undefined): BlockKi
 
 export function kitVisibleFingerprint(kit: LayoutPresetId): string {
   switch (kit) {
-    case "sonos":
-      return "A quick update";
-    case "avocode":
-      return "What's ending";
-    case "benchmark":
-      return "Nothing here is gone";
-    case "fontbase":
-      return "What's included";
-    case "nordvpn-structure":
-      return "1. Update billing";
+    case "poster-notice":
+      return "font-size:34px";
+    case "amount-due":
+      return "Amount due";
+    case "plain-letter":
+      return "Thanks,";
+    case "what-happened":
+      return "WHAT HAPPENED";
+    case "quiet-column":
+      return "font-size:32px";
     default: {
       const _exhaustive: never = kit;
       return _exhaustive;

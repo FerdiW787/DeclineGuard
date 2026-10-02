@@ -4,42 +4,12 @@ import {
   kitShowsStoreName,
   type KitCopy,
 } from "@/lib/emailBlockKits";
-import {
-  LAYOUT_PRESET_STRUCTURE_META,
-  type LayoutPresetId,
-  type StylingMode,
-} from "@/lib/emailLayoutPresets";
-import { LAYOUT_PRESET_CATALOG, LAYOUT_PRESET_IDS } from "@/lib/emailTheme";
+import { type LayoutPresetId, type StylingMode } from "@/lib/emailLayoutPresets";
+import { LAYOUT_PRESET_CATALOG } from "@/lib/emailTheme";
 import type { EmailThemeTokens } from "@/lib/emailTheme";
 import { cn } from "@/lib/utils";
 import EmailStoreHeader from "../EmailStoreHeader";
 import { Panel } from "../dashboardUi";
-
-const RGE_LABEL: Record<
-  LayoutPresetId,
-  { title: string; source: string }
-> = {
-  sonos: {
-    title: "Sonos",
-    source: "Verify your email",
-  },
-  avocode: {
-    title: "Avocode",
-    source: "Your trial ended",
-  },
-  benchmark: {
-    title: "Benchmark",
-    source: "Don’t worry, your data is safe",
-  },
-  fontbase: {
-    title: "FontBase",
-    source: "Upcoming renewal",
-  },
-  "nordvpn-structure": {
-    title: "NordVPN",
-    source: "Your account has expired",
-  },
-};
 
 type Props = {
   layoutPresetId: LayoutPresetId;
@@ -48,7 +18,6 @@ type Props = {
   storeName: string;
   storeLogoUrl: string | null;
   previewCopy: KitCopy;
-  onSelectKit: (id: LayoutPresetId) => void;
   onStylingModeChange: (mode: StylingMode) => void;
 };
 
@@ -59,7 +28,6 @@ export default function EmailLabSidebar({
   storeName,
   storeLogoUrl,
   previewCopy,
-  onSelectKit,
   onStylingModeChange,
 }: Props) {
   return (
@@ -69,43 +37,10 @@ export default function EmailLabSidebar({
           Lab
         </p>
         <p className="mt-1 text-[12px] leading-relaxed text-[#6b6f76]">
-          Starter kits copied 1:1 from the Really Good Emails refs. Same layout
-          on Day 0, Day 2, and Day 5 — only the copy changes.
+          We A/B five recovery layouts. Day 0, Day 2, and Day 5 share the same
+          kit — only the copy changes. Merchants set brand colors and the CTA.
+          Assignment stays on the backend.
         </p>
-        <div
-          className="mt-3 space-y-1"
-          role="listbox"
-          aria-label="Email layout templates"
-        >
-          {LAYOUT_PRESET_IDS.map((id) => {
-            const meta = LAYOUT_PRESET_STRUCTURE_META[id];
-            const rge = RGE_LABEL[id];
-            const active = id === layoutPresetId;
-            return (
-              <button
-                key={id}
-                type="button"
-                role="option"
-                aria-selected={active}
-                onClick={() => onSelectKit(id)}
-                className={cn(
-                  "dg-interactive flex w-full flex-col items-start rounded-md border px-2.5 py-2 text-left",
-                  active
-                    ? "border-black/12 bg-[#f7f8f8]"
-                    : "border-transparent",
-                )}
-              >
-                <span className="text-[13px] font-semibold text-[#08090a]">
-                  {rge.title}
-                </span>
-                <span className="mt-0.5 text-[11px] leading-snug text-[#8a8f98]">
-                  {rge.source}
-                </span>
-                <span className="sr-only">{meta.hint}</span>
-              </button>
-            );
-          })}
-        </div>
       </Panel>
 
       <Panel className="p-5">
@@ -131,8 +66,9 @@ export default function EmailLabSidebar({
           Colors
         </p>
         <p className="mt-1 text-[12px] leading-relaxed text-[#8a8f98]">
-          Template tokens come from the kit. Personal tokens are your store
-          colors.
+          Template applies kit structure. Personal uses your store scrape
+          tokens. CTA and colors stay on BrandKit when configured — kits
+          never invent a palette.
         </p>
         <div className="mt-3 grid gap-2">
           <ConfigButton
@@ -191,7 +127,18 @@ function EmailLabKitPreview({
   copy: KitCopy;
 }) {
   const spec = BLOCK_KIT_SPEC[kitId];
-  const centered = spec.align === "center";
+  const alignClass =
+    spec.align === "center"
+      ? "text-center"
+      : spec.align === "right"
+        ? "text-right"
+        : "text-left";
+  const ctaClass =
+    spec.ctaAlign === "center"
+      ? "mx-auto"
+      : spec.ctaAlign === "right"
+        ? "ml-auto"
+        : "";
   return (
     <div
       className="overflow-hidden border border-black/8"
@@ -203,10 +150,10 @@ function EmailLabKitPreview({
         borderRadius: spec.shellRadius,
       }}
     >
-        {spec.showAccentBar ? (
-          <div className="h-1 w-full" style={{ background: theme.brandColor }} />
-        ) : null}
-        <div className={cn("px-3 py-3", centered && "text-center")}>
+      {spec.showAccentBar ? (
+        <div className="h-1 w-full" style={{ background: theme.brandColor }} />
+      ) : null}
+      <div className={cn("px-3 py-3", alignClass)}>
         <EmailStoreHeader
           storeName={storeName}
           storeLogoUrl={storeLogoUrl}
@@ -217,57 +164,23 @@ function EmailLabKitPreview({
           showName={kitShowsStoreName(kitId)}
           className="mb-3"
         />
-        {kitId === "benchmark" ? (
+        {kitId === "amount-due" ? (
           <p
-            className="mb-1 text-[8px] font-semibold"
-            style={{ color: theme.brandColor }}
+            className="mb-1 text-[13px] font-semibold leading-none"
+            style={{ color: theme.emailTextColor }}
           >
-            {copy.eyebrow}
+            €29
           </p>
-        ) : (
-          <p
-            className="text-[8px] font-medium uppercase tracking-[0.14em]"
-            style={{ color: theme.mutedTextColor }}
-          >
-            {copy.eyebrow}
-          </p>
-        )}
+        ) : null}
         <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-snug tracking-tight">
           {copy.headline}
         </p>
-        {kitId === "avocode" ? (
-          <div
-            className="mt-1.5 rounded border px-1.5 py-1"
-            style={{ borderColor: `${theme.brandColor}33` }}
-          >
-            <p className="text-[7px]" style={{ color: theme.mutedTextColor }}>
-              What’s ending
-            </p>
-            <p className="text-[8px] font-semibold">Pro Monthly</p>
-          </div>
-        ) : null}
-        {kitId === "fontbase" ? (
+        {kitId === "what-happened" ? (
           <p
-            className="mt-1 text-[8px]"
+            className="mt-1.5 text-[7px] uppercase tracking-[0.12em]"
             style={{ color: theme.mutedTextColor }}
           >
-            What’s included · plan · card
-          </p>
-        ) : null}
-        {kitId === "nordvpn-structure" ? (
-          <p
-            className="mt-1 text-[8px] font-semibold"
-            style={{ color: theme.brandColor }}
-          >
-            1 Update billing · 2 Keep access
-          </p>
-        ) : null}
-        {kitId === "benchmark" ? (
-          <p
-            className="mt-1 text-[8px]"
-            style={{ color: theme.mutedTextColor }}
-          >
-            Nothing here is gone
+            What happened · What to do
           </p>
         ) : null}
         <p
@@ -279,7 +192,7 @@ function EmailLabKitPreview({
         <span
           className={cn(
             "mt-2 inline-block px-2.5 py-1 text-[8px] font-semibold",
-            spec.ctaAlign === "center" && "mx-auto",
+            ctaClass,
           )}
           style={{
             background: theme.ctaBackgroundColor,
@@ -289,7 +202,7 @@ function EmailLabKitPreview({
         >
           {copy.cta}
         </span>
-        </div>
+      </div>
     </div>
   );
 }

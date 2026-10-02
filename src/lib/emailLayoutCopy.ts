@@ -96,54 +96,16 @@ const BASE_BY_TYPE: Record<LifecycleEmailType, EmailLayoutCopy> = {
   },
 };
 
-/** Layout-specific chrome only — not third-party copy. */
+/** Layout-specific chrome only — recovery copy lives in the kit builders. */
 const LAYOUT_CHROME: Record<
   LayoutPresetId,
   Partial<Record<LifecycleEmailType, Partial<EmailLayoutCopy>>>
 > = {
-  sonos: {
-    verify: {
-      eyebrow: "Just to be sure",
-      headline: "One tap to confirm",
-    },
-  },
-  avocode: {
-    trial_ended: {
-      eyebrow: "Trial wrapped up",
-      headline: "Your trial has ended",
-    },
-    decline_pause: {
-      eyebrow: "Billing needs a moment",
-    },
-  },
-  benchmark: {
-    decline_pause: {
-      status: "Paused — your data is safe",
-      headline: "Don’t worry — your data is safe",
-      body: "The payment of {{amount}} for {{product}} didn’t go through. Everything you saved is still here.",
-    },
-    trial_ended: {
-      status: "Paused — your data is safe",
-    },
-    expiry: {
-      status: "Ending — your data is safe",
-    },
-  },
-  fontbase: {
-    renewal: {
-      eyebrow: "Upcoming renewal",
-      headline: "Your renewal is coming up",
-    },
-  },
-  "nordvpn-structure": {
-    expiry: {
-      eyebrow: "Account expired",
-      headline: "Your account has expired",
-    },
-    decline_pause: {
-      eyebrow: "Needs a card update",
-    },
-  },
+  "poster-notice": {},
+  "amount-due": {},
+  "plain-letter": {},
+  "what-happened": {},
+  "quiet-column": {},
 };
 
 export function defaultLayoutCopy(

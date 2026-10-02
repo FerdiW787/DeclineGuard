@@ -44,7 +44,6 @@ export type SettingsEmailSetup = {
   isProduction: boolean;
   replyToEmail: string | null;
   fromName: string | null;
-  hasApiKey: boolean;
 } | null;
 
 export type SettingsModuleProps = {

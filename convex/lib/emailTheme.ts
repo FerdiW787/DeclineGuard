@@ -12,29 +12,38 @@ import {
  * Import:
  *   import { resolveTheme, type EmailThemeTokens } from "../../convex/lib/emailTheme";
  *
- * One global `layoutPresetId` selects the starter block kit for the 3 recovery
- * emails (Day 0 / Day 2 / Day 5). `stylingMode` only swaps token source:
- * catalog (preset) vs merchant BrandKit (configured). Token field names match
- * recoverySettings / BrandKit — do not invent a parallel alias set.
+ * Set A kits (we control layouts): poster-notice · amount-due · plain-letter ·
+ * what-happened · quiet-column. Merchants do not pick templates — Auto A/B
+ * assigns an arm (or the promoted winner). `stylingMode` only swaps token
+ * source: catalog (preset fallback) vs merchant BrandKit / scrape (configured).
+ * Token field names match recoverySettings / BrandKit.
  * Send renders blocks + theme tokens — not layout-table HTML.
  */
 
 export const STYLING_MODES = ["preset", "configured"] as const;
 export type StylingMode = (typeof STYLING_MODES)[number];
 
-/** Five RGE starter block kits. IDs describe kit structure, not product emails. */
+/**
+ * Set A only — five locked kits. Day 0 / 2 / 5 share the assigned kit.
+ * Set B is parked (do not add ids here).
+ *
+ * Default / experiment fallback / promote tie-break: `quiet-column`.
+ * Rotation starts at index 0 (`poster-notice`) and walks this array.
+ */
 export const LAYOUT_PRESET_IDS = [
-  "sonos",
-  "avocode",
-  "benchmark",
-  "fontbase",
-  "nordvpn-structure",
+  "poster-notice",
+  "amount-due",
+  "plain-letter",
+  "what-happened",
+  "quiet-column",
 ] as const;
 
 export type LayoutPresetId = (typeof LAYOUT_PRESET_IDS)[number];
 
-export const SONOS_LAYOUT_ID: LayoutPresetId = "sonos";
-export const DEFAULT_LAYOUT_PRESET_ID: LayoutPresetId = SONOS_LAYOUT_ID;
+export const QUIET_COLUMN_LAYOUT_ID: LayoutPresetId = "quiet-column";
+/** @deprecated Use QUIET_COLUMN_LAYOUT_ID. */
+export const SONOS_LAYOUT_ID: LayoutPresetId = QUIET_COLUMN_LAYOUT_ID;
+export const DEFAULT_LAYOUT_PRESET_ID: LayoutPresetId = QUIET_COLUMN_LAYOUT_ID;
 export const DEFAULT_STYLING_MODE: StylingMode = "preset";
 
 /** Recovery sequence only — the sole themed email surface. */
@@ -53,11 +62,11 @@ export const stylingModeValidator = v.union(
 );
 
 export const layoutPresetIdValidator = v.union(
-  v.literal("sonos"),
-  v.literal("avocode"),
-  v.literal("benchmark"),
-  v.literal("fontbase"),
-  v.literal("nordvpn-structure"),
+  v.literal("poster-notice"),
+  v.literal("amount-due"),
+  v.literal("plain-letter"),
+  v.literal("what-happened"),
+  v.literal("quiet-column"),
 );
 
 export const recoverySequenceStepValidator = v.union(
@@ -113,8 +122,8 @@ function layoutTokens(
   };
 }
 
-/** Sonos — warm, quiet, editorial whitespace. */
-export const SONOS_TOKENS: EmailThemeTokens = layoutTokens({
+/** quiet-column — warm, quiet, editorial whitespace (sonos-structure inspiration). */
+export const QUIET_COLUMN_TOKENS: EmailThemeTokens = layoutTokens({
   brandColor: "#1a1a1a",
   secondaryColor: "#6f6b66",
   mutedTextColor: "#6f6b66",
@@ -129,6 +138,9 @@ export const SONOS_TOKENS: EmailThemeTokens = layoutTokens({
   emailFont: "georgia",
 });
 
+/** @deprecated Use QUIET_COLUMN_TOKENS. */
+export const SONOS_TOKENS: EmailThemeTokens = QUIET_COLUMN_TOKENS;
+
 export type LayoutPreset = {
   id: LayoutPresetId;
   name: string;
@@ -137,18 +149,18 @@ export type LayoutPreset = {
 };
 
 export const LAYOUT_PRESET_CATALOG: Record<LayoutPresetId, LayoutPreset> = {
-  sonos: {
-    id: "sonos",
-    name: "Sonos",
+  "quiet-column": {
+    id: "quiet-column",
+    name: "Quiet column",
     description:
-      "Sonos-structure recovery layout: warm paper, quiet type, Day 0/2/5.",
-    tokens: SONOS_TOKENS,
+      "Centered quiet column: warm paper, editorial type. Day 0/2/5.",
+    tokens: QUIET_COLUMN_TOKENS,
   },
-  avocode: {
-    id: "avocode",
-    name: "Avocode",
+  "amount-due": {
+    id: "amount-due",
+    name: "Amount due",
     description:
-      "Avocode-structure recovery layout: cool product chrome, compact CTA.",
+      "Left product stack with an amount-due callout and compact CTA.",
     tokens: layoutTokens({
       brandColor: "#2b4c7e",
       secondaryColor: "#6b7380",
@@ -164,11 +176,11 @@ export const LAYOUT_PRESET_CATALOG: Record<LayoutPresetId, LayoutPreset> = {
       emailFont: "inter",
     }),
   },
-  benchmark: {
-    id: "benchmark",
-    name: "Benchmark",
+  "what-happened": {
+    id: "what-happened",
+    name: "What happened",
     description:
-      "Benchmark-structure recovery layout: newsletter block, teal accent.",
+      "Newsletter block that explains the failed charge, then reassures.",
     tokens: layoutTokens({
       brandColor: "#1f6f5b",
       secondaryColor: "#5f6f68",
@@ -184,11 +196,11 @@ export const LAYOUT_PRESET_CATALOG: Record<LayoutPresetId, LayoutPreset> = {
       emailFont: "system",
     }),
   },
-  fontbase: {
-    id: "fontbase",
-    name: "FontBase",
+  "plain-letter": {
+    id: "plain-letter",
+    name: "Plain letter",
     description:
-      "FontBase-structure recovery layout: cream page, typographic ink.",
+      "Typographic letter: cream page, rule, short plan list.",
     tokens: layoutTokens({
       brandColor: "#2c241c",
       secondaryColor: "#7a7268",
@@ -204,11 +216,11 @@ export const LAYOUT_PRESET_CATALOG: Record<LayoutPresetId, LayoutPreset> = {
       emailFont: "merriweather",
     }),
   },
-  "nordvpn-structure": {
-    id: "nordvpn-structure",
-    name: "NordVPN structure",
+  "poster-notice": {
+    id: "poster-notice",
+    name: "Poster notice",
     description:
-      "NordVPN-structure recovery layout: cool navy stack, structured sections.",
+      "Structured poster stack: navy chrome, numbered next steps.",
     tokens: layoutTokens({
       brandColor: "#1b2332",
       secondaryColor: "#5c6573",
@@ -226,31 +238,44 @@ export const LAYOUT_PRESET_CATALOG: Record<LayoutPresetId, LayoutPreset> = {
   },
 };
 
-/** Writes + asserts: Quiet Verify is the only accepted legacy alias. */
+/**
+ * Writes: Quiet Verify is the only accepted leftover product-email alias.
+ * Old Set-A-era kit ids are read-mapped below — not writable catalog ids.
+ */
 const LEGACY_LAYOUT_PRESET_IDS: Record<string, LayoutPresetId> = {
-  "quiet-verify": "sonos",
-  quiet_verify: "sonos",
+  "quiet-verify": "quiet-column",
+  quiet_verify: "quiet-column",
 };
 
 /**
- * Shared read-path remaps for leftover ids. Send and any leftover layout
- * normalizer must use this table (e.g. soft-expire → fontbase, not sonos).
+ * Legacy id → Set A. Structural inspiration only (do not keep old names
+ * as catalog ids):
+ *   sonos / quiet-verify / calm-verify     → quiet-column
+ *   avocode / soft-renew / trial-ended     → amount-due
+ *   benchmark / safe-pause / data-safe     → what-happened
+ *   fontbase / soft-expire / upcoming-renewal → plain-letter
+ *   nordvpn-structure / alert-expire / account-expired → poster-notice
  */
 export const LEGACY_LAYOUT_PRESET_ID_MAP: Record<string, LayoutPresetId> = {
   ...LEGACY_LAYOUT_PRESET_IDS,
-  "calm-verify": "sonos",
-  "soft-expire": "fontbase",
-  soft_expire: "fontbase",
-  "safe-pause": "benchmark",
-  safe_pause: "benchmark",
-  "soft-renew": "avocode",
-  soft_renew: "avocode",
-  "alert-expire": "nordvpn-structure",
-  alert_expire: "nordvpn-structure",
-  "account-expired": "nordvpn-structure",
-  "trial-ended": "avocode",
-  "upcoming-renewal": "fontbase",
-  "data-safe": "benchmark",
+  sonos: "quiet-column",
+  "calm-verify": "quiet-column",
+  avocode: "amount-due",
+  "soft-renew": "amount-due",
+  soft_renew: "amount-due",
+  "trial-ended": "amount-due",
+  benchmark: "what-happened",
+  "safe-pause": "what-happened",
+  safe_pause: "what-happened",
+  "data-safe": "what-happened",
+  fontbase: "plain-letter",
+  "soft-expire": "plain-letter",
+  soft_expire: "plain-letter",
+  "upcoming-renewal": "plain-letter",
+  "nordvpn-structure": "poster-notice",
+  "alert-expire": "poster-notice",
+  alert_expire: "poster-notice",
+  "account-expired": "poster-notice",
 };
 
 /** @deprecated Use LEGACY_LAYOUT_PRESET_ID_MAP — same table. */
@@ -489,6 +514,22 @@ export function resolveThemeFromSettings(settings: {
   return resolveTheme({
     stylingMode: inferStylingMode(settings),
     layoutPresetId: settings.layoutPresetId,
+    configured: configuredTokensFromSettings(settings),
+  });
+}
+
+/**
+ * Send / preview tokens: scrape (configured) with catalog kit tokens as
+ * fallback for missing fields. Layout id is the winner or assigned arm —
+ * never a merchant picker value.
+ */
+export function resolveSendTheme(
+  kitId: string | null | undefined,
+  settings: SettingsTokenSource | null | undefined,
+): ResolvedEmailTheme {
+  return resolveTheme({
+    stylingMode: "configured",
+    layoutPresetId: kitId,
     configured: configuredTokensFromSettings(settings),
   });
 }

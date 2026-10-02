@@ -15,9 +15,9 @@ const STORAGE_KEY = "dg.emailLayoutDraft.v1";
 
 /**
  * Riley-shaped FE draft. recoverySettings will store stylingMode +
- * layoutPresetId (default sonos; legacy quiet-verify maps here) when Convex tips; until then
- * this stays in localStorage. Kit ids are FE-local until Riley’s catalog
- * accepts them — persist errors should surface, not remap on hydrate.
+ * layoutPresetId (default quiet-column; legacy quiet-verify / sonos map here)
+ * when Convex tips; until then this stays in localStorage. FE catalog is
+ * Set A (5 kits). Merchants do not persist a chosen template id.
  */
 export type EmailLayoutDraft = {
   stylingMode: StylingMode;
@@ -130,15 +130,16 @@ export type PersistableEmailLayoutFields = {
  *
  * Writes the Riley-shaped draft to localStorage. Color fields that
  * `saveEmailCustomizations` already accepts are returned for the live
- * save path. `stylingMode` + `layoutPresetId` persist via
- * `setStylingMode` / `setLayoutPresetId` when those refs exist.
+ * save path. `stylingMode` persists via `setStylingMode` when that
+ * ref exists. `layoutPresetId` is BE-owned (A/B assignment) — FE
+ * must not persist a merchant-chosen template id.
  */
 export function persistEmailLayoutSettings(input: {
   draft: EmailLayoutDraft;
   configured: Partial<EmailThemeTokens>;
 }): {
   persisted: PersistableEmailLayoutFields | null;
-  localOnly: Pick<EmailLayoutDraft, "layoutPresetId" | "stylingMode" | "copyOverrides" | "shellOverrides">;
+  localOnly: Pick<EmailLayoutDraft, "stylingMode" | "copyOverrides" | "shellOverrides">;
   convexGap: readonly string[];
 } {
   writeEmailLayoutDraft(input.draft);
@@ -161,13 +162,11 @@ export function persistEmailLayoutSettings(input: {
   return {
     persisted,
     localOnly: {
-      layoutPresetId: input.draft.layoutPresetId,
       stylingMode: input.draft.stylingMode,
       copyOverrides: input.draft.copyOverrides,
       shellOverrides: input.draft.shellOverrides,
     },
     convexGap: [
-      "layoutPresetId",
       "stylingMode",
       "copyOverrides (lifecycle short copy)",
       "emailBackgroundColor",

@@ -1,12 +1,12 @@
 /**
  * Shared table-based recovery-layout HTML.
  *
- * Locked catalog IDs (CoS + Riley):
- *   sonos              → src/components/dashboard/email-layouts/refs/sonos.png
- *   avocode            → src/components/dashboard/email-layouts/refs/avocode.png
- *   benchmark          → src/components/dashboard/email-layouts/refs/benchmark.png
- *   fontbase           → src/components/dashboard/email-layouts/refs/fontbase.png
- *   nordvpn-structure  → src/components/dashboard/email-layouts/refs/nordvpn-structure.png
+ * Leftover table HTML (off send path). Set A IDs:
+ *   quiet-column  ← sonos-structure
+ *   amount-due    ← avocode-structure
+ *   what-happened ← benchmark-structure
+ *   plain-letter  ← fontbase-structure
+ *   poster-notice ← nordvpn-structure
  *
  * Keyed by layoutPresetId × day0|day2|day5. Merchant branding only —
  * no third-party logos or cloned marketing copy.
@@ -22,11 +22,11 @@ import {
 import { allowHttpsUrl } from "./safeUrl";
 
 export const RECOVERY_LAYOUT_IDS = [
-  "sonos",
-  "avocode",
-  "benchmark",
-  "fontbase",
-  "nordvpn-structure",
+  "poster-notice",
+  "amount-due",
+  "plain-letter",
+  "what-happened",
+  "quiet-column",
 ] as const;
 
 export type RecoveryLayoutId = (typeof RECOVERY_LAYOUT_IDS)[number];
@@ -116,7 +116,7 @@ export function normalizeRecoveryLayoutId(
 ): RecoveryLayoutId {
   const raw = value?.trim() ?? "";
   const mapped = LEGACY_LAYOUT_PRESET_ID_MAP[raw] ?? raw;
-  return isRecoveryLayoutId(mapped) ? mapped : "sonos";
+  return isRecoveryLayoutId(mapped) ? mapped : "quiet-column";
 }
 
 export function recoveryStepFromTemplate(
@@ -607,19 +607,19 @@ export function buildRecoveryLayoutHtml(
 
   let html: string;
   switch (layoutPresetId) {
-    case "sonos":
+    case "quiet-column":
       html = sonosHtml(input, ctx);
       break;
-    case "avocode":
+    case "amount-due":
       html = avocodeHtml(input, ctx);
       break;
-    case "benchmark":
+    case "what-happened":
       html = benchmarkHtml(input, ctx);
       break;
-    case "fontbase":
+    case "plain-letter":
       html = fontbaseHtml(input, ctx);
       break;
-    case "nordvpn-structure":
+    case "poster-notice":
       html = nordvpnHtml(input, ctx);
       break;
     default: {

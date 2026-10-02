@@ -5,14 +5,22 @@ import {
   LAYOUT_PRESET_IDS,
   LEGACY_LAYOUT_PRESET_ID_MAP,
   NEW_MERCHANT_THEME_DEFAULTS,
+  QUIET_COLUMN_TOKENS,
   RECOVERY_SEQUENCE_STEPS,
-  SONOS_TOKENS,
   assertKnownLayoutPresetId,
   inferStylingMode,
   normalizeLayoutPresetId,
+  resolveSendTheme,
   resolveTheme,
   resolveThemeFromSettings,
 } from "../convex/lib/emailTheme";
+import {
+  KIT_EXPERIMENT_MIN_SEQUENCES,
+  nextRotationKit,
+  pickWinningKit,
+  resolveSendKit,
+  shouldPromoteKitExperiment,
+} from "../convex/lib/kitExperiment";
 import {
   persistTextBlockHtml,
   persistTextCopySlot,
@@ -35,8 +43,9 @@ import {
   inferStylingMode as feInferStylingMode,
   normalizeLayoutPresetId as feNormalizeLayoutPresetId,
   assertKnownLayoutPresetId as feAssertKnownLayoutPresetId,
+  DEFAULT_LAYOUT_PRESET_ID as FE_DEFAULT_LAYOUT_PRESET_ID,
+  NEW_MERCHANT_THEME_DEFAULTS as FE_NEW_MERCHANT_THEME_DEFAULTS,
   LAYOUT_PRESET_IDS as FE_LAYOUT_PRESET_IDS,
-  RECOVERY_SEQUENCE_STEPS as FE_RECOVERY_SEQUENCE_STEPS,
 } from "../src/lib/emailTheme";
 import {
   sanitizeEditorHtml,
@@ -68,25 +77,27 @@ if (inferStylingMode({ stylingMode: undefined }) !== "configured") {
 if (NEW_MERCHANT_THEME_DEFAULTS.stylingMode !== "preset") {
   throw new Error("FAIL: new merchants must default stylingMode preset");
 }
-if (NEW_MERCHANT_THEME_DEFAULTS.layoutPresetId !== "sonos") {
+if (NEW_MERCHANT_THEME_DEFAULTS.layoutPresetId !== "quiet-column") {
   throw new Error(
-    `FAIL: new merchants must default layoutPresetId sonos, got ${NEW_MERCHANT_THEME_DEFAULTS.layoutPresetId}`,
+    `FAIL: new merchants must default layoutPresetId quiet-column, got ${NEW_MERCHANT_THEME_DEFAULTS.layoutPresetId}`,
   );
 }
 
-if (normalizeLayoutPresetId("quiet-verify") !== "sonos") {
-  throw new Error("FAIL: quiet-verify must map to sonos");
+if (normalizeLayoutPresetId("quiet-verify") !== "quiet-column") {
+  throw new Error("FAIL: quiet-verify must map to quiet-column");
 }
-if (assertKnownLayoutPresetId("quiet-verify") !== "sonos") {
-  throw new Error("FAIL: assertKnownLayoutPresetId(quiet-verify) must be sonos");
+if (assertKnownLayoutPresetId("quiet-verify") !== "quiet-column") {
+  throw new Error(
+    "FAIL: assertKnownLayoutPresetId(quiet-verify) must be quiet-column",
+  );
 }
 
 const expectedIds = [
-  "sonos",
-  "avocode",
-  "benchmark",
-  "fontbase",
-  "nordvpn-structure",
+  "poster-notice",
+  "amount-due",
+  "plain-letter",
+  "what-happened",
+  "quiet-column",
 ] as const;
 if (LAYOUT_PRESET_IDS.join(",") !== expectedIds.join(",")) {
   throw new Error(
@@ -99,15 +110,15 @@ for (const id of expectedIds) {
   }
 }
 
-const sonosPreset = resolveTheme({
+const quietPreset = resolveTheme({
   stylingMode: "preset",
-  layoutPresetId: "sonos",
+  layoutPresetId: "quiet-column",
 });
-if (sonosPreset.tokens.brandColor !== SONOS_TOKENS.brandColor) {
-  throw new Error("FAIL: preset sonos must use Sonos catalog tokens");
+if (quietPreset.tokens.brandColor !== QUIET_COLUMN_TOKENS.brandColor) {
+  throw new Error("FAIL: preset quiet-column must use catalog tokens");
 }
-if (sonosPreset.tokens.brandColor === "#3d5248") {
-  throw new Error("FAIL: sonos must not fall back to Quiet Verify green");
+if (quietPreset.tokens.brandColor === "#3d5248") {
+  throw new Error("FAIL: quiet-column must not fall back to Quiet Verify green");
 }
 
 if (RECOVERY_SEQUENCE_STEPS.join(",") !== "day0,day2,day5") {
@@ -116,23 +127,34 @@ if (RECOVERY_SEQUENCE_STEPS.join(",") !== "day0,day2,day5") {
   );
 }
 
-if (feNormalizeLayoutPresetId("sonos") !== "sonos") {
-  throw new Error("FAIL: FE normalizeLayoutPresetId must accept sonos");
+if (feNormalizeLayoutPresetId("quiet-column") !== "quiet-column") {
+  throw new Error("FAIL: FE normalizeLayoutPresetId must accept quiet-column");
 }
-if (feNormalizeLayoutPresetId("quiet-verify") !== "sonos") {
-  throw new Error("FAIL: FE quiet-verify must map to sonos");
+if (FE_DEFAULT_LAYOUT_PRESET_ID !== "quiet-column") {
+  throw new Error(
+    `FAIL: FE default kit must be quiet-column, got ${FE_DEFAULT_LAYOUT_PRESET_ID}`,
+  );
 }
-if (feAssertKnownLayoutPresetId("sonos") !== "sonos") {
-  throw new Error("FAIL: FE assertKnownLayoutPresetId must accept sonos");
+if (FE_NEW_MERCHANT_THEME_DEFAULTS.layoutPresetId !== "quiet-column") {
+  throw new Error("FAIL: FE new merchants must default layoutPresetId quiet-column");
 }
-if (feInferStylingMode({ stylingMode: undefined }) !== "configured") {
-  throw new Error("FAIL: FE unset stylingMode must infer configured");
+if (feNormalizeLayoutPresetId("quiet-verify") !== "quiet-column") {
+  throw new Error("FAIL: FE quiet-verify must map to quiet-column");
+}
+if (feNormalizeLayoutPresetId("sonos") !== "quiet-column") {
+  throw new Error("FAIL: FE sonos must map to quiet-column");
+}
+if (feNormalizeLayoutPresetId("calm-verify") !== "quiet-column") {
+  throw new Error("FAIL: FE calm-verify must map to quiet-column");
+}
+if (feAssertKnownLayoutPresetId("quiet-column") !== "quiet-column") {
+  throw new Error("FAIL: FE assertKnownLayoutPresetId must accept quiet-column");
+}
+if (feInferStylingMode({ stylingMode: "configured" }) !== "configured") {
+  throw new Error("FAIL: FE configured stylingMode must stay configured");
 }
 if (FE_LAYOUT_PRESET_IDS.join(",") !== expectedIds.join(",")) {
   throw new Error("FAIL: FE catalog ids must match BE");
-}
-if (FE_RECOVERY_SEQUENCE_STEPS.join(",") !== "day0,day2,day5") {
-  throw new Error("FAIL: FE recovery steps must be day0|day2|day5");
 }
 
 let rejected = false;
@@ -199,35 +221,123 @@ if (uniqueHtml.size !== expectedIds.length) {
   throw new Error("FAIL: layoutPresetId must seed five distinct block kits");
 }
 
-const sonosHtml = structures.find((row) => row.id === "sonos")!.html;
-if (sonosHtml.includes(kitVisibleFingerprint("avocode"))) {
-  throw new Error("FAIL: sonos kit must not use avocode starter blocks");
+const quietHtml = structures.find((row) => row.id === "quiet-column")!.html;
+if (quietHtml.includes(kitVisibleFingerprint("amount-due"))) {
+  throw new Error("FAIL: quiet-column kit must not use amount-due starter blocks");
 }
 
 const day0 = buildRecoveryEmail({
   ...sharedColors,
   templateId: "gentle",
-  layoutPresetId: "sonos",
+  layoutPresetId: "quiet-column",
 });
 const day2 = buildRecoveryEmail({
   ...sharedColors,
   templateId: "direct",
-  layoutPresetId: "sonos",
+  layoutPresetId: "quiet-column",
 });
 if (day0.html === day2.html) {
   throw new Error("FAIL: day step must change kit copy without changing kit id");
 }
-if (!day2.html.includes('data-email-kit="sonos"')) {
+if (!day2.html.includes('data-email-kit="quiet-column"')) {
   throw new Error("FAIL: day step must keep the same starter kit");
 }
 
-if (normalizeLayoutPresetId("soft-expire") !== "fontbase") {
+if (normalizeLayoutPresetId("soft-expire") !== "plain-letter") {
   throw new Error(
-    `FAIL: soft-expire must map to fontbase, got ${normalizeLayoutPresetId("soft-expire")}`,
+    `FAIL: soft-expire must map to plain-letter, got ${normalizeLayoutPresetId("soft-expire")}`,
   );
 }
-if (LEGACY_LAYOUT_PRESET_ID_MAP["soft-expire"] !== "fontbase") {
-  throw new Error("FAIL: shared legacy map must send soft-expire → fontbase");
+if (LEGACY_LAYOUT_PRESET_ID_MAP["soft-expire"] !== "plain-letter") {
+  throw new Error("FAIL: shared legacy map must send soft-expire → plain-letter");
+}
+if (LEGACY_LAYOUT_PRESET_ID_MAP.sonos !== "quiet-column") {
+  throw new Error("FAIL: sonos must map to quiet-column");
+}
+if (LEGACY_LAYOUT_PRESET_ID_MAP.avocode !== "amount-due") {
+  throw new Error("FAIL: avocode must map to amount-due");
+}
+if (LEGACY_LAYOUT_PRESET_ID_MAP.benchmark !== "what-happened") {
+  throw new Error("FAIL: benchmark must map to what-happened");
+}
+if (LEGACY_LAYOUT_PRESET_ID_MAP.fontbase !== "plain-letter") {
+  throw new Error("FAIL: fontbase must map to plain-letter");
+}
+if (LEGACY_LAYOUT_PRESET_ID_MAP["nordvpn-structure"] !== "poster-notice") {
+  throw new Error("FAIL: nordvpn-structure must map to poster-notice");
+}
+
+if (resolveSendKit({ experimentStatus: "won", winnerKitId: "amount-due" }) !== "amount-due") {
+  throw new Error("FAIL: won experiment must send the winner kit");
+}
+if (
+  resolveSendKit({
+    experimentStatus: "won",
+    winnerKitId: "amount-due",
+    assignedKitId: "plain-letter",
+  }) !== "plain-letter"
+) {
+  throw new Error("FAIL: won+assigned must send the assigned arm");
+}
+if (
+  resolveSendKit({
+    experimentStatus: "active",
+    assignedKitId: "plain-letter",
+    winnerKitId: "amount-due",
+  }) !== "plain-letter"
+) {
+  throw new Error("FAIL: active experiment must send the assigned arm");
+}
+if (resolveSendKit({}) !== "quiet-column") {
+  throw new Error("FAIL: missing assignment must fall back to quiet-column");
+}
+if (nextRotationKit(0).kitId !== "poster-notice") {
+  throw new Error("FAIL: rotation must start at poster-notice");
+}
+if (KIT_EXPERIMENT_MIN_SEQUENCES !== 20) {
+  throw new Error("FAIL: promote floor must be 20 sequences per kit");
+}
+if (
+  shouldPromoteKitExperiment(
+    expectedIds.map((kitId) => ({
+      kitId,
+      sequencesStarted: 19,
+      recoveries: 1,
+    })),
+  )
+) {
+  throw new Error("FAIL: must not promote before every kit reaches N=20");
+}
+if (
+  !shouldPromoteKitExperiment(
+    expectedIds.map((kitId) => ({
+      kitId,
+      sequencesStarted: 20,
+      recoveries: kitId === "quiet-column" ? 5 : 4,
+    })),
+  )
+) {
+  throw new Error("FAIL: must promote when every kit has ≥ 20 sequences");
+}
+if (
+  pickWinningKit([
+    { kitId: "amount-due", sequencesStarted: 20, recoveries: 4 },
+    { kitId: "quiet-column", sequencesStarted: 20, recoveries: 4 },
+    { kitId: "poster-notice", sequencesStarted: 20, recoveries: 3 },
+    { kitId: "plain-letter", sequencesStarted: 20, recoveries: 2 },
+    { kitId: "what-happened", sequencesStarted: 20, recoveries: 1 },
+  ]) !== "quiet-column"
+) {
+  throw new Error("FAIL: tied rate + recoveries must break to quiet-column");
+}
+const sendConfigured = resolveSendTheme("quiet-column", {
+  brandColor: "#112233",
+});
+if (sendConfigured.stylingMode !== "configured") {
+  throw new Error("FAIL: send theme must use configured scrape tokens");
+}
+if (sendConfigured.tokens.brandColor !== "#112233") {
+  throw new Error("FAIL: send theme must apply scrape brandColor");
 }
 
 if (!day0.html.includes("data-ignore-note") || !day0.html.includes("already updated")) {
@@ -237,7 +347,7 @@ if (!day0.html.includes("data-ignore-note") || !day0.html.includes("already upda
 const withSocials = buildRecoveryEmail({
   ...sharedColors,
   templateId: "gentle",
-  layoutPresetId: "sonos",
+  layoutPresetId: "quiet-column",
   socials: { x: "https://x.com/acme" },
 });
 if (!withSocials.html.includes("https://x.com/acme")) {
@@ -247,7 +357,7 @@ if (!withSocials.html.includes("https://x.com/acme")) {
 const withBlocks = buildRecoveryEmail({
   ...sharedColors,
   templateId: "gentle",
-  layoutPresetId: "sonos",
+  layoutPresetId: "quiet-column",
   copyOverrides: {
     gentle: {
       subject: "Subj",
@@ -270,22 +380,31 @@ const withBlocks = buildRecoveryEmail({
   },
 });
 if (!withBlocks.html.includes('data-compose="blocks"')) {
-  throw new Error("FAIL: merchant blocks must compose via renderBlocksHtml");
+  throw new Error("FAIL: send must still compose via renderBlocksHtml");
 }
-if (!withBlocks.html.includes("<strong>block</strong>")) {
-  throw new Error("FAIL: merchant blocks must compose as HTML inside theme chrome");
+if (withBlocks.html.includes("Merchant <strong>block</strong>")) {
+  throw new Error("FAIL: merchant blocks must be ignored on send");
 }
-if (withBlocks.html.includes("&lt;strong&gt;block&lt;/strong&gt;")) {
-  throw new Error("FAIL: blocks HTML must not be escaped as plain text");
+if (!withBlocks.html.includes(kitVisibleFingerprint("quiet-column"))) {
+  throw new Error("FAIL: send must use assigned kit blocks, not merchant blocks");
 }
-if (!withBlocks.html.includes("Pro Monthly")) {
-  throw new Error("FAIL: block placeholders must apply");
+if (!withBlocks.html.includes("Headline")) {
+  throw new Error("FAIL: merchant headline must overlay kit copySlot");
+}
+if (!withBlocks.html.includes("plain body that must not flatten blocks")) {
+  throw new Error("FAIL: merchant body must overlay kit copySlot");
+}
+if (!withBlocks.html.includes("CTA")) {
+  throw new Error("FAIL: merchant cta must overlay kit button");
+}
+if (withBlocks.subject !== "Subj") {
+  throw new Error("FAIL: merchant subject must apply on send");
 }
 
 const withShell = buildRecoveryEmail({
   ...sharedColors,
   templateId: "gentle",
-  layoutPresetId: "sonos",
+  layoutPresetId: "quiet-column",
   copyOverrides: {
     gentle: {
       subject: "Subj",
@@ -301,17 +420,14 @@ const withShell = buildRecoveryEmail({
     },
   },
 });
-if (!withShell.html.includes("#abcdef")) {
-  throw new Error("FAIL: shellBackground must apply to layout HTML");
+if (withShell.html.includes("#abcdef")) {
+  throw new Error("FAIL: merchant shellBackground must not override kit chrome");
 }
-if (!withShell.html.includes("border-radius:16px")) {
-  throw new Error("FAIL: shellRadius must apply to layout HTML");
+if (!withShell.html.includes("padding:40px 64px")) {
+  throw new Error("FAIL: send must use kit emailPadding, not merchant chrome");
 }
-if (!withShell.html.includes("border:2px solid #112233")) {
-  throw new Error("FAIL: shell border must apply to layout HTML");
-}
-if (!withShell.html.includes("padding:40px")) {
-  throw new Error("FAIL: emailPadding must apply to layout HTML");
+if (!withShell.html.includes("border:0")) {
+  throw new Error("FAIL: send must use kit shellBorder, not merchant chrome");
 }
 
 const xssBlockHtml =
@@ -375,7 +491,7 @@ if (!xssDirect.includes("js") || !xssDirect.includes("bold")) {
 const xssComposed = buildRecoveryEmail({
   ...sharedColors,
   templateId: "gentle",
-  layoutPresetId: "sonos",
+  layoutPresetId: "quiet-column",
   copyOverrides: {
     gentle: {
       subject: "Subj",
@@ -398,9 +514,6 @@ const xssComposed = buildRecoveryEmail({
   },
 });
 assertSafeHrefs(xssComposed.html, "composed send HTML");
-if (!xssComposed.html.includes("https://safe.example")) {
-  throw new Error("FAIL: composed HTML must keep allowlisted https href");
-}
 
 const gluedOnclick = '<a href="https://safe.example"onclick="alert(1)">ok</a>';
 const gluedRendered = renderBlocksHtml(
@@ -476,22 +589,22 @@ if (danglingRendered.includes("onclick") || danglingRendered.includes("target=")
   throw new Error("FAIL: dangling open render must not keep raw attrs");
 }
 
-const kitHeadline = starterBlocksForKit("sonos", "gentle").find(
+const kitHeadline = starterBlocksForKit("quiet-column", "gentle").find(
   (block) => block.type === "text" && block.copySlot === "headline",
 );
 if (!kitHeadline || kitHeadline.type !== "text") {
-  throw new Error("FAIL: sonos starter kit must emit headline copySlot");
+  throw new Error("FAIL: quiet-column starter kit must emit headline copySlot");
 }
 const savedHeadline = persistTextCopySlot(kitHeadline.copySlot);
 if (savedHeadline !== "headline") {
   throw new Error("FAIL: copySlot headline must round-trip persistTextCopySlot");
 }
-for (const slot of ["eyebrow", "headline", "body"] as const) {
-  const seeded = starterBlocksForKit("avocode", "direct").find(
+for (const slot of ["headline", "body"] as const) {
+  const seeded = starterBlocksForKit("amount-due", "direct").find(
     (block) => block.type === "text" && block.copySlot === slot,
   );
   if (!seeded || seeded.type !== "text") {
-    throw new Error(`FAIL: avocode kit must emit copySlot ${slot}`);
+    throw new Error(`FAIL: amount-due kit must emit copySlot ${slot}`);
   }
   if (persistTextCopySlot(seeded.copySlot) !== slot) {
     throw new Error(`FAIL: copySlot ${slot} stripped on persist`);
@@ -715,6 +828,7 @@ type ShapeBlock = {
   bold?: boolean | undefined;
   align?: string;
   copySlot?: string | undefined;
+  height?: number;
   marginTop: number;
   marginBottom: number;
 };
@@ -730,6 +844,7 @@ function kitShape(
     bold?: boolean;
     align?: string;
     copySlot?: string;
+    height?: number;
     marginTop: number;
     marginBottom: number;
   },
@@ -744,6 +859,7 @@ function kitShape(
     bold: block.bold,
     align: block.align,
     copySlot: block.copySlot,
+    height: block.height,
     marginTop: block.marginTop,
     marginBottom: block.marginBottom,
   };
@@ -797,49 +913,46 @@ for (const id of expectedIds) {
         .filter((block) => block.type === "text" && block.copySlot)
         .map((block) => (block.type === "text" ? block.copySlot : undefined)),
     );
-    if (!slots.has("eyebrow") || !slots.has("headline") || !slots.has("body")) {
-      throw new Error(`FAIL: ${id}/${day} must map copySlot eyebrow/headline/body`);
+    if (!slots.has("headline") || !slots.has("body")) {
+      throw new Error(`FAIL: ${id}/${day} must map copySlot headline/body`);
     }
   }
 }
 
-const sonosSeeded = structures.find((row) => row.id === "sonos")!.html;
-if (!sonosSeeded.includes("padding:40px 48px")) {
-  throw new Error("FAIL: empty-block sonos send must use kit emailPadding 48");
+const quietSeeded = structures.find((row) => row.id === "quiet-column")!.html;
+if (!quietSeeded.includes("padding:40px 64px")) {
+  throw new Error("FAIL: empty-block quiet-column send must use kit emailPadding 64");
 }
-if (!sonosSeeded.includes("border:0")) {
-  throw new Error("FAIL: empty-block sonos send must use kit shellBorder false");
+if (!quietSeeded.includes("border:0")) {
+  throw new Error("FAIL: empty-block quiet-column send must use kit shellBorder false");
 }
-const nordSeeded = structures.find((row) => row.id === "nordvpn-structure")!.html;
-if (!nordSeeded.includes("border:4px solid")) {
-  throw new Error("FAIL: empty-block nordvpn send must use kit shellBorderWidth 4");
+const posterSeeded = structures.find((row) => row.id === "poster-notice")!.html;
+if (!posterSeeded.includes("font-size:34px")) {
+  throw new Error("FAIL: poster-notice send must use kit headline size 34");
 }
-const benchSeeded = structures.find((row) => row.id === "benchmark")!.html;
-if (!benchSeeded.includes("border-radius:12px")) {
-  throw new Error("FAIL: empty-block benchmark send must use kit shellRadius 12");
+const amountSeeded = structures.find((row) => row.id === "amount-due")!.html;
+if (!amountSeeded.includes("Amount due")) {
+  throw new Error("FAIL: amount-due send must include money-first chrome");
 }
 
-if (!day0.html.includes("A quick update") || !day0.html.includes("Your payment didn’t go through")) {
-  throw new Error("FAIL: day0 sonos must seed FE gentle eyebrow/headline");
+if (!day0.html.includes("Your payment didn’t go through")) {
+  throw new Error("FAIL: day0 quiet-column must seed FE gentle headline");
 }
-if (!day2.html.includes("Still pending") || !day2.html.includes("Still need an updated card")) {
-  throw new Error("FAIL: day2 sonos must seed FE direct eyebrow/headline");
+if (!day2.html.includes("Still need an updated card")) {
+  throw new Error("FAIL: day2 quiet-column must seed FE direct headline");
 }
 const day5 = buildRecoveryEmail({
   ...sharedColors,
   templateId: "urgent",
-  layoutPresetId: "sonos",
+  layoutPresetId: "quiet-column",
 });
 if (!day5.html.includes("Last chance") || !day5.html.includes("Fix payment now")) {
-  throw new Error("FAIL: day5 sonos must seed FE urgent copy");
+  throw new Error("FAIL: day5 quiet-column must seed FE urgent copy");
 }
-if (day0.html.includes("Or <a") === false && !day0.html.includes("Or ")) {
-  throw new Error("FAIL: sonos billing prefix Or must render");
-}
-if (!day0.html.includes("Open the billing page") || !day0.html.includes("to continue.")) {
-  throw new Error("FAIL: sonos billing link must match FE suffix");
+if (!day0.html.includes("Open the billing page")) {
+  throw new Error("FAIL: quiet-column billing link must render");
 }
 
 console.log(
-  "asserts green: configured-legacy #112233, quiet-verify→sonos, 5 kit ids, FE normalize sonos, unset→configured, D0/D2/D5, blocks+theme send, no layout-table body, shared soft-expire map, socials, ignoreNote, shell chrome, block href/attr sanitizer, FE/BE starter kit parity, copySlot persist, glued onclick + dangling open, FE sanitizer parity, slash-glue on* + allowHttpsUrl closed-a, slash-attr space after tag, invalid href no orphan </a>",
+  "asserts green: configured-legacy #112233, Set A ids, quiet-verify→quiet-column, A/B resolve, won+assigned sticky, unset→configured, D0/D2/D5, blocks+theme send, merchant short copy overlay, merchant blocks ignored, no layout-table body, FE/BE default+legacy, socials, ignoreNote, kit chrome, sanitizer, FE/BE kit parity",
 );

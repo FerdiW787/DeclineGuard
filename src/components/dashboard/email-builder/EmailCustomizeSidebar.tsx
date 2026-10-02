@@ -1,7 +1,4 @@
-import type { LayoutPresetId, StylingMode } from "@/lib/emailLayoutPresets";
-import { LAYOUT_PRESET_STRUCTURE_META } from "@/lib/emailLayoutPresets";
-import { LAYOUT_PRESET_IDS } from "@/lib/emailTheme";
-import { cn } from "@/lib/utils";
+import type { StylingMode } from "@/lib/emailLayoutPresets";
 import { Panel } from "../dashboardUi";
 import type { ShortCopyField, ShortCopyValues } from "@/lib/emailBlockCopy";
 
@@ -18,8 +15,6 @@ type ColorValues = Record<ColorKey, string>;
 
 type Props = {
   stylingMode: StylingMode;
-  layoutPresetId: LayoutPresetId;
-  onLayoutPresetChange: (id: LayoutPresetId) => void;
   colors: ColorValues;
   onColorChange: (key: ColorKey, value: string) => void;
   copy: ShortCopyValues;
@@ -39,8 +34,6 @@ const COLOR_FIELDS: { key: ColorKey; label: string }[] = [
 
 export default function EmailCustomizeSidebar({
   stylingMode,
-  layoutPresetId,
-  onLayoutPresetChange,
   colors,
   onColorChange,
   copy,
@@ -49,44 +42,6 @@ export default function EmailCustomizeSidebar({
 }: Props) {
   return (
     <div className="space-y-4">
-      <Panel className="p-5">
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8a8f98]">
-          Layout
-        </p>
-        <p className="mt-1 text-[12px] leading-relaxed text-[#6b6f76]">
-          Structure for every recovery email. Colors follow{" "}
-          {stylingMode === "preset" ? "the selected layout" : "your store"}.
-        </p>
-        <div className="mt-3 space-y-1" role="listbox" aria-label="Email layout">
-          {LAYOUT_PRESET_IDS.map((id) => {
-            const meta = LAYOUT_PRESET_STRUCTURE_META[id];
-            const active = id === layoutPresetId;
-            return (
-              <button
-                key={id}
-                type="button"
-                role="option"
-                aria-selected={active}
-                onClick={() => onLayoutPresetChange(id)}
-                className={cn(
-                  "dg-interactive flex w-full items-start justify-between gap-2 rounded-md border px-2.5 py-2 text-left",
-                  active
-                    ? "border-black/12 bg-[#f7f8f8]"
-                    : "border-transparent",
-                )}
-              >
-                <span className="text-[13px] font-semibold text-[#08090a]">
-                  {meta.label}
-                </span>
-                <span className="max-w-[9rem] text-right text-[11px] leading-snug text-[#8a8f98]">
-                  {meta.hint}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </Panel>
-
       <Panel className="p-5">
         <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8a8f98]">
           Colors
@@ -113,8 +68,7 @@ export default function EmailCustomizeSidebar({
           Short copy
         </p>
         <p className="mt-1 text-[12px] leading-relaxed text-[#8a8f98]">
-          Overrides for {dayLabel} only. Click a block in the email to edit in
-          place.
+          Overrides for {dayLabel} only. Day 0 / 2 / 5 share the same layout.
         </p>
         <div className="mt-3 space-y-2.5">
           <TextField
