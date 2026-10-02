@@ -299,8 +299,9 @@ function galleryPage(scrape: ScrapeReport, cards: string): string {
   <title>DeclineGuard — Day 0 kit gallery</title>
   ${fontLink}
   <style>
-    body { margin: 0; background: #f7f8f8; color: #08090a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
+    body { margin: 0; background: #ffffff; color: #08090a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
     .wrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 80px; }
+    .shot { background: #ffffff; padding: 28px 24px; box-sizing: border-box; }
     h1 { font-size: 22px; letter-spacing: -0.03em; margin: 0 0 8px; }
     .meta { font-size: 13px; color: #6b6f76; line-height: 1.5; margin: 0 0 28px; }
     .card { margin: 0 0 40px; }
@@ -336,7 +337,7 @@ async function main(): Promise<void> {
     cards.push(`<section class="card">
       <p class="label">${escapeHtml(kitId)}</p>
       <p class="hint">${escapeHtml(meta.label)} — ${escapeHtml(catalog?.description ?? meta.hint)} · Day 0 / gentle</p>
-      ${html}
+      <div class="shot" data-shot="${kitId}">${html}</div>
     </section>`);
   }
 
@@ -358,7 +359,7 @@ async function main(): Promise<void> {
   await page.waitForTimeout(400);
 
   for (const kitId of LAYOUT_PRESET_IDS) {
-    const handle = page.locator(`[data-kit="${kitId}"]`);
+    const handle = page.locator(`[data-shot="${kitId}"]`);
     await handle.screenshot({
       path: path.join(OUT_DIR, `${kitId}-day0.png`),
       type: "png",
