@@ -177,6 +177,7 @@ export function formatAdminMetricValue(
   format: "count" | "cents",
 ): string {
   if (format === "cents") {
+    // Always USD. Mixed currencies are badged in the UI, not formatted here.
     try {
       return new Intl.NumberFormat("en", {
         style: "currency",
@@ -231,11 +232,15 @@ export function chartPointsFromPeriods(
   });
 }
 
+/**
+ * Overlay key for prior vs current series.
+ * BE labels are `YYYY-MM` (monthly YoY / 5y) or `YYYY-MM-DD` (daily MoM).
+ * Last token is the shared ordinal: month (`10`) for YoY, day-of-month (`02`)
+ * for MoM so `2026-10-02` meets `2026-09-02`.
+ */
 function alignKey(point: AdminSeriesPoint): string {
   const parts = point.label.split("-");
-  if (parts.length >= 3) return parts.slice(1).join("-");
-  if (parts.length === 2) return parts[1] ?? point.label;
-  return point.label;
+  return parts[parts.length - 1] ?? point.label;
 }
 
 export function periodDelta(
