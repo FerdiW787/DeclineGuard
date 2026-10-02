@@ -403,7 +403,14 @@ async function main(): Promise<void> {
   await page.goto(`file://${galleryPath}`, { waitUntil: "networkidle" });
   await page.waitForTimeout(400);
 
-  for (const kitId of LAYOUT_PRESET_IDS) {
+  const shotFilter = process.env.KIT_SHOTS?.split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  const shotIds = shotFilter?.length
+    ? LAYOUT_PRESET_IDS.filter((id) => shotFilter.includes(id))
+    : LAYOUT_PRESET_IDS;
+
+  for (const kitId of shotIds) {
     const handle = page.locator(`[data-shot="${kitId}"]`);
     await handle.screenshot({
       path: path.join(OUT_DIR, `${kitId}-day0.png`),

@@ -24,20 +24,20 @@ export const POSTER_NOTICE_LAYOUT_ID = "poster-notice";
  * FE catalog is 10. Riley BE still knows older IDs (sonos…). New ids
  * stay on the local draft until Convex validators catch up.
  *
- *   poster-notice | amount-due | plain-letter | cta-lead | ruled-editorial
- *   postscript-note | what-happened | quiet-column | stub-header | end-action
+ *   poster-notice | amount-due | plain-letter | what-happened | quiet-column
+ *   italic-lead | status-word | deck-headline | hold-open | folio-mark
  */
 export const LAYOUT_PRESET_IDS = [
   "poster-notice",
   "amount-due",
   "plain-letter",
-  "cta-lead",
-  "ruled-editorial",
-  "postscript-note",
   "what-happened",
   "quiet-column",
-  "stub-header",
-  "end-action",
+  "italic-lead",
+  "status-word",
+  "deck-headline",
+  "hold-open",
+  "folio-mark",
 ] as const;
 
 /** IDs Riley BE is expected to accept today. New FE kits persist locally. */
@@ -133,24 +133,6 @@ export const LAYOUT_PRESET_CATALOG: Record<string, LayoutPreset> = {
     description: "A short letter, then the ask.",
     tokens: SONOS_TOKENS,
   },
-  "cta-lead": {
-    id: "cta-lead",
-    name: "CTA lead",
-    description: "Button first, explanation after.",
-    tokens: SONOS_TOKENS,
-  },
-  "ruled-editorial": {
-    id: "ruled-editorial",
-    name: "Ruled editorial",
-    description: "Rules frame the notice.",
-    tokens: SONOS_TOKENS,
-  },
-  "postscript-note": {
-    id: "postscript-note",
-    name: "Postscript",
-    description: "Ask, then a P.S. trust line.",
-    tokens: SONOS_TOKENS,
-  },
   "what-happened": {
     id: "what-happened",
     name: "What happened",
@@ -163,16 +145,34 @@ export const LAYOUT_PRESET_CATALOG: Record<string, LayoutPreset> = {
     description: "Wide type, almost nothing else.",
     tokens: SONOS_TOKENS,
   },
-  "stub-header": {
-    id: "stub-header",
-    name: "Stub header",
-    description: "Product and amount as a stub.",
+  "italic-lead": {
+    id: "italic-lead",
+    name: "Italic lead",
+    description: "Italic problem line as the hero.",
     tokens: SONOS_TOKENS,
   },
-  "end-action": {
-    id: "end-action",
-    name: "End action",
-    description: "Copy first, isolated CTA last.",
+  "status-word": {
+    id: "status-word",
+    name: "Status word",
+    description: "One status word, then the ask.",
+    tokens: SONOS_TOKENS,
+  },
+  "deck-headline": {
+    id: "deck-headline",
+    name: "Deck headline",
+    description: "Tiny deck, then a large left hed.",
+    tokens: SONOS_TOKENS,
+  },
+  "hold-open": {
+    id: "hold-open",
+    name: "Hold open",
+    description: "Reassurance first, then the problem.",
+    tokens: SONOS_TOKENS,
+  },
+  "folio-mark": {
+    id: "folio-mark",
+    name: "Folio mark",
+    description: "Right folio, then a left notice.",
     tokens: SONOS_TOKENS,
   },
 };
@@ -218,9 +218,14 @@ const LEGACY_LAYOUT_PRESET_IDS: Record<string, LayoutPresetId> = {
   "nordvpn-structure": "poster-notice",
   "invoice-stack": "amount-due",
   "checklist-card": "what-happened",
-  "split-banner": "ruled-editorial",
-  "step-rail": "end-action",
-  "tight-notice": "stub-header",
+  "split-banner": "poster-notice",
+  "step-rail": "poster-notice",
+  "tight-notice": "poster-notice",
+  "cta-lead": "poster-notice",
+  "ruled-editorial": "poster-notice",
+  "postscript-note": "poster-notice",
+  "stub-header": "amount-due",
+  "end-action": "poster-notice",
 };
 
 export function isStylingMode(value: unknown): value is StylingMode {

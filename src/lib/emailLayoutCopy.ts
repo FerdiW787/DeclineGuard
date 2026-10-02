@@ -100,13 +100,13 @@ const LAYOUT_CHROME: Record<
   "poster-notice": {},
   "amount-due": {},
   "plain-letter": {},
-  "cta-lead": {},
-  "ruled-editorial": {},
-  "postscript-note": {},
   "what-happened": {},
   "quiet-column": {},
-  "stub-header": {},
-  "end-action": {},
+  "italic-lead": {},
+  "status-word": {},
+  "deck-headline": {},
+  "hold-open": {},
+  "folio-mark": {},
 };
 
 export function defaultLayoutCopy(

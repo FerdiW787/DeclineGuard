@@ -31,18 +31,6 @@ const KIT_LABEL: Record<
     title: "Plain letter",
     source: "A short letter, then the ask",
   },
-  "cta-lead": {
-    title: "CTA lead",
-    source: "Button first, explanation after",
-  },
-  "ruled-editorial": {
-    title: "Ruled editorial",
-    source: "Rules frame the notice",
-  },
-  "postscript-note": {
-    title: "Postscript",
-    source: "Ask, then a P.S. trust line",
-  },
   "what-happened": {
     title: "What happened",
     source: "Two beats: happened, then do",
@@ -51,13 +39,25 @@ const KIT_LABEL: Record<
     title: "Quiet column",
     source: "Wide type, almost nothing else",
   },
-  "stub-header": {
-    title: "Stub header",
-    source: "Product and amount as a stub",
+  "italic-lead": {
+    title: "Italic lead",
+    source: "Italic problem line as the hero",
   },
-  "end-action": {
-    title: "End action",
-    source: "Copy first, isolated CTA last",
+  "status-word": {
+    title: "Status word",
+    source: "One status word, then the ask",
+  },
+  "deck-headline": {
+    title: "Deck headline",
+    source: "Tiny deck, then a large left hed",
+  },
+  "hold-open": {
+    title: "Hold open",
+    source: "Reassurance first, then the problem",
+  },
+  "folio-mark": {
+    title: "Folio mark",
+    source: "Right folio, then a left notice",
   },
 };
 
@@ -258,38 +258,46 @@ function EmailLabKitPreview({
             €29
           </p>
         ) : null}
-        {kitId === "stub-header" ? (
+        {kitId === "status-word" ? (
           <p
-            className="mb-1 text-[7px]"
-            style={{ color: theme.mutedTextColor }}
+            className="mb-1 text-[13px] font-semibold leading-none"
+            style={{ color: theme.emailTextColor }}
           >
-            Pro Monthly · €29
+            Failed
           </p>
         ) : null}
-        {kitId === "cta-lead" ? (
-          <span
-            className={cn(
-              "mb-2 inline-block px-2.5 py-1 text-[8px] font-semibold",
-              ctaClass,
-            )}
-            style={{
-              background: theme.ctaBackgroundColor,
-              color: theme.ctaTextColor,
-              borderRadius: theme.ctaBorderRadiusPx,
-            }}
+        {kitId === "hold-open" ? (
+          <p
+            className="mb-1 text-[9px]"
+            style={{ color: theme.emailTextColor }}
           >
-            {copy.cta}
-          </span>
+            Access is still on.
+          </p>
         ) : null}
-        {kitId === "ruled-editorial" ? (
-          <hr className="mb-1.5 border-0 border-t" style={{ borderColor: `${theme.emailTextColor}18` }} />
+        {kitId === "folio-mark" ? (
+          <p
+            className="mb-1 text-right text-[7px]"
+            style={{ color: theme.mutedTextColor }}
+          >
+            Notice
+          </p>
         ) : null}
-        <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-snug tracking-tight">
+        {kitId === "deck-headline" ? (
+          <p
+            className="text-[7px]"
+            style={{ color: theme.mutedTextColor }}
+          >
+            Card update needed
+          </p>
+        ) : null}
+        <p
+          className={cn(
+            "mt-1 line-clamp-2 text-[11px] font-semibold leading-snug tracking-tight",
+            kitId === "italic-lead" && "italic",
+          )}
+        >
           {copy.headline}
         </p>
-        {kitId === "ruled-editorial" ? (
-          <hr className="mt-1.5 border-0 border-t" style={{ borderColor: `${theme.emailTextColor}18` }} />
-        ) : null}
         {kitId === "what-happened" ? (
           <p
             className="mt-1.5 text-[7px] uppercase tracking-[0.12em]"
@@ -304,37 +312,19 @@ function EmailLabKitPreview({
         >
           {copy.body}
         </p>
-        {kitId === "cta-lead" ? null : (
-          <span
-            className={cn(
-              "mt-2 inline-block px-2.5 py-1 text-[8px] font-semibold",
-              ctaClass,
-            )}
-            style={{
-              background: theme.ctaBackgroundColor,
-              color: theme.ctaTextColor,
-              borderRadius: theme.ctaBorderRadiusPx,
-            }}
-          >
-            {copy.cta}
-          </span>
-        )}
-        {kitId === "postscript-note" ? (
-          <p
-            className="mt-1.5 text-[7px] italic"
-            style={{ color: theme.mutedTextColor }}
-          >
-            P.S. Access stays on
-          </p>
-        ) : null}
-        {kitId === "end-action" ? (
-          <p
-            className="mt-1 text-[7px]"
-            style={{ color: theme.mutedTextColor }}
-          >
-            Your workspace stays put.
-          </p>
-        ) : null}
+        <span
+          className={cn(
+            "mt-2 inline-block px-2.5 py-1 text-[8px] font-semibold",
+            ctaClass,
+          )}
+          style={{
+            background: theme.ctaBackgroundColor,
+            color: theme.ctaTextColor,
+            borderRadius: theme.ctaBorderRadiusPx,
+          }}
+        >
+          {copy.cta}
+        </span>
         </div>
     </div>
   );

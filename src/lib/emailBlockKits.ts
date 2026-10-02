@@ -5,13 +5,13 @@
  *   poster-notice     one announcement, then the button
  *   amount-due        money first, then the problem
  *   plain-letter      a short letter, then the ask
- *   cta-lead          button first, explanation after
- *   ruled-editorial   rules frame the notice
- *   postscript-note   ask, then a P.S. trust line
  *   what-happened     two beats: happened, then do
  *   quiet-column      wide type, almost nothing else
- *   stub-header       product and amount as a stub
- *   end-action        copy first, isolated CTA last
+ *   italic-lead       italic problem line as the hero
+ *   status-word       one status word, then the ask
+ *   deck-headline     tiny deck, then a large left hed
+ *   hold-open         reassurance first, then the problem
+ *   folio-mark        right folio, then a left notice
  *
  * Day 0 / 2 / 5 reuse the same kit chrome with gentle / direct / urgent copy.
  */
@@ -106,51 +106,6 @@ export const BLOCK_KIT_SPEC: Record<LayoutPresetId, BlockKitSpec> = {
     headlineSize: 22,
     bodySize: 16,
   },
-  "cta-lead": {
-    align: "left",
-    ctaAlign: "left",
-    logoAlign: "left",
-    showStoreName: true,
-    showGreeting: false,
-    showAccentBar: false,
-    emailPadding: 36,
-    shellBorder: false,
-    shellBorderWidth: 1,
-    shellRadius: 0,
-    eyebrowSize: 11,
-    headlineSize: 20,
-    bodySize: 15,
-  },
-  "ruled-editorial": {
-    align: "center",
-    ctaAlign: "center",
-    logoAlign: "center",
-    showStoreName: false,
-    showGreeting: false,
-    showAccentBar: false,
-    emailPadding: 48,
-    shellBorder: false,
-    shellBorderWidth: 1,
-    shellRadius: 0,
-    eyebrowSize: 11,
-    headlineSize: 28,
-    bodySize: 15,
-  },
-  "postscript-note": {
-    align: "left",
-    ctaAlign: "left",
-    logoAlign: "left",
-    showStoreName: true,
-    showGreeting: false,
-    showAccentBar: false,
-    emailPadding: 36,
-    shellBorder: false,
-    shellBorderWidth: 1,
-    shellRadius: 0,
-    eyebrowSize: 11,
-    headlineSize: 22,
-    bodySize: 15,
-  },
   "what-happened": {
     align: "left",
     ctaAlign: "left",
@@ -181,29 +136,74 @@ export const BLOCK_KIT_SPEC: Record<LayoutPresetId, BlockKitSpec> = {
     headlineSize: 32,
     bodySize: 18,
   },
-  "stub-header": {
+  "italic-lead": {
+    align: "left",
+    ctaAlign: "left",
+    logoAlign: "left",
+    showStoreName: false,
+    showGreeting: false,
+    showAccentBar: false,
+    emailPadding: 48,
+    shellBorder: false,
+    shellBorderWidth: 1,
+    shellRadius: 0,
+    eyebrowSize: 11,
+    headlineSize: 28,
+    bodySize: 15,
+  },
+  "status-word": {
     align: "left",
     ctaAlign: "left",
     logoAlign: "left",
     showStoreName: true,
     showGreeting: false,
     showAccentBar: false,
-    emailPadding: 28,
-    shellBorder: true,
+    emailPadding: 36,
+    shellBorder: false,
     shellBorderWidth: 1,
-    shellRadius: 4,
+    shellRadius: 0,
     eyebrowSize: 11,
     headlineSize: 20,
-    bodySize: 14,
+    bodySize: 15,
   },
-  "end-action": {
+  "deck-headline": {
     align: "left",
-    ctaAlign: "center",
+    ctaAlign: "left",
+    logoAlign: "left",
+    showStoreName: false,
+    showGreeting: false,
+    showAccentBar: false,
+    emailPadding: 52,
+    shellBorder: false,
+    shellBorderWidth: 1,
+    shellRadius: 0,
+    eyebrowSize: 11,
+    headlineSize: 36,
+    bodySize: 15,
+  },
+  "hold-open": {
+    align: "left",
+    ctaAlign: "left",
     logoAlign: "left",
     showStoreName: true,
     showGreeting: false,
     showAccentBar: false,
-    emailPadding: 36,
+    emailPadding: 44,
+    shellBorder: false,
+    shellBorderWidth: 1,
+    shellRadius: 0,
+    eyebrowSize: 11,
+    headlineSize: 18,
+    bodySize: 15,
+  },
+  "folio-mark": {
+    align: "left",
+    ctaAlign: "left",
+    logoAlign: "left",
+    showStoreName: true,
+    showGreeting: false,
+    showAccentBar: false,
+    emailPadding: 40,
     shellBorder: false,
     shellBorderWidth: 1,
     shellRadius: 0,
@@ -241,7 +241,7 @@ const DAY_COPY: Record<RecoveryTemplateId, KitCopy> = {
 };
 
 const CHROME_LINE =
-  /^(what happened|what to do|amount due|payment failed|thanks,?|p\.?s\.|access stays on|your workspace stays|updating the card|nothing else changes|open billing|or\s)/i;
+  /^(what happened|what to do|amount due|payment failed|thanks,?|p\.?s\.|access stays on|access is still on|your workspace stays|updating the card|nothing else changes|open billing|card update needed|failed$|notice$|or\s)/i;
 
 const BILLING_ECHO =
   /open the billing page|to update your card|to continue\.?/i;
@@ -457,10 +457,162 @@ function blocksForPlainLetter(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
   ];
 }
 
-function blocksForCtaLead(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
+function blocksForItalicLead(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
   return [
-    createButtonBlock(copy.cta, { align: "left", marginBottom: 0 }),
+    createTextBlock(copy.headline, {
+      copySlot: "headline",
+      fontSize: spec.headlineSize,
+      color: "default",
+      italic: true,
+      align: "left",
+      marginTop: 8,
+      marginBottom: 16,
+    }),
+    createTextBlock("Update the card to keep **{{product}}** on — about a minute.", {
+      copySlot: "body",
+      fontSize: spec.bodySize,
+      color: "muted",
+      align: "left",
+      marginTop: 0,
+      marginBottom: 0,
+    }),
     createSpacerBlock(28),
+    createButtonBlock(copy.cta, { align: "left", marginBottom: 14 }),
+    createBillingLinkTextBlock({
+      prefix: "",
+      linkLabel: copy.link,
+      suffix: "",
+      align: "left",
+    }),
+  ];
+}
+
+function blocksForStatusWord(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
+  return [
+    createTextBlock("Failed", {
+      fontSize: 40,
+      color: "default",
+      bold: true,
+      align: "left",
+      marginTop: 0,
+      marginBottom: 6,
+    }),
+    createTextBlock("{{product}}", {
+      fontSize: 14,
+      color: "muted",
+      align: "left",
+      marginTop: 0,
+      marginBottom: 22,
+    }),
+    createTextBlock(copy.headline, {
+      copySlot: "headline",
+      fontSize: spec.headlineSize,
+      color: "default",
+      bold: true,
+      align: "left",
+      marginTop: 0,
+      marginBottom: 8,
+    }),
+    createTextBlock("The charge of **{{amount}}** didn’t go through.", {
+      copySlot: "body",
+      fontSize: spec.bodySize,
+      color: "muted",
+      align: "left",
+      marginTop: 0,
+      marginBottom: 24,
+    }),
+    createButtonBlock(copy.cta, { align: "left", marginBottom: 14 }),
+    createBillingLinkTextBlock({
+      prefix: "",
+      linkLabel: copy.link,
+      suffix: "",
+      align: "left",
+    }),
+  ];
+}
+
+function blocksForDeckHeadline(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
+  return [
+    createTextBlock("Card update needed", {
+      fontSize: spec.eyebrowSize,
+      color: "muted",
+      align: "left",
+      marginTop: 4,
+      marginBottom: 10,
+    }),
+    createTextBlock(copy.headline, {
+      copySlot: "headline",
+      fontSize: spec.headlineSize,
+      color: "default",
+      bold: true,
+      align: "left",
+      marginTop: 0,
+      marginBottom: 14,
+    }),
+    createTextBlock("Takes about a minute to keep **{{product}}** on.", {
+      copySlot: "body",
+      fontSize: spec.bodySize,
+      color: "muted",
+      align: "left",
+      marginTop: 0,
+      marginBottom: 0,
+    }),
+    createSpacerBlock(28),
+    createButtonBlock(copy.cta, { align: "left", marginBottom: 14 }),
+    createBillingLinkTextBlock({
+      prefix: "",
+      linkLabel: copy.link,
+      suffix: "",
+      align: "left",
+    }),
+  ];
+}
+
+function blocksForHoldOpen(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
+  return [
+    createTextBlock("Access is still on.", {
+      fontSize: 24,
+      color: "default",
+      align: "left",
+      marginTop: 0,
+      marginBottom: 14,
+    }),
+    createTextBlock(copy.headline, {
+      copySlot: "headline",
+      fontSize: spec.headlineSize,
+      color: "default",
+      bold: true,
+      align: "left",
+      marginTop: 0,
+      marginBottom: 8,
+    }),
+    createTextBlock(boldTokens(copy.body), {
+      copySlot: "body",
+      fontSize: spec.bodySize,
+      color: "muted",
+      align: "left",
+      marginTop: 0,
+      marginBottom: 24,
+    }),
+    createButtonBlock(copy.cta, { align: "left", marginBottom: 14 }),
+    createBillingLinkTextBlock({
+      prefix: "",
+      linkLabel: copy.link,
+      suffix: "",
+      align: "left",
+    }),
+  ];
+}
+
+function blocksForFolioMark(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
+  return [
+    createTextBlock("Notice", {
+      fontSize: spec.eyebrowSize,
+      color: "muted",
+      align: "right",
+      marginTop: 0,
+      marginBottom: 20,
+    }),
     createTextBlock(copy.headline, {
       copySlot: "headline",
       fontSize: spec.headlineSize,
@@ -476,85 +628,9 @@ function blocksForCtaLead(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
       color: "muted",
       align: "left",
       marginTop: 0,
-      marginBottom: 16,
+      marginBottom: 24,
     }),
-    createBillingLinkTextBlock({
-      prefix: "",
-      linkLabel: copy.link,
-      suffix: "",
-      align: "left",
-    }),
-  ];
-}
-
-function blocksForRuledEditorial(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
-  return [
-    createTextBlock("Payment failed", {
-      fontSize: spec.eyebrowSize,
-      color: "muted",
-      align: "center",
-      marginTop: 0,
-      marginBottom: 16,
-    }),
-    divider(0, 22),
-    createTextBlock(copy.headline, {
-      copySlot: "headline",
-      fontSize: spec.headlineSize,
-      color: "default",
-      bold: true,
-      align: "center",
-      marginTop: 0,
-      marginBottom: 0,
-    }),
-    divider(22, 22),
-    createTextBlock(boldTokens(copy.body), {
-      copySlot: "body",
-      fontSize: spec.bodySize,
-      color: "muted",
-      align: "center",
-      marginTop: 0,
-      marginBottom: 0,
-    }),
-    createSpacerBlock(28),
-    createButtonBlock(copy.cta, { align: "center", marginBottom: 16 }),
-    createBillingLinkTextBlock({
-      prefix: "",
-      linkLabel: copy.link,
-      suffix: "",
-      align: "center",
-    }),
-  ];
-}
-
-function blocksForPostscriptNote(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
-  return [
-    createTextBlock(copy.headline, {
-      copySlot: "headline",
-      fontSize: spec.headlineSize,
-      color: "default",
-      bold: true,
-      align: "left",
-      marginTop: 0,
-      marginBottom: 12,
-    }),
-    createTextBlock(boldTokens(copy.body), {
-      copySlot: "body",
-      fontSize: spec.bodySize,
-      color: "muted",
-      align: "left",
-      marginTop: 0,
-      marginBottom: 22,
-    }),
-    createButtonBlock(copy.cta, { align: "left", marginBottom: 8 }),
-    divider(20, 16),
-    createTextBlock("P.S. Access stays on while you update.", {
-      fontSize: 13,
-      color: "muted",
-      italic: true,
-      align: "left",
-      marginTop: 0,
-      marginBottom: 12,
-    }),
+    createButtonBlock(copy.cta, { align: "left", marginBottom: 14 }),
     createBillingLinkTextBlock({
       prefix: "",
       linkLabel: copy.link,
@@ -645,80 +721,6 @@ function blocksForQuietColumn(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
   ];
 }
 
-function blocksForStubHeader(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
-  return [
-    createTextBlock("{{product}}  ·  {{amount}}", {
-      fontSize: 12,
-      color: "muted",
-      align: "left",
-      marginTop: 0,
-      marginBottom: 10,
-    }),
-    divider(0, 20),
-    createTextBlock(copy.headline, {
-      copySlot: "headline",
-      fontSize: spec.headlineSize,
-      color: "default",
-      bold: true,
-      align: "left",
-      marginTop: 0,
-      marginBottom: 10,
-    }),
-    createTextBlock(boldTokens(copy.body), {
-      copySlot: "body",
-      fontSize: spec.bodySize,
-      color: "muted",
-      align: "left",
-      marginTop: 0,
-      marginBottom: 22,
-    }),
-    createButtonBlock(copy.cta, { align: "left", marginBottom: 14 }),
-    createBillingLinkTextBlock({
-      prefix: "",
-      linkLabel: copy.link,
-      suffix: "",
-      align: "left",
-    }),
-  ];
-}
-
-function blocksForEndAction(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
-  return [
-    createTextBlock(copy.headline, {
-      copySlot: "headline",
-      fontSize: spec.headlineSize,
-      color: "default",
-      bold: true,
-      align: "left",
-      marginTop: 0,
-      marginBottom: 12,
-    }),
-    createTextBlock(boldTokens(copy.body), {
-      copySlot: "body",
-      fontSize: spec.bodySize,
-      color: "muted",
-      align: "left",
-      marginTop: 0,
-      marginBottom: 12,
-    }),
-    createTextBlock("Your workspace stays put.", {
-      fontSize: 14,
-      color: "muted",
-      align: "left",
-      marginTop: 0,
-      marginBottom: 8,
-    }),
-    divider(8, 8),
-    createSpacerBlock(28),
-    createButtonBlock(copy.cta, { align: "center", marginBottom: 14 }),
-    createBillingLinkTextBlock({
-      prefix: "",
-      linkLabel: copy.link,
-      suffix: "",
-      align: "center",
-    }),
-  ];
-}
 
 export function blocksForKit(kitId: LayoutPresetId, copy: KitCopy): EmailBlock[] {
   const spec = BLOCK_KIT_SPEC[kitId];
@@ -729,20 +731,20 @@ export function blocksForKit(kitId: LayoutPresetId, copy: KitCopy): EmailBlock[]
       return blocksForAmountDue(spec, copy);
     case "plain-letter":
       return blocksForPlainLetter(spec, copy);
-    case "cta-lead":
-      return blocksForCtaLead(spec, copy);
-    case "ruled-editorial":
-      return blocksForRuledEditorial(spec, copy);
-    case "postscript-note":
-      return blocksForPostscriptNote(spec, copy);
     case "what-happened":
       return blocksForWhatHappened(spec, copy);
     case "quiet-column":
       return blocksForQuietColumn(spec, copy);
-    case "stub-header":
-      return blocksForStubHeader(spec, copy);
-    case "end-action":
-      return blocksForEndAction(spec, copy);
+    case "italic-lead":
+      return blocksForItalicLead(spec, copy);
+    case "status-word":
+      return blocksForStatusWord(spec, copy);
+    case "deck-headline":
+      return blocksForDeckHeadline(spec, copy);
+    case "hold-open":
+      return blocksForHoldOpen(spec, copy);
+    case "folio-mark":
+      return blocksForFolioMark(spec, copy);
     default: {
       const _exhaustive: never = kitId;
       return _exhaustive;
