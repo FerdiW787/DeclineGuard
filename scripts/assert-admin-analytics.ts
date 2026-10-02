@@ -26,6 +26,9 @@ import {
   recoveryAttributedDay,
   startOfUtcMonth,
   startOfUtcYear,
+  rangeNewestByTime,
+  rowMatchesKit,
+  storedAssignedKitIdsFor,
   takeNewestEvents,
   utcDateMs,
 } from "../convex/lib/adminAnalytics";
@@ -264,6 +267,60 @@ assert(threw, "nowMs far-future rejected");
 assert(assertNowMs(now) === now, "valid nowMs accepted");
 assert(MIN_NOW_MS < now && now < MAX_NOW_MS, "fixture now is inside the allowed range");
 
+const signupStart = allTimeSeriesStartMs(now);
+const futureSignup = now + 60_000;
+const inWindowSignups = [signupStart + 1_000, signupStart + 2_000, now - 1_000];
+const futureFlood = Array.from({ length: 800 }, () => futureSignup);
+const naiveTake = [...futureFlood, ...inWindowSignups]
+  .sort((a, b) => b - a)
+  .slice(0, 800)
+  .filter((at) => at >= signupStart && at < now);
+assert(naiveTake.length === 0, "bare desc-take then filter drops in-window under future-dated flood");
+const rangedSignups = rangeNewestByTime(
+  [...futureFlood, ...inWindowSignups],
+  signupStart,
+  now,
+  800,
+);
+assert(rangedSignups.events.length === 3, "creation-time index range keeps in-window signups");
+assert(!rangedSignups.truncated, "in-window signup count is under the cap");
+assert(
+  rangedSignups.events.every((e) => e.at >= signupStart && e.at < now),
+  "ranged signups stay inside [start, now)",
+);
+
+assert(storedAssignedKitIdsFor("quiet-column").includes("sonos"), "sonos is a quiet-column leftover");
+assert(storedAssignedKitIdsFor("amount-due").includes("avocode"), "avocode is an amount-due leftover");
+assert(rowMatchesKit("sonos", "quiet-column"), "sonos maps onto quiet-column");
+assert(rowMatchesKit("quiet-column", "quiet-column"), "Set A id matches itself");
+assert(!rowMatchesKit("sonos", "amount-due"), "sonos does not map onto amount-due");
+
+const recoveredFixture = [
+  { assignedKitId: "sonos", recoveredAt: now - 3_000, amountCents: 1000 },
+  { assignedKitId: "quiet-column", recoveredAt: now - 2_000, amountCents: 2000 },
+  { assignedKitId: "avocode", recoveredAt: now - 1_000, amountCents: 500 },
+];
+const listQuiet = recoveredFixture.filter(
+  (row) => assignedKitIdOrNull(row.assignedKitId) === "quiet-column",
+);
+const detailQuiet = recoveredFixture.filter((row) =>
+  rowMatchesKit(row.assignedKitId, "quiet-column"),
+);
+const setAOnlyQuiet = recoveredFixture.filter(
+  (row) => row.assignedKitId === "quiet-column",
+);
+assert(listQuiet.length === 2, "listTemplates credits sonos + quiet-column");
+assert(setAOnlyQuiet.length === 1, "eq(assignedKitId, Set A) misses sonos");
+assert(
+  listQuiet.length === detailQuiet.length,
+  "getTemplateDetail totals match listTemplates when leftover assignedKitId maps in",
+);
+assert(
+  listQuiet.reduce((n, row) => n + row.amountCents, 0) ===
+    detailQuiet.reduce((n, row) => n + row.amountCents, 0),
+  "list and detail recovered $ agree for quiet-column leftovers",
+);
+
 console.log(
-  "asserts green: UTC comparable YoY/MoM, empty zero-fill, missing kit arm, day5>day2>day0 attribution, test-mode/deleted excluded, allTime reaches now, newest-first prefers recent, totals match series",
+  "asserts green: UTC comparable YoY/MoM, empty zero-fill, missing kit arm, day5>day2>day0 attribution, test-mode/deleted excluded, allTime reaches now, newest-first prefers recent, totals match series, signup index-range, list/detail leftover kit parity",
 );

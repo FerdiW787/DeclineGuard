@@ -404,6 +404,39 @@ export function assignedKitIdOrNull(
   return mapped ?? null;
 }
 
+/** Set A id plus every leftover stored id that maps to it. */
+export function storedAssignedKitIdsFor(kitId: LayoutPresetId): string[] {
+  const ids = new Set<string>([kitId]);
+  for (const [raw, mapped] of Object.entries(LEGACY_LAYOUT_PRESET_ID_MAP)) {
+    if (mapped === kitId) ids.add(raw);
+  }
+  return [...ids];
+}
+
+export function rowMatchesKit(
+  assignedKitId: string | null | undefined,
+  kitId: LayoutPresetId,
+): boolean {
+  return assignedKitIdOrNull(assignedKitId) === kitId;
+}
+
+/**
+ * Index-range + newest-first take (signup `_creationTime` / similar).
+ * Filter the window first so future-dated rows cannot crowd out in-window events.
+ */
+export function rangeNewestByTime(
+  timestamps: readonly number[],
+  startMs: number,
+  endMs: number,
+  limit: number,
+): { events: AnalyticsEvent[]; truncated: boolean } {
+  const inRange = timestamps.filter((at) => at >= startMs && at < endMs);
+  const sorted = [...inRange].sort((a, b) => b - a);
+  const truncated = sorted.length > limit;
+  const kept = truncated ? sorted.slice(0, limit) : sorted;
+  return { events: kept.map((at) => ({ at })), truncated };
+}
+
 export type RecoveryDayFields = {
   recoveredAt?: number | null;
   day0SentAt?: number | null;

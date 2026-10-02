@@ -3,7 +3,10 @@ import { query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
 import { requireAdmin } from "../lib/admin";
-import { layoutPresetIdValidator } from "../lib/emailTheme";
+import {
+  layoutPresetIdValidator,
+  type LayoutPresetId,
+} from "../lib/emailTheme";
 import {
   ADMIN_ANALYTICS_SCAN_LIMIT,
   ANALYTICS_TIMEZONE,
@@ -13,6 +16,7 @@ import {
   assertNowMs,
   assignedKitIdOrNull,
   isCountableRecovery,
+  rowMatchesKit,
   metricPeriodsFromEvents,
   recoveryAttributedDay,
   type AnalyticsEvent,
@@ -94,24 +98,17 @@ async function loadRecoveredPayments(
 
 async function loadRecoveredPaymentsForKit(
   ctx: QueryCtx,
-  kitId: string,
+  kitId: LayoutPresetId,
   nowMs: number,
 ): Promise<{ rows: Doc<"failedPayments">[]; truncated: boolean }> {
-  const startMs = allTimeSeriesStartMs(nowMs);
-  const rows = await ctx.db
-    .query("failedPayments")
-    .withIndex("by_assignedKitId_recoveredAt", (q) =>
-      q.eq("assignedKitId", kitId).gte("recoveredAt", startMs).lt("recoveredAt", nowMs),
-    )
-    .order("desc")
-    .take(ADMIN_ANALYTICS_SCAN_LIMIT);
-  const countable = rows.filter(
-    (row) =>
-      isCountableRecovery(row) && assignedKitIdOrNull(row.assignedKitId) === kitId,
-  );
+  // Same recovered set as listTemplates, then map leftover ids → Set A.
+  // A kit-only index eq(assignedKitId, Set A id) would miss sonos/avocode/…
+  const recovered = await loadRecoveredPayments(ctx, nowMs);
   return {
-    rows: countable,
-    truncated: rows.length >= ADMIN_ANALYTICS_SCAN_LIMIT,
+    rows: recovered.rows.filter((row) =>
+      rowMatchesKit(row.assignedKitId, kitId),
+    ),
+    truncated: recovered.truncated,
   };
 }
 
@@ -122,16 +119,13 @@ async function loadSignupEvents(
   const startMs = allTimeSeriesStartMs(nowMs);
   const rows = await ctx.db
     .query("users")
+    .withIndex("by_creation_time", (q) =>
+      q.gte("_creationTime", startMs).lt("_creationTime", nowMs),
+    )
     .order("desc")
     .take(ADMIN_ANALYTICS_SCAN_LIMIT);
-  const events: AnalyticsEvent[] = [];
-  for (const row of rows) {
-    if (row._creationTime >= startMs && row._creationTime < nowMs) {
-      events.push({ at: row._creationTime });
-    }
-  }
   return {
-    events,
+    events: rows.map((row) => ({ at: row._creationTime })),
     truncated: rows.length >= ADMIN_ANALYTICS_SCAN_LIMIT,
   };
 }
@@ -281,8 +275,9 @@ export const getOverview = query({
 });
 
 /**
- * Set A kit recovery rollup (platform-wide, all-time). Admin only.
- * Period charts live on getTemplateDetail.
+ * Set A kit recovery rollup (platform-wide, trailing 5y window). Admin only.
+ * Period charts live on getTemplateDetail. Legacy assignedKitId values
+ * map onto Set A the same way as getTemplateDetail.
  */
 export const listTemplates = query({
   args: { nowMs: v.number() },
