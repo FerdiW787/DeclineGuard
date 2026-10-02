@@ -150,6 +150,34 @@ export function shouldUnholdOnMonthRollover(args: {
   return args.lastReleasedMonthStart !== utcMonthStartMs(args.nowMs);
 }
 
+/**
+ * After lazy month unhold, return the post-release row flag — never the
+ * pre-release `open.quotaHeld`. Wait→nudge at month boundary must report
+ * false so the webhook schedules sendForFailure.
+ */
+export function quotaHeldAfterLazyRelease(args: {
+  rowStillHeld: boolean | undefined;
+}): boolean {
+  return args.rowStillHeld === true;
+}
+
+export function webhookSendsAfterUpsert(args: {
+  quotaHeld: boolean;
+  recoveryAction: "wait" | "nudge_update_pm" | "push_update_pm" | "stop";
+}): boolean {
+  if (args.quotaHeld) return false;
+  return (
+    args.recoveryAction === "nudge_update_pm" ||
+    args.recoveryAction === "push_update_pm"
+  );
+}
+
+/** Hold-queue clock is wall time. Receipt `paidAt` must never rewind stamps. */
+export function holdQueueNowMs(nowMs: number): number {
+  if (!Number.isFinite(nowMs) || nowMs <= 0) return 0;
+  return Math.floor(nowMs);
+}
+
 /** Free→Pro (or any included-cap increase) must unhold; demote must not. */
 export function shouldUnholdOnPlanPromote(args: {
   priorPlan: Plan;

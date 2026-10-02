@@ -1,3 +1,4 @@
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import {
   internalMutation,
@@ -31,7 +32,10 @@ import {
   assignKitForNewSequence,
   recordKitRecovery,
 } from "../lib/kitExperiment";
-import { utcMonthStartMs } from "../lib/declineCapacity";
+import {
+  quotaHeldAfterLazyRelease,
+  utcMonthStartMs,
+} from "../lib/declineCapacity";
 import {
   releaseHeldAndSchedule,
   shouldHoldInsert,
@@ -370,7 +374,10 @@ export const upsertFailedPayment = internalMutation({
       // In-flight sequences are never flipped to held.
       attemptIndex = (open.attemptIndex ?? 1) + 1;
       const recoveryAction = computeRecoveryAction(attemptIndex);
-      quotaHeld = open.quotaHeld === true;
+      const afterRelease = await ctx.db.get(open._id);
+      quotaHeld = quotaHeldAfterLazyRelease({
+        rowStillHeld: afterRelease?.quotaHeld,
+      });
 
       await ctx.db.patch(open._id, {
         userId: args.userId,
@@ -447,27 +454,38 @@ export const upsertFailedPayment = internalMutation({
   },
 });
 
-export const listHeldDeclineUserIds = internalQuery({
-  args: { nowMs: v.number() },
-  returns: v.array(v.id("users")),
+export const listHeldDeclineUserPage = internalQuery({
+  args: {
+    nowMs: v.number(),
+    paginationOpts: paginationOptsValidator,
+  },
+  returns: v.object({
+    userIds: v.array(v.id("users")),
+    isDone: v.boolean(),
+    continueCursor: v.string(),
+  }),
   handler: async (ctx, args) => {
     const monthStart = utcMonthStartMs(args.nowMs);
-    const held = await ctx.db
+    const page = await ctx.db
       .query("failedPayments")
       .withIndex("by_quotaHeld_failedAt", (q) => q.eq("quotaHeld", true))
-      .take(2000);
-    const ids: Array<Id<"users">> = [];
+      .paginate(args.paginationOpts);
+    const userIds: Array<Id<"users">> = [];
     const seen = new Set<string>();
-    for (const row of held) {
+    for (const row of page.page) {
       if (row.deletedAt != null || row.status !== "open") continue;
       if (seen.has(row.userId)) continue;
       seen.add(row.userId);
       const user = await ctx.db.get(row.userId);
       if (!user) continue;
       if (user.declineHoldReleasedMonthStart === monthStart) continue;
-      ids.push(row.userId);
+      userIds.push(row.userId);
     }
-    return ids;
+    return {
+      userIds,
+      isDone: page.isDone,
+      continueCursor: page.continueCursor,
+    };
   },
 });
 

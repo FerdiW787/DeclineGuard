@@ -32,12 +32,15 @@ import {
   dodoPackCreditDecision,
   includedDeclinesPerMonth,
   heldRowsToRelease,
+  holdQueueNowMs,
   matchesPackProduct,
   packQuantityPreferringCart,
+  quotaHeldAfterLazyRelease,
   shouldHoldNewDecline,
   shouldUnholdOnMonthRollover,
   shouldUnholdOnPlanPromote,
   utcMonthStartMs,
+  webhookSendsAfterUpsert,
 } from "../convex/lib/declineCapacity";
 import {
   dodoUsageEventId,
@@ -596,6 +599,54 @@ assert(
   creditSrc.includes("allWithPayment") &&
     creditSrc.includes("already_credited"),
   "pack credit OCC-dedupes concurrent paymentId inserts",
+);
+
+const waitToNudgeHeld = quotaHeldAfterLazyRelease({ rowStillHeld: false });
+assert(
+  waitToNudgeHeld === false,
+  "wait→nudge at month boundary returns quotaHeld false after release",
+);
+assert(
+  webhookSendsAfterUpsert({
+    quotaHeld: waitToNudgeHeld,
+    recoveryAction: "nudge_update_pm",
+  }),
+  "wait→nudge at month boundary schedules/sends after lazy unhold",
+);
+assert(
+  !webhookSendsAfterUpsert({
+    quotaHeld: quotaHeldAfterLazyRelease({ rowStillHeld: true }),
+    recoveryAction: "nudge_update_pm",
+  }),
+  "still-held nudge must not send",
+);
+assert(
+  recoveriesSrc.includes("afterRelease") &&
+    recoveriesSrc.includes("quotaHeldAfterLazyRelease"),
+  "upsert re-reads quotaHeld after lazy release (not pre-release open doc)",
+);
+
+const packPaidAt = Date.UTC(2026, 0, 31, 23, 0, 0);
+const packNow = Date.UTC(2026, 1, 1, 0, 5, 0);
+assert(
+  holdQueueNowMs(packNow) === packNow &&
+    holdQueueNowMs(packNow) !== packPaidAt &&
+    utcMonthStartMs(holdQueueNowMs(packNow)) !== utcMonthStartMs(packPaidAt),
+  "pack hold clock is wall nowMs, not paidAt (no month rewind)",
+);
+assert(
+  !creditSrc.includes("nowMs: args.paidAt"),
+  "pack release must not pass paidAt as nowMs",
+);
+assert(
+  creditSrc.includes("holdQueueNowMs(Date.now())") &&
+    creditSrc.includes("creditedAt: args.paidAt"),
+  "pack uses Date.now() for hold release; paidAt is creditedAt only",
+);
+assert(
+  recoveriesSrc.includes("listHeldDeclineUserPage") &&
+    holdActionsSrc.includes("paginationOpts"),
+  "month cron paginates held users (no take(2000) cap)",
 );
 
 console.log("assert-dodo-billing: ok");

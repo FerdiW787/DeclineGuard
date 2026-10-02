@@ -8,18 +8,35 @@ export const runMonthlyHeldDeclineRelease = internalAction({
   returns: v.object({ users: v.number(), released: v.number() }),
   handler: async (ctx): Promise<{ users: number; released: number }> => {
     const nowMs = Date.now();
-    const userIds: Array<Id<"users">> = await ctx.runQuery(
-      internal.functions.recoveries.listHeldDeclineUserIds,
-      { nowMs },
-    );
+    const processed = new Set<string>();
     let released = 0;
-    for (const userId of userIds) {
-      const result: { released: number } = await ctx.runMutation(
-        internal.functions.recoveries.releaseHeldDeclinesForUser,
-        { userId, nowMs },
+    let cursor: string | null = null;
+
+    for (;;) {
+      const page: {
+        userIds: Array<Id<"users">>;
+        isDone: boolean;
+        continueCursor: string;
+      } = await ctx.runQuery(
+        internal.functions.recoveries.listHeldDeclineUserPage,
+        {
+          nowMs,
+          paginationOpts: { numItems: 100, cursor },
+        },
       );
-      released += result.released;
+      for (const userId of page.userIds) {
+        if (processed.has(userId)) continue;
+        processed.add(userId);
+        const result: { released: number } = await ctx.runMutation(
+          internal.functions.recoveries.releaseHeldDeclinesForUser,
+          { userId, nowMs },
+        );
+        released += result.released;
+      }
+      if (page.isDone) break;
+      cursor = page.continueCursor;
     }
-    return { users: userIds.length, released };
+
+    return { users: processed.size, released };
   },
 });

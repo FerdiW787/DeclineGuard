@@ -22,6 +22,7 @@ import {
 import { checkoutNonceMatches, PRO_CHECKOUT_NONCE_TTL_MS } from "../lib/billingPlan";
 import {
   dodoPackCreditDecision,
+  holdQueueNowMs,
   shouldUnholdOnPlanPromote,
 } from "../lib/declineCapacity";
 import { releaseHeldAndSchedule } from "../lib/declineHoldQueue";
@@ -495,7 +496,7 @@ export const creditDodoPackPurchase = internalMutation({
       userId: user._id,
       plan: resolvePlan(user),
       packExtra: nextExtra,
-      nowMs: args.paidAt,
+      nowMs: holdQueueNowMs(Date.now()),
       force: true,
     });
 
