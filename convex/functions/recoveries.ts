@@ -31,7 +31,11 @@ import {
   assignKitForNewSequence,
   recordKitRecovery,
 } from "../lib/kitExperiment";
-import { shouldHoldInsert } from "../lib/declineHoldQueue";
+import { utcMonthStartMs } from "../lib/declineCapacity";
+import {
+  releaseHeldAndSchedule,
+  shouldHoldInsert,
+} from "../lib/declineHoldQueue";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -351,6 +355,16 @@ export const upsertFailedPayment = internalMutation({
     let attemptIndex: number;
     let quotaHeld = false;
 
+    const owner = await ctx.db.get(args.userId);
+    if (owner) {
+      await releaseHeldAndSchedule(ctx, {
+        userId: owner._id,
+        plan: resolvePlan(owner),
+        packExtra: owner.declinePackExtra,
+        nowMs: Date.now(),
+      });
+    }
+
     if (open) {
       // Increment attempt index for each new failure webhook on the same open failure.
       // In-flight sequences are never flipped to held.
@@ -380,11 +394,10 @@ export const upsertFailedPayment = internalMutation({
       // First failure for this subscription — attempt 1 → wait
       attemptIndex = 1;
       const recoveryAction = computeRecoveryAction(attemptIndex);
-      const owner = await ctx.db.get(args.userId);
       if (owner) {
         quotaHeld = await shouldHoldInsert(ctx, owner, {
           testMode: args.testMode,
-          nowMs: args.failedAt,
+          nowMs: Date.now(),
         });
       }
 
@@ -431,6 +444,51 @@ export const upsertFailedPayment = internalMutation({
     });
 
     return { failureId, attemptIndex, recoveryAction, quotaHeld };
+  },
+});
+
+export const listHeldDeclineUserIds = internalQuery({
+  args: { nowMs: v.number() },
+  returns: v.array(v.id("users")),
+  handler: async (ctx, args) => {
+    const monthStart = utcMonthStartMs(args.nowMs);
+    const held = await ctx.db
+      .query("failedPayments")
+      .withIndex("by_quotaHeld_failedAt", (q) => q.eq("quotaHeld", true))
+      .take(2000);
+    const ids: Array<Id<"users">> = [];
+    const seen = new Set<string>();
+    for (const row of held) {
+      if (row.deletedAt != null || row.status !== "open") continue;
+      if (seen.has(row.userId)) continue;
+      seen.add(row.userId);
+      const user = await ctx.db.get(row.userId);
+      if (!user) continue;
+      if (user.declineHoldReleasedMonthStart === monthStart) continue;
+      ids.push(row.userId);
+    }
+    return ids;
+  },
+});
+
+export const releaseHeldDeclinesForUser = internalMutation({
+  args: {
+    userId: v.id("users"),
+    nowMs: v.number(),
+    force: v.optional(v.boolean()),
+  },
+  returns: v.object({ released: v.number() }),
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) return { released: 0 };
+    const released = await releaseHeldAndSchedule(ctx, {
+      userId: user._id,
+      plan: resolvePlan(user),
+      packExtra: user.declinePackExtra,
+      nowMs: args.nowMs,
+      force: args.force,
+    });
+    return { released: released.length };
   },
 });
 
@@ -1238,7 +1296,7 @@ export const getRecoverySummary = query({
         )
         .order("desc")
         .take(SUMMARY_SCAN_LIMIT)
-    ).filter((row) => row.deletedAt == null);
+    ).filter((row) => row.deletedAt == null && row.quotaHeld !== true);
 
     const openMoney = primaryCurrencyTotals(openRows);
     let cohortOpenCount = 0;

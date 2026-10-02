@@ -81,6 +81,8 @@ export default defineSchema({
     dodoCheckoutNonceExpiresAt: v.optional(v.number()),
     /** Extra monthly declines from paid $0.99 +10 packs (sum of credited units). */
     declinePackExtra: v.optional(v.number()),
+    /** UTC month start last used for hold-queue release (lazy + cron). */
+    declineHoldReleasedMonthStart: v.optional(v.number()),
   })
     .index("by_userId", ["userId"])
     .index("by_lsSubscriptionId", ["lsSubscriptionId"])
@@ -261,11 +263,15 @@ export default defineSchema({
      * In-flight sequences are never flipped to held.
      */
     quotaHeld: v.optional(v.boolean()),
+    /** When a held row entered the live queue (consumes that UTC month's cap). */
+    quotaReleasedAt: v.optional(v.number()),
     deletedAt: v.optional(v.number()),
     deletedBy: v.optional(deletedByValidator),
   })
     .index("by_user_status_failedAt", ["userId", "status", "failedAt"])
     .index("by_user_quotaHeld_failedAt", ["userId", "quotaHeld", "failedAt"])
+    .index("by_quotaHeld_failedAt", ["quotaHeld", "failedAt"])
+    .index("by_user_quotaReleasedAt", ["userId", "quotaReleasedAt"])
     .index("by_user_status_recoveredAt", ["userId", "status", "recoveredAt"])
     .index("by_user_failedAt", ["userId", "failedAt"])
     .index("by_store_subscription_status", [

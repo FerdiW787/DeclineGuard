@@ -18,6 +18,7 @@ import type * as functions_adminTakeover from "../functions/adminTakeover.js";
 import type * as functions_adminTakeoverActions from "../functions/adminTakeoverActions.js";
 import type * as functions_brandImportActions from "../functions/brandImportActions.js";
 import type * as functions_devSeed from "../functions/devSeed.js";
+import type * as functions_declineHoldActions from "../functions/declineHoldActions.js";
 import type * as functions_dodoBilling from "../functions/dodoBilling.js";
 import type * as functions_dodoBillingActions from "../functions/dodoBillingActions.js";
 import type * as functions_featureRequests from "../functions/featureRequests.js";
@@ -79,6 +80,7 @@ declare const fullApi: ApiFromModules<{
   "functions/adminTakeoverActions": typeof functions_adminTakeoverActions;
   "functions/brandImportActions": typeof functions_brandImportActions;
   "functions/devSeed": typeof functions_devSeed;
+  "functions/declineHoldActions": typeof functions_declineHoldActions;
   "functions/dodoBilling": typeof functions_dodoBilling;
   "functions/dodoBillingActions": typeof functions_dodoBillingActions;
   "functions/featureRequests": typeof functions_featureRequests;

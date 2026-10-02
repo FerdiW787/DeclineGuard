@@ -1,5 +1,4 @@
 import { v } from "convex/values";
-import { internal } from "../_generated/api";
 import type { Doc } from "../_generated/dataModel";
 import {
   internalMutation,
@@ -21,8 +20,11 @@ import {
   type BillingProviderId,
 } from "../lib/billingProvider";
 import { checkoutNonceMatches, PRO_CHECKOUT_NONCE_TTL_MS } from "../lib/billingPlan";
-import { dodoPackCreditDecision } from "../lib/declineCapacity";
-import { releaseHeldDeclinesForCapacity } from "../lib/declineHoldQueue";
+import {
+  dodoPackCreditDecision,
+  shouldUnholdOnPlanPromote,
+} from "../lib/declineCapacity";
+import { releaseHeldAndSchedule } from "../lib/declineHoldQueue";
 import {
   getDodoPaymentsConfig,
   matchesDodoProProduct,
@@ -335,6 +337,16 @@ export const applyDodoSubscription = internalMutation({
       });
     }
 
+    if (shouldUnholdOnPlanPromote({ priorPlan, nextPlan: appliedPlan })) {
+      await releaseHeldAndSchedule(ctx, {
+        userId: user._id,
+        plan: appliedPlan,
+        packExtra: user.declinePackExtra,
+        nowMs: Date.now(),
+        force: true,
+      });
+    }
+
     return {
       applied: priorPlan !== appliedPlan || !knownSub,
       plan: appliedPlan,
@@ -447,35 +459,45 @@ export const creditDodoPackPurchase = internalMutation({
     const extraDeclines = decision.extraDeclines;
     const nextExtra = nextDeclinePackExtra(user.declinePackExtra, quantity);
 
-    await ctx.db.insert("dodoPackPurchases", {
+    const insertedId = await ctx.db.insert("dodoPackPurchases", {
       userId: user._id,
       paymentId,
       quantity,
       extraDeclines,
       creditedAt: args.paidAt,
     });
+    const allWithPayment = await ctx.db
+      .query("dodoPackPurchases")
+      .withIndex("by_paymentId", (q) => q.eq("paymentId", paymentId))
+      .take(8);
+    allWithPayment.sort((a, b) => a._creationTime - b._creationTime);
+    const winner = allWithPayment[0]!;
+    for (const row of allWithPayment) {
+      if (row._id !== winner._id) {
+        await ctx.db.delete(row._id);
+      }
+    }
+    if (winner._id !== insertedId) {
+      return {
+        credited: true,
+        alreadyCredited: true,
+        extraDeclines: winner.extraDeclines,
+        releasedHeld: 0,
+        reason: "already_credited",
+      };
+    }
+
     await ctx.db.patch(user._id, {
       declinePackExtra: nextExtra,
     });
 
-    const released = await releaseHeldDeclinesForCapacity(ctx, {
+    const released = await releaseHeldAndSchedule(ctx, {
       userId: user._id,
       plan: resolvePlan(user),
       packExtra: nextExtra,
       nowMs: args.paidAt,
+      force: true,
     });
-    for (const row of released) {
-      if (
-        row.recoveryAction === "nudge_update_pm" ||
-        row.recoveryAction === "push_update_pm"
-      ) {
-        await ctx.scheduler.runAfter(
-          0,
-          internal.functions.recoveryEmails.sendForFailure,
-          { failureId: row._id },
-        );
-      }
-    }
 
     await writeAuditLog(ctx, {
       actorUserId: null,

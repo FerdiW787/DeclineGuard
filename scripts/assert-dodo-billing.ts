@@ -31,9 +31,13 @@ import {
   declineCapacity,
   dodoPackCreditDecision,
   includedDeclinesPerMonth,
+  heldRowsToRelease,
   matchesPackProduct,
   packQuantityPreferringCart,
   shouldHoldNewDecline,
+  shouldUnholdOnMonthRollover,
+  shouldUnholdOnPlanPromote,
+  utcMonthStartMs,
 } from "../convex/lib/declineCapacity";
 import {
   dodoUsageEventId,
@@ -487,13 +491,111 @@ assert(
 );
 assert(
   creditSrc.includes("dodoPackCreditDecision") &&
-    creditSrc.includes("releaseHeldDeclinesForCapacity"),
+    creditSrc.includes("releaseHeldAndSchedule"),
   "pack webhook credits through decision + hold-queue release",
 );
 assert(
   recoveriesSrc.includes("shouldHoldInsert") &&
-    recoveriesSrc.includes("quotaHeld"),
-  "upsertFailedPayment consumes decline capacity / hold-queue",
+    recoveriesSrc.includes("quotaHeld") &&
+    recoveriesSrc.includes("releaseHeldAndSchedule"),
+  "upsertFailedPayment consumes decline capacity / hold-queue + lazy month unhold",
+);
+
+const jan = Date.UTC(2026, 0, 15);
+const feb = Date.UTC(2026, 1, 2);
+assert(
+  utcMonthStartMs(feb) !== utcMonthStartMs(jan),
+  "February is a new UTC month vs January",
+);
+assert(
+  shouldUnholdOnMonthRollover({
+    lastReleasedMonthStart: utcMonthStartMs(jan),
+    nowMs: feb,
+  }),
+  "month rollover must unhold when last release was prior month",
+);
+assert(
+  !shouldUnholdOnMonthRollover({
+    lastReleasedMonthStart: utcMonthStartMs(feb),
+    nowMs: feb,
+  }),
+  "same-month stamp skips a second rollover unhold",
+);
+const rolloverSlots = availableDeclineCapacity({
+  plan: "free",
+  packExtra: 0,
+  usedActive: 0,
+});
+assert(
+  rolloverSlots === 50 &&
+    heldRowsToRelease({ heldCount: 20, availableSlots: rolloverSlots }) === 20,
+  "month rollover drains held backlog when capacity is available",
+);
+assert(
+  heldRowsToRelease({ heldCount: 80, availableSlots: rolloverSlots }) === 50,
+  "month rollover unhold is still capped by monthly capacity",
+);
+
+assert(
+  shouldUnholdOnPlanPromote({ priorPlan: "free", nextPlan: "pro" }),
+  "Free→Pro promote must unhold",
+);
+assert(
+  !shouldUnholdOnPlanPromote({ priorPlan: "pro", nextPlan: "free" }),
+  "Pro→Free demote must not unhold",
+);
+assert(
+  !shouldUnholdOnPlanPromote({ priorPlan: "pro", nextPlan: "pro" }),
+  "Pro renewal is not a capacity-increase unhold",
+);
+const promoteSlots = availableDeclineCapacity({
+  plan: "pro",
+  packExtra: 0,
+  usedActive: 50,
+});
+assert(
+  availableDeclineCapacity({
+    plan: "free",
+    packExtra: 0,
+    usedActive: 50,
+  }) === 0 &&
+    promoteSlots === 450 &&
+    heldRowsToRelease({ heldCount: 20, availableSlots: promoteSlots }) === 20,
+  "Free→Pro capacity increase drains Free hold backlog",
+);
+
+const cronsSrc = readFileSync(join(repoRoot, "convex/crons.ts"), "utf8");
+const billingSrc = readFileSync(
+  join(repoRoot, "convex/functions/billing.ts"),
+  "utf8",
+);
+assert(
+  cronsSrc.includes("runMonthlyHeldDeclineRelease"),
+  "monthly cron drains held backlog",
+);
+const holdActionsSrc = readFileSync(
+  join(repoRoot, "convex/functions/declineHoldActions.ts"),
+  "utf8",
+);
+assert(
+  holdActionsSrc.includes("runMonthlyHeldDeclineRelease") &&
+    recoveriesSrc.includes("releaseHeldDeclinesForUser"),
+  "month-boundary release mutation/action exist",
+);
+assert(
+  billingSrc.includes("shouldUnholdOnPlanPromote") &&
+    billingSrc.includes("releaseHeldAndSchedule"),
+  "LS plan promote unholds hold-queue",
+);
+assert(
+  creditSrc.includes("shouldUnholdOnPlanPromote") &&
+    creditSrc.includes("releaseHeldAndSchedule"),
+  "Dodo plan promote unholds hold-queue",
+);
+assert(
+  creditSrc.includes("allWithPayment") &&
+    creditSrc.includes("already_credited"),
+  "pack credit OCC-dedupes concurrent paymentId inserts",
 );
 
 console.log("assert-dodo-billing: ok");

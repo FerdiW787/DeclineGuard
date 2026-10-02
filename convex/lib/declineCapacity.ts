@@ -98,15 +98,67 @@ export function matchesPackProduct(args: {
   return args.productId === args.expectedProductId;
 }
 
-export function countsTowardDeclineCapacity(row: {
-  deletedAt?: number;
-  testMode: boolean;
-  quotaHeld?: boolean;
-}): boolean {
+export function enteredDeclineCapacityAt(row: {
+  failedAt: number;
+  quotaReleasedAt?: number;
+}): number {
+  return row.quotaReleasedAt ?? row.failedAt;
+}
+
+export function countsTowardDeclineCapacity(
+  row: {
+    deletedAt?: number;
+    testMode: boolean;
+    quotaHeld?: boolean;
+    failedAt?: number;
+    quotaReleasedAt?: number;
+  },
+  monthStartMs?: number,
+): boolean {
   if (row.deletedAt != null) return false;
   if (row.testMode) return false;
   if (row.quotaHeld === true) return false;
-  return true;
+  if (monthStartMs == null) return true;
+  if (typeof row.failedAt !== "number") return false;
+  return enteredDeclineCapacityAt({
+    failedAt: row.failedAt,
+    quotaReleasedAt: row.quotaReleasedAt,
+  }) >= monthStartMs;
+}
+
+export function heldRowsToRelease(args: {
+  heldCount: number;
+  availableSlots: number;
+}): number {
+  const held =
+    typeof args.heldCount === "number" && Number.isFinite(args.heldCount)
+      ? Math.max(0, Math.floor(args.heldCount))
+      : 0;
+  const slots =
+    typeof args.availableSlots === "number" &&
+    Number.isFinite(args.availableSlots)
+      ? Math.max(0, Math.floor(args.availableSlots))
+      : 0;
+  return Math.min(held, slots);
+}
+
+/** New UTC month has unused capacity — drain last month's hold backlog. */
+export function shouldUnholdOnMonthRollover(args: {
+  lastReleasedMonthStart: number | undefined;
+  nowMs: number;
+}): boolean {
+  return args.lastReleasedMonthStart !== utcMonthStartMs(args.nowMs);
+}
+
+/** Free→Pro (or any included-cap increase) must unhold; demote must not. */
+export function shouldUnholdOnPlanPromote(args: {
+  priorPlan: Plan;
+  nextPlan: Plan;
+}): boolean {
+  return (
+    declineCapacity({ plan: args.nextPlan, packExtra: 0 }) >
+    declineCapacity({ plan: args.priorPlan, packExtra: 0 })
+  );
 }
 
 export type DodoPackCreditReason =

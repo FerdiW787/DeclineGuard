@@ -26,6 +26,8 @@ import {
   lsPlatformEventAction,
   planAfterForeignDemotion,
 } from "../lib/billingProvider";
+import { shouldUnholdOnPlanPromote } from "../lib/declineCapacity";
+import { releaseHeldAndSchedule } from "../lib/declineHoldQueue";
 import {
   billingProviderForUser,
   userHasActivePro,
@@ -308,6 +310,16 @@ export const applyPlatformSubscription = internalMutation({
           knownSub,
           checkoutNonceOk,
         },
+      });
+    }
+
+    if (shouldUnholdOnPlanPromote({ priorPlan, nextPlan: appliedPlan })) {
+      await releaseHeldAndSchedule(ctx, {
+        userId: user._id,
+        plan: appliedPlan,
+        packExtra: user.declinePackExtra,
+        nowMs: Date.now(),
+        force: true,
       });
     }
 
