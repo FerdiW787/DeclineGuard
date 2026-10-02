@@ -1202,7 +1202,6 @@ function Dashboard() {
                           ? {
                               fromAddress: emailSetup.fromAddress,
                               isProduction: emailSetup.isProduction,
-                              hasApiKey: emailSetup.hasApiKey,
                             }
                           : emailSetup
                       }

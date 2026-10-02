@@ -4,6 +4,7 @@
  */
 
 export {
+  BE_LAYOUT_PRESET_IDS,
   DEFAULT_LAYOUT_PRESET_ID,
   DEFAULT_LIFECYCLE_EMAIL_TYPE,
   DEFAULT_STYLING_MODE,
@@ -46,16 +47,16 @@ export const LAYOUT_PRESET_META: readonly LayoutPresetMeta[] =
     };
   });
 
-/** Product labels match the RGE refs — never Quiet Verify / Soft Expire. */
+/** Labels describe structure — not RGE refs or Quiet Verify. */
 export const LAYOUT_PRESET_STRUCTURE_META: Record<
   LayoutPresetId,
   { label: string; hint: string }
 > = {
-  sonos: { label: "Sonos", hint: "Verify your email" },
-  avocode: { label: "Avocode", hint: "Your trial ended" },
-  benchmark: { label: "Benchmark", hint: "Your data is safe" },
-  fontbase: { label: "FontBase", hint: "Upcoming renewal" },
-  "nordvpn-structure": { label: "NordVPN", hint: "Your account has expired" },
+  "poster-notice": { label: "Poster notice", hint: "Centered announcement" },
+  "amount-due": { label: "Amount due", hint: "Money first" },
+  "plain-letter": { label: "Plain letter", hint: "Two paragraphs" },
+  "what-happened": { label: "What happened", hint: "Two labeled beats" },
+  "quiet-column": { label: "Quiet column", hint: "Wide type only" },
 };
 
 export const LIFECYCLE_EMAIL_META: Record<

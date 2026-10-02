@@ -98,8 +98,9 @@ const TEMPLATES: Record<RecoveryTemplateId, TemplateCopy> = {
 export type RecoveryEmailVars = {
   templateId: RecoveryTemplateId;
   /**
-   * Selects starter block kit (Sonos / Avocode / Benchmark / FontBase / NordVPN).
+   * Selects starter block kit (Set A winner or assigned arm).
    * Day step still selects copy/urgency via templateId.
+   * Merchant emailCopy.blocks are ignored — kit structure is ours.
    */
   layoutPresetId?: string | null;
   /** Primary — accents / monogram fallback (not always the CTA) */
@@ -265,11 +266,12 @@ export function buildRecoveryEmail(input: RecoveryEmailVars): {
 } {
   const copy = resolveCopy(input.templateId, input.copyOverrides);
   const kit = normalizeLayoutPresetId(input.layoutPresetId);
-  const seeded = !(copy.blocks && copy.blocks.length > 0);
-  const blocks = seeded
-    ? starterBlocksForKit(kit, input.templateId)
-    : copy.blocks!;
-  const seedShell = seeded ? kitShellSpec(kit) : null;
+  const blocks = overlayMerchantCopyOnKit(
+    starterBlocksForKit(kit, input.templateId),
+    copy,
+    input.copyOverrides?.[input.templateId],
+  );
+  const seedShell = kitShellSpec(kit);
   const vars = {
     first_name: firstName(input.customerName, input.customerEmail),
     product: input.productName,
@@ -304,25 +306,12 @@ export function buildRecoveryEmail(input: RecoveryEmailVars): {
     input.linkColor?.trim() ||
     copy.linkColor?.trim() ||
     primary;
-  const pad =
-    typeof copy.emailPadding === "number" && Number.isFinite(copy.emailPadding)
-      ? Math.max(0, Math.min(80, Math.round(copy.emailPadding)))
-      : (seedShell?.emailPadding ?? 24);
-  const cardBg = copy.shellBackground?.trim() || shellBg;
-  const cardBorderOn =
-    typeof copy.shellBorder === "boolean"
-      ? copy.shellBorder
-      : (seedShell?.shellBorder ?? true);
-  const cardBorderColor = copy.shellBorderColor?.trim() || primary;
-  const cardRadius =
-    typeof copy.shellRadius === "number" && Number.isFinite(copy.shellRadius)
-      ? Math.max(0, Math.min(48, Math.round(copy.shellRadius)))
-      : (seedShell?.shellRadius ?? 0);
-  const cardBorderWidth =
-    typeof copy.shellBorderWidth === "number" &&
-    Number.isFinite(copy.shellBorderWidth)
-      ? Math.max(1, Math.min(8, Math.round(copy.shellBorderWidth)))
-      : (seedShell?.shellBorderWidth ?? 1);
+  const pad = seedShell.emailPadding;
+  const cardBg = shellBg;
+  const cardBorderOn = seedShell.shellBorder;
+  const cardBorderColor = primary;
+  const cardRadius = seedShell.shellRadius;
+  const cardBorderWidth = seedShell.shellBorderWidth;
   const cardBox = [
     `background:${escapeAttr(cardBg)}`,
     cardBorderOn
@@ -352,6 +341,8 @@ export function buildRecoveryEmail(input: RecoveryEmailVars): {
   const logoMark = logoUrl
     ? `<img src="${escapeAttr(logoUrl)}" alt="${escapeHtml(input.storeName)}" width="44" height="44" style="display:block;width:44px;height:44px;border-radius:10px;object-fit:cover;" />`
     : `<div style="display:inline-block;width:44px;height:44px;border-radius:10px;background:${escapeAttr(primary)};color:#ffffff;font-size:15px;font-weight:700;letter-spacing:-0.02em;line-height:44px;text-align:center;">${escapeHtml(initials)}</div>`;
+  // BE kits do not flag store-name / greeting chrome — send always
+  // renders the logo + store name + greeting (FE kitShows* stay Lab-only).
   const headerHtml = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 36px;">
         <tr>
           <td style="vertical-align:middle;padding:0 12px 0 0;">${logoMark}</td>
@@ -442,6 +433,35 @@ export function buildRecoveryEmail(input: RecoveryEmailVars): {
   }
 
   return { subject, html, text: textParts.join("\n") };
+}
+
+/**
+ * Overlay merchant headline/body/cta onto starter kit copySlots + button.
+ * Kit structure and chrome stay ours — merchant `blocks` are ignored.
+ * Unset merchant fields keep kit day copy.
+ */
+function overlayMerchantCopyOnKit(
+  blocks: EmailBlock[],
+  copy: TemplateCopy,
+  over?: Partial<EditableEmailCopy> | null,
+): EmailBlock[] {
+  const headline = over?.headline?.trim();
+  const body = over?.body?.trim();
+  const cta = over?.cta?.trim();
+  if (!headline && !body && !cta) return blocks;
+
+  return blocks.map((block) => {
+    if (headline && block.type === "text" && block.copySlot === "headline") {
+      return { ...block, html: copy.headline };
+    }
+    if (body && block.type === "text" && block.copySlot === "body") {
+      return { ...block, html: copy.bodyHtml };
+    }
+    if (cta && block.type === "button") {
+      return { ...block, label: copy.cta };
+    }
+    return block;
+  });
 }
 
 function escapeHtml(value: string): string {

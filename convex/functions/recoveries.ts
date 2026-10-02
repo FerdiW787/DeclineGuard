@@ -27,6 +27,10 @@ import {
   EMAIL_OVERAGE_PACK_PRICE_USD,
 } from "../lib/accountGuard";
 import { planValidator, recoveryActionValidator } from "../schema";
+import {
+  assignKitForNewSequence,
+  recordKitRecovery,
+} from "../lib/kitExperiment";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -372,6 +376,7 @@ export const upsertFailedPayment = internalMutation({
       attemptIndex = 1;
       const recoveryAction = computeRecoveryAction(attemptIndex);
 
+      const assignedKitId = await assignKitForNewSequence(ctx, args.userId);
       failureId = await ctx.db.insert("failedPayments", {
         userId: args.userId,
         connectionId: args.connectionId,
@@ -391,6 +396,7 @@ export const upsertFailedPayment = internalMutation({
         testMode: args.testMode,
         attemptIndex,
         recoveryAction,
+        assignedKitId,
       });
     }
 
@@ -442,6 +448,7 @@ export const getFailureEmailPayload = internalQuery({
       day0SentAt: v.union(v.number(), v.null()),
       day2SentAt: v.union(v.number(), v.null()),
       day5SentAt: v.union(v.number(), v.null()),
+      assignedKitId: v.union(v.string(), v.null()),
     }),
     v.null(),
   ),
@@ -481,6 +488,7 @@ export const getFailureEmailPayload = internalQuery({
       day0SentAt: failure.day0SentAt ?? null,
       day2SentAt: failure.day2SentAt ?? null,
       day5SentAt: failure.day5SentAt ?? null,
+      assignedKitId: failure.assignedKitId ?? null,
     };
   },
 });
@@ -915,6 +923,7 @@ export const markPaymentRecovered = internalMutation({
     // - Fee rate: Free = 10%, Pro = 4%
     // - Idempotent via by_failure index
     if (!open.testMode && attributed) {
+      await recordKitRecovery(ctx, args.userId, open.assignedKitId);
       const existingFee = await ctx.db
         .query("recoveryFees")
         .withIndex("by_failure", (q) => q.eq("failureId", open._id))

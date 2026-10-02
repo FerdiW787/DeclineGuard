@@ -338,7 +338,6 @@ export default function BrandImportGate({
       });
       await persistEmailTheme({
         stylingMode: draft.stylingMode,
-        layoutPresetId: draft.layoutPresetId,
       });
       onComplete?.();
     } catch (e) {

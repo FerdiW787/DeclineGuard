@@ -9,10 +9,10 @@ import {
   type RecoveryTemplateId,
 } from "../lib/recoveryEmailTemplate";
 import {
-  NEW_MERCHANT_THEME_DEFAULTS,
   recoveryColorsFromTheme,
-  resolveThemeFromSettings,
+  resolveSendTheme,
 } from "../lib/emailTheme";
+import { resolveSendKit } from "../lib/kitExperiment";
 import { resolveFromAddress } from "../lib/recoveryEmailFrom";
 import { isResendQuotaError, parseResendError } from "../lib/resendErrors";
 import { safePaymentUpdateUrl } from "../lib/safeUrl";
@@ -219,9 +219,12 @@ async function runSequenceStep(
   const finalUpdatePaymentUrl = safePaymentUpdateUrl(updatePaymentUrl);
 
   const templateId = STEP_TEMPLATE[step];
-  const theme = resolveThemeFromSettings(
-    settings ?? NEW_MERCHANT_THEME_DEFAULTS,
-  );
+  const kitId = resolveSendKit({
+    experimentStatus: settings?.kitExperimentStatus,
+    winnerKitId: settings?.layoutPresetId,
+    assignedKitId: payload.assignedKitId,
+  });
+  const theme = resolveSendTheme(kitId, settings);
   const colors = recoveryColorsFromTheme(theme.tokens);
   const amountLabel = formatMoney(payload.amountCents, payload.currency);
 

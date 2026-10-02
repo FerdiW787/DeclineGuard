@@ -38,7 +38,6 @@ import {
 import {
   NEW_MERCHANT_THEME_DEFAULTS,
   RECOVERY_SEQUENCE_STEPS,
-  assertKnownLayoutPresetId,
   configuredTokensFromSettings,
   inferStylingMode,
   listLayoutPresets,
@@ -55,7 +54,15 @@ import {
   stylingModeValidator,
 } from "../lib/emailTheme";
 import { buildRecoveryEmail } from "../lib/recoveryEmailTemplate";
-import { requireStaff } from "../lib/admin";
+import {
+  requireActionReason,
+  requireStaff,
+  writeAuditLog,
+} from "../lib/admin";
+import {
+  resetKitExperimentForUser,
+  resolveSendKit,
+} from "../lib/kitExperiment";
 import { consumeRateLimit } from "../lib/rateLimit";
 import { assertStorageOwnedByUser } from "../lib/storageOwnership";
 
@@ -101,6 +108,7 @@ const settingsValidator = v.object({
   brandImportBonusCredits: v.number(),
   stylingMode: stylingModeValidator,
   layoutPresetId: v.string(),
+  kitExperimentStatus: v.union(v.literal("active"), v.literal("won")),
   updatedAt: v.number(),
 });
 
@@ -249,6 +257,13 @@ function normalizeHttpsUrl(value: string | undefined, max = 2000): string {
   } catch {
     return "";
   }
+}
+
+/** Internal/admin seed path — public save strips blocks and does not call this. */
+export function normalizeEmailBlockForSeed(
+  block: EmailBlockInput,
+): EmailBlockInput | null {
+  return normalizeBlock(block);
 }
 
 function normalizeBlock(block: EmailBlockInput): EmailBlockInput | null {
@@ -415,13 +430,6 @@ function normalizeEditableCopy(
     typeof input.shellRadius === "number"
       ? clampNumber(input.shellRadius, 0, 48)
       : undefined;
-  const blocks = Array.isArray(input.blocks)
-    ? input.blocks
-        .slice(0, 40)
-        .map(normalizeBlock)
-        .filter((b): b is EmailBlockInput => b != null)
-    : undefined;
-
   if (
     !subject &&
     !headline &&
@@ -433,8 +441,7 @@ function normalizeEditableCopy(
     !shellBorderColor &&
     shellBorder === undefined &&
     shellBorderWidth === undefined &&
-    shellRadius === undefined &&
-    (!blocks || blocks.length === 0)
+    shellRadius === undefined
   ) {
     return undefined;
   }
@@ -443,7 +450,6 @@ function normalizeEditableCopy(
     ...(headline ? { headline } : {}),
     ...(body ? { body } : {}),
     ...(cta ? { cta } : {}),
-    ...(blocks && blocks.length > 0 ? { blocks } : {}),
     ...(linkColor ? { linkColor } : {}),
     ...(emailPadding !== undefined ? { emailPadding } : {}),
     ...(shellBackground ? { shellBackground } : {}),
@@ -505,6 +511,8 @@ function mapSettings(row: Doc<"recoverySettings">) {
     brandImportBonusCredits: Math.max(0, row.brandImportBonusCredits ?? 0),
     stylingMode: inferStylingMode(row),
     layoutPresetId: normalizeLayoutPresetId(row.layoutPresetId),
+    kitExperimentStatus:
+      row.kitExperimentStatus === "won" ? ("won" as const) : ("active" as const),
     updatedAt: row.updatedAt,
   };
 }
@@ -550,7 +558,6 @@ export const getEmailSetup = query({
       isProduction: v.boolean(),
       replyToEmail: v.union(v.string(), v.null()),
       fromName: v.union(v.string(), v.null()),
-      hasApiKey: v.boolean(),
     }),
     v.null(),
   ),
@@ -583,7 +590,6 @@ export const getEmailSetup = query({
       isProduction: isProductionFromAddress(fromAddress),
       replyToEmail: activeSettings?.replyToEmail ?? null,
       fromName: activeSettings?.fromName ?? null,
-      hasApiKey: Boolean(process.env.RESEND_API_KEY?.trim()),
     };
   },
 });
@@ -1226,9 +1232,14 @@ async function recoveryPreviewContext(
     connection && !isSoftDeleted(connection)
       ? connection.storeAvatarUrl ?? null
       : null;
+  const kitId = resolveSendKit({
+    experimentStatus: mapped?.kitExperimentStatus,
+    winnerKitId: mapped?.layoutPresetId,
+    assignedKitId: null,
+  });
   const themeInput = {
-    stylingMode: mapped?.stylingMode,
-    layoutPresetId: mapped?.layoutPresetId,
+    stylingMode: "configured" as const,
+    layoutPresetId: kitId,
     configured: configuredTokensFromSettings(mapped),
   };
   return {
@@ -1254,7 +1265,10 @@ function recoveryPreviewPayload(
     };
   },
 ) {
-  const theme = resolveRecoveryEmailTheme(step, preview.themeInput);
+  const theme = resolveRecoveryEmailTheme(step, {
+    ...preview.themeInput,
+    stylingMode: "configured",
+  });
   const colors = recoveryColorsFromTheme(theme.tokens);
   const built = buildRecoveryEmail({
     templateId: theme.templateId,
@@ -1386,23 +1400,39 @@ export const setStylingMode = mutation({
   },
 });
 
-/** Jules: one global layout for recovery Day 0 / Day 2 / Day 5. */
+/**
+ * Merchants cannot pick templates. Public write is a no-op and returns
+ * the current winner / default kit from Auto A/B.
+ */
 export const setLayoutPresetId = mutation({
   args: { layoutPresetId: v.string() },
   returns: emailThemeSettingsValidator,
-  handler: async (ctx, args) => {
+  handler: async (ctx, _args) => {
     const user = await requireWriteUser(ctx, "email_theme");
-    const layoutPresetId = assertKnownLayoutPresetId(args.layoutPresetId);
     const row = await ensureThemeSettingsRow(ctx, user._id);
-    const now = Date.now();
-    await ctx.db.patch(row._id, {
-      layoutPresetId,
-      updatedAt: now,
-    });
-    const next = await ctx.db.get(row._id);
-    if (!next) throw new Error("Recovery settings not found");
     const storefrontDomain = await storefrontDomainForUser(ctx, user._id);
-    return themeSettingsPayload(next, storefrontDomain, now);
+    return themeSettingsPayload(row, storefrontDomain, Date.now());
+  },
+});
+
+/** Staff / admin: restart kit rotation for a merchant. */
+export const resetKitExperiment = mutation({
+  args: {
+    userId: v.id("users"),
+    reason: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const actor = await requireStaff(ctx);
+    const reason = requireActionReason(args.reason);
+    await resetKitExperimentForUser(ctx, args.userId);
+    await writeAuditLog(ctx, {
+      actorUserId: actor._id,
+      targetUserId: args.userId,
+      action: "kit_experiment:reset",
+      reason,
+    });
+    return null;
   },
 });
 

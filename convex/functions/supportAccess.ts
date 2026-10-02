@@ -627,7 +627,6 @@ export const getDashboardSimulation = query({
           isProduction: v.boolean(),
           replyToEmail: v.union(v.string(), v.null()),
           fromName: v.union(v.string(), v.null()),
-          hasApiKey: v.boolean(),
         }),
         v.null(),
       ),
@@ -827,7 +826,6 @@ export const getDashboardSimulation = query({
       isProduction: boolean;
       replyToEmail: string | null;
       fromName: string | null;
-      hasApiKey: boolean;
     } | null = null;
     if (connection) {
       const displayName =
@@ -838,7 +836,6 @@ export const getDashboardSimulation = query({
         isProduction: isProductionFromAddress(fromAddress),
         replyToEmail: settings?.replyToEmail ?? null,
         fromName: settings?.fromName ?? null,
-        hasApiKey: Boolean(process.env.RESEND_API_KEY?.trim()),
       };
     }
 

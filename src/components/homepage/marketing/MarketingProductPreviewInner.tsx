@@ -113,7 +113,6 @@ export function MarketingProductPreviewInner({
             emailSetup={{
               fromAddress: marketingStore.fromAddressHint,
               isProduction: true,
-              hasApiKey: true,
             }}
             chartsReady
             kpiLive={live.kpiLive}

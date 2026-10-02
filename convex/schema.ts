@@ -180,6 +180,11 @@ export default defineSchema({
     day5SentAt: v.optional(v.number()),
     day2JobId: v.optional(v.id("_scheduled_functions")),
     day5JobId: v.optional(v.id("_scheduled_functions")),
+    /**
+     * Sticky Set A kit for this decline’s Day 0/2/5. Assigned on insert;
+     * ignored as a merchant control (Auto A/B or winner).
+     */
+    assignedKitId: v.optional(v.string()),
     /** Decline / billing reason from Lemon Squeezy when present */
     declineReason: v.optional(v.string()),
     /** Latest Resend delivery status for the most recent recovery email */
@@ -412,11 +417,23 @@ export default defineSchema({
       v.union(v.literal("preset"), v.literal("configured")),
     ),
     /**
-     * One global layout for all three recovery emails (not a per-step map).
-     * Catalog: sonos | avocode | benchmark | fontbase | nordvpn-structure.
-     * New merchants default to "sonos". Legacy "quiet-verify" maps to sonos.
+     * Winner kit after Auto A/B (`kitExperimentStatus === "won"`).
+     * While `active`, send uses `failedPayments.assignedKitId` — this field
+     * is not a merchant picker. Catalog: poster-notice | amount-due |
+     * plain-letter | what-happened | quiet-column.
      */
     layoutPresetId: v.optional(v.string()),
+    /**
+     * Kit experiment: `active` rotates arms; `won` locks layoutPresetId.
+     * Unset is treated as `active`.
+     */
+    kitExperimentStatus: v.optional(
+      v.union(v.literal("active"), v.literal("won")),
+    ),
+    /** Next arm index into LAYOUT_PRESET_IDS (fair rotation). */
+    kitExperimentRotationIndex: v.optional(v.number()),
+    /** When the winning kit was promoted. */
+    kitExperimentWonAt: v.optional(v.number()),
     /** Rolling monthly rebrand quota — set on each successful import */
     lastBrandImportAt: v.optional(v.number()),
     /** Support-granted extra imports (big rebrand) */
@@ -425,6 +442,21 @@ export default defineSchema({
     deletedAt: v.optional(v.number()),
     deletedBy: v.optional(deletedByValidator),
   }).index("by_user", ["userId"]),
+
+  /**
+   * Per-merchant × kit Auto A/B counters.
+   * sequencesStarted increments on each new decline assignment while active.
+   * recoveries increment from markPaymentRecovered (attributed, non-test).
+   */
+  kitExperimentStats: defineTable({
+    userId: v.id("users"),
+    kitId: v.string(),
+    sequencesStarted: v.number(),
+    recoveries: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_kit", ["userId", "kitId"]),
 
   /** Timeline feed for the dashboard */
   activityEvents: defineTable({

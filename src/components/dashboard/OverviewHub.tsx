@@ -33,7 +33,6 @@ type WebhookHealth = {
 type EmailHealth = {
   fromAddress: string;
   isProduction: boolean;
-  hasApiKey: boolean;
 };
 
 type Props = {
@@ -200,13 +199,6 @@ export default function OverviewHub({
     }
     const setup = emailSetup;
     const isProd = setup?.isProduction ?? emailIsProduction;
-    if (setup && !setup.hasApiKey) {
-      return {
-        label: "No API key",
-        detail: "Resend key missing",
-        tone: "warn" as const,
-      };
-    }
     if (isProd === false) {
       return {
         label: "Test mode",

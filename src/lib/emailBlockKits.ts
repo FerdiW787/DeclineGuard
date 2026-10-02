@@ -1,20 +1,23 @@
 /**
- * Starter block kits — 1:1 structure of the RGE templates Fendem locked.
- *   sonos              https://reallygoodemails.com/emails/verify-your-email-sonos
- *   avocode            https://reallygoodemails.com/emails/your-avocode-trial-ended
- *   benchmark          https://reallygoodemails.com/emails/dont-worry-your-data-is-safe
- *   fontbase           https://reallygoodemails.com/emails/upcoming-renewal
- *   nordvpn-structure  https://reallygoodemails.com/emails/your-account-has-expired
+ * Recovery starter kits — structure only. Hard reset (not RGE remixes).
+ * Colors/CTA come from resolveTheme. Do not bake brand hex into blocks.
+ *
+ *   poster-notice     one announcement, then the button
+ *   amount-due        money first, then the problem
+ *   plain-letter      a short letter, then the ask
+ *   what-happened     two beats: happened, then do
+ *   quiet-column      wide type, almost nothing else
+ *
+ * Set A only. Merchants do not pick a kit.
  *
  * Day 0 / 2 / 5 reuse the same kit chrome with gentle / direct / urgent copy.
- * Switching kits rebuilds blocks from clean slots — never re-ingest the
- * billing link into body (that stacked "Or update billing" on every pick).
  */
 
 import {
   createBillingLinkTextBlock,
   createButtonBlock,
   createDividerBlock,
+  createSpacerBlock,
   createTextBlock,
   type BlockAlign,
   type EmailBlock,
@@ -55,37 +58,52 @@ export type BlockKitSpec = {
 };
 
 export const BLOCK_KIT_SPEC: Record<LayoutPresetId, BlockKitSpec> = {
-  sonos: {
+  "poster-notice": {
     align: "center",
     ctaAlign: "center",
     logoAlign: "center",
     showStoreName: false,
     showGreeting: false,
     showAccentBar: false,
-    emailPadding: 48,
+    emailPadding: 64,
     shellBorder: false,
     shellBorderWidth: 1,
     shellRadius: 0,
     eyebrowSize: 11,
-    headlineSize: 28,
-    bodySize: 15,
+    headlineSize: 34,
+    bodySize: 16,
   },
-  avocode: {
+  "amount-due": {
     align: "left",
     ctaAlign: "left",
     logoAlign: "left",
     showStoreName: true,
     showGreeting: false,
     showAccentBar: false,
-    emailPadding: 28,
+    emailPadding: 40,
     shellBorder: false,
     shellBorderWidth: 1,
     shellRadius: 0,
-    eyebrowSize: 13,
-    headlineSize: 22,
+    eyebrowSize: 11,
+    headlineSize: 20,
     bodySize: 15,
   },
-  benchmark: {
+  "plain-letter": {
+    align: "left",
+    ctaAlign: "left",
+    logoAlign: "left",
+    showStoreName: true,
+    showGreeting: true,
+    showAccentBar: false,
+    emailPadding: 44,
+    shellBorder: false,
+    shellBorderWidth: 1,
+    shellRadius: 0,
+    eyebrowSize: 11,
+    headlineSize: 22,
+    bodySize: 16,
+  },
+  "what-happened": {
     align: "left",
     ctaAlign: "left",
     logoAlign: "left",
@@ -95,40 +113,25 @@ export const BLOCK_KIT_SPEC: Record<LayoutPresetId, BlockKitSpec> = {
     emailPadding: 32,
     shellBorder: false,
     shellBorderWidth: 1,
-    shellRadius: 12,
-    eyebrowSize: 12,
+    shellRadius: 0,
+    eyebrowSize: 11,
     headlineSize: 22,
     bodySize: 15,
   },
-  fontbase: {
+  "quiet-column": {
     align: "left",
     ctaAlign: "left",
     logoAlign: "left",
-    showStoreName: true,
+    showStoreName: false,
     showGreeting: false,
     showAccentBar: false,
-    emailPadding: 32,
+    emailPadding: 64,
     shellBorder: false,
     shellBorderWidth: 1,
     shellRadius: 0,
     eyebrowSize: 11,
-    headlineSize: 28,
-    bodySize: 15,
-  },
-  "nordvpn-structure": {
-    align: "left",
-    ctaAlign: "left",
-    logoAlign: "left",
-    showStoreName: true,
-    showGreeting: false,
-    showAccentBar: true,
-    emailPadding: 28,
-    shellBorder: true,
-    shellBorderWidth: 4,
-    shellRadius: 0,
-    eyebrowSize: 11,
-    headlineSize: 22,
-    bodySize: 15,
+    headlineSize: 32,
+    bodySize: 18,
   },
 };
 
@@ -160,7 +163,7 @@ const DAY_COPY: Record<RecoveryTemplateId, KitCopy> = {
 };
 
 const CHROME_LINE =
-  /^(what.?s ending|what.?s included|nothing here is gone|paused|access stays on|card details stay|same plan|change the card|update billing so|keep access|or\s)/i;
+  /^(what happened|what to do|amount due|payment failed|thanks,?|p\.?s\.|access stays on|access is still on|your workspace stays|updating the card|nothing else changes|open billing|card update needed|failed$|notice$|or\s)/i;
 
 const BILLING_ECHO =
   /open the billing page|to update your card|to continue\.?/i;
@@ -247,16 +250,9 @@ function divider(marginTop: number, marginBottom: number): EmailBlock {
   return { ...createDividerBlock(), marginTop, marginBottom };
 }
 
-function blocksForSonos(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
+function blocksForPosterNotice(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
   return [
-    createTextBlock(copy.eyebrow, {
-      copySlot: "eyebrow",
-      fontSize: spec.eyebrowSize,
-      color: "muted",
-      align: "center",
-      marginTop: 8,
-      marginBottom: 10,
-    }),
+    createSpacerBlock(8),
     createTextBlock(copy.headline, {
       copySlot: "headline",
       fontSize: spec.headlineSize,
@@ -272,212 +268,42 @@ function blocksForSonos(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
       color: "muted",
       align: "center",
       marginTop: 0,
-      marginBottom: 28,
+      marginBottom: 0,
     }),
-    createButtonBlock(copy.cta, { align: "center", marginBottom: 20 }),
+    createSpacerBlock(36),
+    createButtonBlock(copy.cta, { align: "center", marginBottom: 16 }),
     createBillingLinkTextBlock({
-      prefix: "Or",
+      prefix: "",
       linkLabel: copy.link,
-      suffix: "to continue.",
+      suffix: "",
       align: "center",
     }),
   ];
 }
 
-function blocksForAvocode(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
+function blocksForAmountDue(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
   return [
-    createTextBlock(copy.eyebrow, {
-      copySlot: "eyebrow",
+    createTextBlock("Amount due", {
       fontSize: spec.eyebrowSize,
       color: "muted",
       align: "left",
       marginTop: 0,
-      marginBottom: 8,
-    }),
-    createTextBlock(copy.headline, {
-      copySlot: "headline",
-      fontSize: spec.headlineSize,
-      color: "default",
-      bold: true,
-      align: "left",
-      marginTop: 0,
-      marginBottom: 16,
-    }),
-    createTextBlock("What's ending", {
-      fontSize: 12,
-      color: "muted",
-      align: "left",
-      marginTop: 4,
       marginBottom: 6,
-    }),
-    createTextBlock("{{product}}", {
-      fontSize: 15,
-      color: "default",
-      bold: true,
-      align: "left",
-      marginTop: 0,
-      marginBottom: 2,
     }),
     createTextBlock("{{amount}}", {
-      fontSize: 13,
-      color: "muted",
-      align: "left",
-      marginTop: 0,
-      marginBottom: 16,
-    }),
-    createTextBlock(boldTokens(copy.body), {
-      copySlot: "body",
-      fontSize: spec.bodySize,
-      color: "default",
-      align: "left",
-      marginTop: 0,
-      marginBottom: 24,
-    }),
-    createButtonBlock(copy.cta, { align: "left", marginBottom: 16 }),
-    createBillingLinkTextBlock({
-      prefix: "",
-      linkLabel: copy.link,
-      suffix: "",
-      align: "left",
-    }),
-  ];
-}
-
-function blocksForBenchmark(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
-  return [
-    createTextBlock(copy.eyebrow, {
-      copySlot: "eyebrow",
-      fontSize: 11,
-      color: "muted",
-      align: "left",
-      hexColor: "#1f7a4d",
-      marginTop: 0,
-      marginBottom: 14,
-    }),
-    createTextBlock(copy.headline, {
-      copySlot: "headline",
-      fontSize: spec.headlineSize,
+      fontSize: 42,
       color: "default",
       bold: true,
-      align: "left",
-      marginTop: 0,
-      marginBottom: 12,
-    }),
-    createTextBlock(boldTokens(copy.body), {
-      copySlot: "body",
-      fontSize: spec.bodySize,
-      color: "default",
-      align: "left",
-      marginTop: 0,
-      marginBottom: 18,
-    }),
-    createTextBlock("Nothing here is gone", {
-      fontSize: 13,
-      color: "default",
-      bold: true,
-      align: "left",
-      marginTop: 4,
-      marginBottom: 6,
-    }),
-    createTextBlock("Access stays on while you update.", {
-      fontSize: 13,
-      color: "muted",
-      align: "left",
-      marginTop: 0,
-      marginBottom: 2,
-    }),
-    createTextBlock("Card details stay on your billing page.", {
-      fontSize: 13,
-      color: "muted",
-      align: "left",
-      marginTop: 0,
-      marginBottom: 24,
-    }),
-    createButtonBlock(copy.cta, { align: "left", marginBottom: 16 }),
-    createBillingLinkTextBlock({
-      prefix: "",
-      linkLabel: copy.link,
-      suffix: "",
-      align: "left",
-    }),
-  ];
-}
-
-function blocksForFontbase(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
-  return [
-    createTextBlock(copy.eyebrow, {
-      copySlot: "eyebrow",
-      fontSize: spec.eyebrowSize,
-      color: "muted",
-      align: "left",
-      marginTop: 0,
-      marginBottom: 10,
-    }),
-    createTextBlock(copy.headline, {
-      copySlot: "headline",
-      fontSize: spec.headlineSize,
-      color: "default",
-      bold: true,
-      align: "left",
-      marginTop: 0,
-      marginBottom: 14,
-    }),
-    createTextBlock(boldTokens(copy.body), {
-      copySlot: "body",
-      fontSize: spec.bodySize,
-      color: "muted",
-      align: "left",
-      marginTop: 0,
-      marginBottom: 8,
-    }),
-    divider(12, 16),
-    createTextBlock("What's included", {
-      fontSize: 12,
-      color: "muted",
-      align: "left",
-      marginTop: 0,
-      marginBottom: 8,
-    }),
-    createTextBlock("Same plan and workspace", {
-      fontSize: 14,
-      color: "default",
       align: "left",
       marginTop: 0,
       marginBottom: 4,
     }),
-    createTextBlock("Change the card anytime before renewal", {
+    createTextBlock("{{product}}", {
       fontSize: 14,
-      color: "default",
-      align: "left",
-      marginTop: 0,
-      marginBottom: 16,
-    }),
-    createTextBlock("{{product}}  ·  {{amount}}", {
-      fontSize: 13,
       color: "muted",
       align: "left",
       marginTop: 0,
-      marginBottom: 24,
-    }),
-    createButtonBlock(copy.cta, { align: "left", marginBottom: 16 }),
-    createBillingLinkTextBlock({
-      prefix: "",
-      linkLabel: copy.link,
-      suffix: "",
-      align: "left",
-    }),
-  ];
-}
-
-function blocksForNordvpn(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
-  return [
-    createTextBlock(copy.eyebrow, {
-      copySlot: "eyebrow",
-      fontSize: spec.eyebrowSize,
-      color: "muted",
-      align: "left",
-      marginTop: 0,
-      marginBottom: 8,
+      marginBottom: 28,
     }),
     createTextBlock(copy.headline, {
       copySlot: "headline",
@@ -486,7 +312,36 @@ function blocksForNordvpn(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
       bold: true,
       align: "left",
       marginTop: 0,
-      marginBottom: 12,
+      marginBottom: 8,
+    }),
+    createTextBlock("Update the card to keep access on — about a minute.", {
+      copySlot: "body",
+      fontSize: spec.bodySize,
+      color: "muted",
+      align: "left",
+      marginTop: 0,
+      marginBottom: 24,
+    }),
+    createButtonBlock(copy.cta, { align: "left", marginBottom: 14 }),
+    createBillingLinkTextBlock({
+      prefix: "",
+      linkLabel: copy.link,
+      suffix: "",
+      align: "left",
+    }),
+  ];
+}
+
+function blocksForPlainLetter(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
+  return [
+    createTextBlock(copy.headline, {
+      copySlot: "headline",
+      fontSize: spec.headlineSize,
+      color: "default",
+      bold: true,
+      align: "left",
+      marginTop: 0,
+      marginBottom: 16,
     }),
     createTextBlock(boldTokens(copy.body), {
       copySlot: "body",
@@ -494,24 +349,107 @@ function blocksForNordvpn(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
       color: "default",
       align: "left",
       marginTop: 0,
-      marginBottom: 18,
+      marginBottom: 16,
     }),
-    createTextBlock("1. Update billing", {
-      fontSize: 14,
+    createTextBlock(
+      "Updating the card keeps **{{product}}** on. Nothing else changes.",
+      {
+        fontSize: spec.bodySize,
+        color: "muted",
+        align: "left",
+        marginTop: 0,
+        marginBottom: 20,
+      },
+    ),
+    createTextBlock("Thanks,", {
+      fontSize: spec.bodySize,
       color: "default",
-      bold: true,
       align: "left",
       marginTop: 0,
-      marginBottom: 6,
+      marginBottom: 0,
     }),
-    createTextBlock("2. Keep access on", {
-      fontSize: 14,
+    createSpacerBlock(28),
+    createButtonBlock(copy.cta, { align: "left", marginBottom: 14 }),
+    createBillingLinkTextBlock({
+      prefix: "",
+      linkLabel: copy.link,
+      suffix: "",
+      align: "left",
+    }),
+  ];
+}
+
+function blocksForWhatHappened(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
+  return [
+    createTextBlock(copy.headline, {
+      copySlot: "headline",
+      fontSize: spec.headlineSize,
       color: "default",
       bold: true,
       align: "left",
       marginTop: 0,
       marginBottom: 24,
     }),
+    createTextBlock("WHAT HAPPENED", {
+      fontSize: 11,
+      color: "muted",
+      align: "left",
+      marginTop: 0,
+      marginBottom: 6,
+    }),
+    createTextBlock(boldTokens(copy.body), {
+      copySlot: "body",
+      fontSize: spec.bodySize,
+      color: "default",
+      align: "left",
+      marginTop: 0,
+      marginBottom: 0,
+    }),
+    divider(18, 18),
+    createTextBlock("WHAT TO DO", {
+      fontSize: 11,
+      color: "muted",
+      align: "left",
+      marginTop: 0,
+      marginBottom: 6,
+    }),
+    createTextBlock("Open billing and update the card.", {
+      fontSize: spec.bodySize,
+      color: "default",
+      align: "left",
+      marginTop: 0,
+      marginBottom: 24,
+    }),
+    createButtonBlock(copy.cta, { align: "left", marginBottom: 14 }),
+    createBillingLinkTextBlock({
+      prefix: "",
+      linkLabel: copy.link,
+      suffix: "",
+      align: "left",
+    }),
+  ];
+}
+
+function blocksForQuietColumn(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
+  return [
+    createTextBlock(copy.headline, {
+      copySlot: "headline",
+      fontSize: spec.headlineSize,
+      color: "default",
+      bold: true,
+      align: "left",
+      marginTop: 8,
+      marginBottom: 16,
+    }),
+    createTextBlock(boldTokens(copy.body), {
+      copySlot: "body",
+      fontSize: spec.bodySize,
+      color: "muted",
+      align: "left",
+      marginTop: 0,
+      marginBottom: 0,
+    }),
+    createSpacerBlock(32),
     createButtonBlock(copy.cta, { align: "left", marginBottom: 16 }),
     createBillingLinkTextBlock({
       prefix: "",
@@ -522,19 +460,20 @@ function blocksForNordvpn(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
   ];
 }
 
+
 export function blocksForKit(kitId: LayoutPresetId, copy: KitCopy): EmailBlock[] {
   const spec = BLOCK_KIT_SPEC[kitId];
   switch (kitId) {
-    case "sonos":
-      return blocksForSonos(spec, copy);
-    case "avocode":
-      return blocksForAvocode(spec, copy);
-    case "benchmark":
-      return blocksForBenchmark(spec, copy);
-    case "fontbase":
-      return blocksForFontbase(spec, copy);
-    case "nordvpn-structure":
-      return blocksForNordvpn(spec, copy);
+    case "poster-notice":
+      return blocksForPosterNotice(spec, copy);
+    case "amount-due":
+      return blocksForAmountDue(spec, copy);
+    case "plain-letter":
+      return blocksForPlainLetter(spec, copy);
+    case "what-happened":
+      return blocksForWhatHappened(spec, copy);
+    case "quiet-column":
+      return blocksForQuietColumn(spec, copy);
     default: {
       const _exhaustive: never = kitId;
       return _exhaustive;
