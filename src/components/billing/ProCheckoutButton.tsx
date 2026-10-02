@@ -2,13 +2,9 @@ import { useState } from "react";
 import { useAuth } from "@clerk/astro/react";
 import { useAction, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { withBillingReturnUrl } from "@/lib/billingUrls";
 
 const SIGN_UP_HREF = "/a/sign-up?redirect=/pricing";
-
-function defaultReturnUrl(): string {
-  if (typeof window === "undefined") return "";
-  return `${window.location.origin}/a/dashboard?billing=1`;
-}
 
 export function ProCheckoutButton({
   className = "ln-btn-primary w-full justify-center",
@@ -84,7 +80,7 @@ function ProCheckoutButtonConnected({
             try {
               await ensureCurrentUser({});
               const { checkoutUrl } = await createCheckout({
-                returnUrl: defaultReturnUrl(),
+                ...withBillingReturnUrl(),
               });
               window.location.assign(checkoutUrl);
             } catch (err) {

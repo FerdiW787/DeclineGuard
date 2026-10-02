@@ -662,7 +662,7 @@ export const getDashboardSimulation = query({
         )
         .order("desc")
         .take(SIM_SCAN)
-    ).filter((row) => row.deletedAt == null);
+    ).filter((row) => row.deletedAt == null && row.quotaHeld !== true);
 
     const openFailures = openRows.slice(0, 100).map((row) => ({
       _id: row._id,

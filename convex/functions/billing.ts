@@ -21,21 +21,30 @@ import {
   PRO_CHECKOUT_NONCE_TTL_MS,
   shouldIgnoreLsTestEvent,
 } from "../lib/billingPlan";
-import { planValidator } from "../schema";
+import {
+  isActiveSubscriptionStatus,
+  lsPlatformEventAction,
+  planAfterForeignDemotion,
+} from "../lib/billingProvider";
+import { shouldUnholdOnPlanPromote } from "../lib/declineCapacity";
+import { releaseHeldAndSchedule } from "../lib/declineHoldQueue";
+import {
+  billingProviderForUser,
+  userHasActivePro,
+} from "./dodoBilling";
+import { billingProviderValidator, planValidator } from "../schema";
 
 const billingStatusValidator = v.object({
   plan: planValidator,
+  billingProvider: billingProviderValidator,
   lsSubscriptionId: v.union(v.string(), v.null()),
   lsSubscriptionStatus: v.union(v.string(), v.null()),
+  dodoCustomerId: v.union(v.string(), v.null()),
+  dodoSubscriptionId: v.union(v.string(), v.null()),
+  dodoSubscriptionStatus: v.union(v.string(), v.null()),
   hasActivePro: v.boolean(),
+  portalAvailable: v.boolean(),
 });
-
-function hasActivePro(user: Doc<"users">): boolean {
-  return (
-    resolvePlan(user) === "pro" &&
-    (user.lsSubscriptionStatus ?? "").toLowerCase() === "active"
-  );
-}
 
 /** Viewer (signed-in user), never the takeover merchant. Used for checkout. */
 export const getViewerForCheckout = internalQuery({
@@ -44,13 +53,18 @@ export const getViewerForCheckout = internalQuery({
     _id: v.id("users"),
     clerkUserId: v.string(),
     plan: planValidator,
+    billingProvider: billingProviderValidator,
     lsSubscriptionId: v.union(v.string(), v.null()),
     lsSubscriptionStatus: v.union(v.string(), v.null()),
+    dodoCustomerId: v.union(v.string(), v.null()),
+    dodoSubscriptionId: v.union(v.string(), v.null()),
+    dodoSubscriptionStatus: v.union(v.string(), v.null()),
     accountStatus: v.union(
       v.literal("active"),
       v.literal("frozen"),
       v.literal("disabled"),
     ),
+    hasActivePro: v.boolean(),
   }),
   handler: async (ctx) => {
     const user = await getAuthenticatedUser(ctx);
@@ -58,9 +72,14 @@ export const getViewerForCheckout = internalQuery({
       _id: user._id,
       clerkUserId: user.userId,
       plan: resolvePlan(user),
+      billingProvider: billingProviderForUser(user),
       lsSubscriptionId: user.lsSubscriptionId ?? null,
       lsSubscriptionStatus: user.lsSubscriptionStatus ?? null,
+      dodoCustomerId: user.dodoCustomerId ?? null,
+      dodoSubscriptionId: user.dodoSubscriptionId ?? null,
+      dodoSubscriptionStatus: user.dodoSubscriptionStatus ?? null,
       accountStatus: user.accountStatus ?? "active",
+      hasActivePro: userHasActivePro(user),
     };
   },
 });
@@ -77,11 +96,19 @@ export const getMyBilling = query({
       .withIndex("by_userId", (q) => q.eq("userId", identity.subject))
       .unique();
     if (!user) return null;
+    const billingProvider = billingProviderForUser(user);
+    const hasActivePro = userHasActivePro(user);
     return {
       plan: resolvePlan(user),
+      billingProvider,
       lsSubscriptionId: user.lsSubscriptionId ?? null,
       lsSubscriptionStatus: user.lsSubscriptionStatus ?? null,
-      hasActivePro: hasActivePro(user),
+      dodoCustomerId: user.dodoCustomerId ?? null,
+      dodoSubscriptionId: user.dodoSubscriptionId ?? null,
+      dodoSubscriptionStatus: user.dodoSubscriptionStatus ?? null,
+      hasActivePro,
+      portalAvailable:
+        Boolean(user.dodoCustomerId) || Boolean(user.lsSubscriptionId),
     };
   },
 });
@@ -168,6 +195,18 @@ export const applyPlatformSubscription = internalMutation({
       return { applied: false, reason: "platform_billing_not_configured" };
     }
 
+    const previewUser = await findPlatformBillingUser(ctx, args);
+    const nextPlanPreview = planFromLsStatus(args.status);
+    if (previewUser) {
+      const eventAction = lsPlatformEventAction({
+        provider: billingProviderForUser(previewUser),
+        nextPlan: nextPlanPreview,
+      });
+      if (eventAction === "skip_promote") {
+        return { applied: false, reason: "provider_dodo" };
+      }
+    }
+
     if (shouldIgnoreLsTestEvent(args.testMode)) {
       const user = await findPlatformBillingUser(ctx, args);
       if (user) {
@@ -238,19 +277,29 @@ export const applyPlatformSubscription = internalMutation({
     }
 
     const priorPlan: Plan = resolvePlan(user);
+    const appliedPlan = planAfterForeignDemotion({
+      nextPlan,
+      otherMorActive: isActiveSubscriptionStatus(user.dodoSubscriptionStatus),
+    });
     await ctx.db.patch(user._id, {
-      plan: nextPlan,
+      plan: appliedPlan,
       lsSubscriptionId: args.lsSubscriptionId,
       lsSubscriptionStatus: args.status,
       lsCheckoutNonce: "",
       lsCheckoutNonceExpiresAt: 0,
+      ...(nextPlan === "pro"
+        ? {
+            dodoSubscriptionId: "",
+            dodoSubscriptionStatus: "",
+          }
+        : {}),
     });
 
-    if (priorPlan !== nextPlan) {
+    if (priorPlan !== appliedPlan) {
       await writeAuditLog(ctx, {
         actorUserId: null,
         targetUserId: user._id,
-        action: `plan_webhook:${nextPlan}`,
+        action: `plan_webhook:${appliedPlan}`,
         reason: "Lemon Squeezy platform subscription webhook",
         metadata: {
           priorPlan,
@@ -264,9 +313,19 @@ export const applyPlatformSubscription = internalMutation({
       });
     }
 
+    if (shouldUnholdOnPlanPromote({ priorPlan, nextPlan: appliedPlan })) {
+      await releaseHeldAndSchedule(ctx, {
+        userId: user._id,
+        plan: appliedPlan,
+        packExtra: user.declinePackExtra,
+        nowMs: Date.now(),
+        force: true,
+      });
+    }
+
     return {
-      applied: priorPlan !== nextPlan || !knownSub,
-      plan: nextPlan,
+      applied: priorPlan !== appliedPlan || !knownSub,
+      plan: appliedPlan,
       reason: "ok",
     };
   },

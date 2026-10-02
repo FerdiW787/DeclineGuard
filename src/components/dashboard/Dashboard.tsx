@@ -223,9 +223,6 @@ function Dashboard() {
     connection ? {} : "skip",
   );
   const ensureCurrentUser = useMutation(api.functions.user.ensureCurrentUser);
-  const createProCheckout = useAction(
-    api.functions.lemonSqueezyActions.createProCheckout,
-  );
   const currentUser = useQuery(api.functions.user.getCurrentUser);
   const plan = currentUser?.plan ?? "free";
   const recoveryFeePercent =
@@ -542,6 +539,7 @@ function Dashboard() {
   const billingQueryHandledRef = useRef(false);
   useEffect(() => {
     if (typeof window === "undefined" || !isSignedIn) return;
+    if (connectionLoading) return;
     if (billingQueryHandledRef.current) return;
     const params = new URLSearchParams(window.location.search);
     const wantBilling = params.get("billing") === "1";
@@ -556,28 +554,12 @@ function Dashboard() {
     }${window.location.hash}`;
     window.history.replaceState({}, "", next);
 
-    if (wantBilling && lsConnected) {
+    // Deep links open Billing. Do not auto-start checkout — Pricing / Billing
+    // CTAs remain the intentional Pro checkout path.
+    if (lsConnected) {
       openSettings("billing");
     }
-    if (!wantUpgrade) return;
-
-    void (async () => {
-      try {
-        await ensureCurrentUser({});
-        const { checkoutUrl } = await createProCheckout({
-          returnUrl: `${window.location.origin}/a/dashboard?billing=1`,
-        });
-        window.location.assign(checkoutUrl);
-      } catch {
-        if (lsConnected) openSettings("billing");
-      }
-    })();
-  }, [
-    isSignedIn,
-    lsConnected,
-    ensureCurrentUser,
-    createProCheckout,
-  ]);
+  }, [isSignedIn, lsConnected, connectionLoading]);
 
   useEffect(() => {
     if (!isSignedIn) return;

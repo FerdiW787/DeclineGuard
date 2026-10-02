@@ -21,4 +21,10 @@ crons.monthly(
   internal.functions.feeBillingActions.runMonthlyFeeInvoices,
 );
 
+crons.monthly(
+  "release held declines for new month capacity",
+  { day: 1, hourUTC: 0, minuteUTC: 20 },
+  internal.functions.declineHoldActions.runMonthlyHeldDeclineRelease,
+);
+
 export default crons;

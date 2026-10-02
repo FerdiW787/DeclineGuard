@@ -290,6 +290,7 @@ export default function SettingsModule({
                 planId={planId}
                 lsSubscriptionStatus={lsSubscriptionStatus}
                 recoveryFeePercent={recoveryFeePercent}
+                readOnly={readOnly}
               />
             ) : null}
             {tab === "account" && showAccount ? (

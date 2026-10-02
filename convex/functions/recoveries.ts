@@ -1,3 +1,4 @@
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import {
   internalMutation,
@@ -31,6 +32,14 @@ import {
   assignKitForNewSequence,
   recordKitRecovery,
 } from "../lib/kitExperiment";
+import {
+  quotaHeldAfterLazyRelease,
+  utcMonthStartMs,
+} from "../lib/declineCapacity";
+import {
+  releaseHeldAndSchedule,
+  shouldHoldInsert,
+} from "../lib/declineHoldQueue";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -333,6 +342,8 @@ export const upsertFailedPayment = internalMutation({
     failureId: v.id("failedPayments"),
     attemptIndex: v.number(),
     recoveryAction: recoveryActionValidator,
+    quotaHeld: v.boolean(),
+    releaseScheduledEmail: v.boolean(),
   }),
   handler: async (ctx, args) => {
     const open = await ctx.db
@@ -347,11 +358,31 @@ export const upsertFailedPayment = internalMutation({
 
     let failureId: Id<"failedPayments">;
     let attemptIndex: number;
+    let quotaHeld = false;
+
+    const owner = await ctx.db.get(args.userId);
+    const scheduledFromRelease = new Set<string>();
+    if (owner) {
+      const released = await releaseHeldAndSchedule(ctx, {
+        userId: owner._id,
+        plan: resolvePlan(owner),
+        packExtra: owner.declinePackExtra,
+        nowMs: Date.now(),
+      });
+      for (const id of released.scheduledFailureIds) {
+        scheduledFromRelease.add(id);
+      }
+    }
 
     if (open) {
-      // Increment attempt index for each new failure webhook on the same open failure
+      // Increment attempt index for each new failure webhook on the same open failure.
+      // In-flight sequences are never flipped to held.
       attemptIndex = (open.attemptIndex ?? 1) + 1;
       const recoveryAction = computeRecoveryAction(attemptIndex);
+      const afterRelease = await ctx.db.get(open._id);
+      quotaHeld = quotaHeldAfterLazyRelease({
+        rowStillHeld: afterRelease?.quotaHeld,
+      });
 
       await ctx.db.patch(open._id, {
         userId: args.userId,
@@ -375,6 +406,12 @@ export const upsertFailedPayment = internalMutation({
       // First failure for this subscription — attempt 1 → wait
       attemptIndex = 1;
       const recoveryAction = computeRecoveryAction(attemptIndex);
+      if (owner) {
+        quotaHeld = await shouldHoldInsert(ctx, owner, {
+          testMode: args.testMode,
+          nowMs: Date.now(),
+        });
+      }
 
       const assignedKitId = await assignKitForNewSequence(ctx, args.userId);
       failureId = await ctx.db.insert("failedPayments", {
@@ -397,6 +434,7 @@ export const upsertFailedPayment = internalMutation({
         attemptIndex,
         recoveryAction,
         assignedKitId,
+        quotaHeld,
       });
     }
 
@@ -417,7 +455,69 @@ export const upsertFailedPayment = internalMutation({
       occurredAt: args.failedAt,
     });
 
-    return { failureId, attemptIndex, recoveryAction };
+    return {
+      failureId,
+      attemptIndex,
+      recoveryAction,
+      quotaHeld,
+      releaseScheduledEmail: scheduledFromRelease.has(failureId),
+    };
+  },
+});
+
+export const listHeldDeclineUserPage = internalQuery({
+  args: {
+    nowMs: v.number(),
+    paginationOpts: paginationOptsValidator,
+  },
+  returns: v.object({
+    userIds: v.array(v.id("users")),
+    isDone: v.boolean(),
+    continueCursor: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    const monthStart = utcMonthStartMs(args.nowMs);
+    const page = await ctx.db
+      .query("failedPayments")
+      .withIndex("by_quotaHeld_failedAt", (q) => q.eq("quotaHeld", true))
+      .paginate(args.paginationOpts);
+    const userIds: Array<Id<"users">> = [];
+    const seen = new Set<string>();
+    for (const row of page.page) {
+      if (row.deletedAt != null || row.status !== "open") continue;
+      if (seen.has(row.userId)) continue;
+      seen.add(row.userId);
+      const user = await ctx.db.get(row.userId);
+      if (!user) continue;
+      if (user.declineHoldReleasedMonthStart === monthStart) continue;
+      userIds.push(row.userId);
+    }
+    return {
+      userIds,
+      isDone: page.isDone,
+      continueCursor: page.continueCursor,
+    };
+  },
+});
+
+export const releaseHeldDeclinesForUser = internalMutation({
+  args: {
+    userId: v.id("users"),
+    nowMs: v.number(),
+    force: v.optional(v.boolean()),
+  },
+  returns: v.object({ released: v.number() }),
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) return { released: 0 };
+    const { released } = await releaseHeldAndSchedule(ctx, {
+      userId: user._id,
+      plan: resolvePlan(user),
+      packExtra: user.declinePackExtra,
+      nowMs: args.nowMs,
+      force: args.force,
+    });
+    return { released: released.length };
   },
 });
 
@@ -455,6 +555,7 @@ export const getFailureEmailPayload = internalQuery({
   handler: async (ctx, args) => {
     const failure = await ctx.db.get(args.failureId);
     if (!failure || failure.deletedAt != null) return null;
+    if (failure.quotaHeld === true) return null;
 
     const owner = await ctx.db.get(failure.userId);
     if (!owner) return null;
@@ -1224,7 +1325,7 @@ export const getRecoverySummary = query({
         )
         .order("desc")
         .take(SUMMARY_SCAN_LIMIT)
-    ).filter((row) => row.deletedAt == null);
+    ).filter((row) => row.deletedAt == null && row.quotaHeld !== true);
 
     const openMoney = primaryCurrencyTotals(openRows);
     let cohortOpenCount = 0;
@@ -1429,9 +1530,12 @@ export const listOpenFailures = query({
         q.eq("userId", user._id).eq("status", "open"),
       )
       .order("desc")
-      .take(limit);
+      .take(800);
 
-    return rows.filter((row) => row.deletedAt == null).map(mapOpenFailure);
+    return rows
+      .filter((row) => row.deletedAt == null && row.quotaHeld !== true)
+      .slice(0, limit)
+      .map(mapOpenFailure);
   },
 });
 

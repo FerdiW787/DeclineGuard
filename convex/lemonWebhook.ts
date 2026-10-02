@@ -258,8 +258,10 @@ export const handleLemonSqueezyWebhook = httpAction(
         // Only send recovery emails when policy says to (attempt >= 2)
         // Attempt 1 = wait (don't stack on LS's own failure email)
         if (
-          result.recoveryAction === "nudge_update_pm" ||
-          result.recoveryAction === "push_update_pm"
+          !result.quotaHeld &&
+          !result.releaseScheduledEmail &&
+          (result.recoveryAction === "nudge_update_pm" ||
+            result.recoveryAction === "push_update_pm")
         ) {
           await ctx.scheduler.runAfter(
             0,
@@ -377,6 +379,24 @@ async function handleBillingOrderWebhook(
       throw new Error(
         `No billingInvoices row for ${claimKey} / order ${args.data.id}`,
       );
+    }
+
+    const invoiceMeta = await ctx.runQuery(
+      internal.functions.feeBilling.getInvoiceProvider,
+      { invoiceId },
+    );
+    if (invoiceMeta?.billingProvider === "dodo") {
+      return new Response("Ignored dodo invoice", { status: 200 });
+    }
+
+    const userProvider = invoiceMeta
+      ? await ctx.runQuery(
+          internal.functions.dodoBilling.getUserBillingProvider,
+          { userId: invoiceMeta.userId },
+        )
+      : null;
+    if (userProvider?.billingProvider === "dodo") {
+      return new Response("Ignored dodo merchant", { status: 200 });
     }
 
     const orderStatus =
