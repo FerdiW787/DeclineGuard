@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { Button } from "@/components/ui/button";
 import { Activity, ChevronRight, RotateCcw, X } from "lucide-react";
 
 type AppRole = "user" | "staff" | "admin";
@@ -252,14 +253,15 @@ export default function LiveStaffLog({
                 <h3 className="font-display text-lg tracking-tight">
                   {humanAction(selected.action)}
                 </h3>
-                <button
+                <Button
                   type="button"
-                  className="rounded-lg p-1 text-[#8a8f98] hover:bg-black/5 hover:text-black"
+                  variant="ghost"
+                  size="icon-xs"
                   onClick={() => setSelectedId(null)}
                   aria-label="Close detail"
                 >
                   <X className="size-4" />
-                </button>
+                </Button>
               </div>
 
               <dl className="space-y-3 text-sm">
@@ -334,17 +336,18 @@ export default function LiveStaffLog({
                     onChange={(e) => setRevokeNote(e.target.value)}
                     rows={3}
                     placeholder="Why are you revoking this? (min 8 chars)"
-                    className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black/25"
+                    className="w-full rounded-lg border border-black/8 bg-[#f7f8f8] px-3 py-2.5 text-sm text-[#08090a] outline-none ring-black/10 placeholder:text-[#8a8f98] focus:ring-2"
                   />
-                  <button
+                  <Button
                     type="button"
+                    variant="destructive"
+                    className="w-full"
                     disabled={busy || revokeNote.trim().length < 8}
                     onClick={() => void handleRevoke()}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-rose-700 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     <RotateCcw className="size-4" />
                     {busy ? "Revoking…" : "Revoke this action"}
-                  </button>
+                  </Button>
                 </div>
               ) : selected.revokedAt ? null : (
                 <p className="border-t border-black/8 pt-4 text-[13px] text-[#8a8f98]">

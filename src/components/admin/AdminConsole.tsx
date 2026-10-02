@@ -13,6 +13,8 @@ import PageEnter, {
   type PageEnterHandle,
 } from "@/components/dashboard/PageEnter";
 import StaffInbox from "@/components/support/StaffInbox";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   ArchiveRestore,
   Ban,
@@ -251,6 +253,9 @@ function toneClasses(tone: StatusInfo["tone"]): string {
   }
 }
 
+const staffFieldClass =
+  "w-full rounded-lg border border-black/8 bg-[#f7f8f8] px-3 py-2.5 text-sm text-[#08090a] outline-none ring-black/10 placeholder:text-[#8a8f98] focus:ring-2";
+
 function ActionButton({
   children,
   onClick,
@@ -262,24 +267,17 @@ function ActionButton({
   disabled?: boolean;
   variant?: "primary" | "secondary" | "danger" | "success";
 }) {
-  const styles =
-    variant === "primary"
-      ? "bg-[#111] text-white hover:bg-black"
+  const mapped =
+    variant === "primary" || variant === "success"
+      ? "default"
       : variant === "danger"
-        ? "bg-rose-700 text-white hover:bg-rose-800"
-        : variant === "success"
-          ? "bg-emerald-700 text-white hover:bg-emerald-800"
-          : "bg-black/[0.06] text-[#0c0c0c] hover:bg-black/[0.1]";
+        ? "destructive"
+        : "secondary";
 
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={`inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${styles}`}
-    >
+    <Button type="button" variant={mapped} disabled={disabled} onClick={onClick}>
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -555,13 +553,12 @@ function AdminConsoleInner() {
           </nav>
 
           <div className="mt-auto space-y-2 px-3 py-4">
-            <a
-              href="/a/dashboard"
-              className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-[#8a8f98] transition hover:bg-black/[0.04] hover:text-[#08090a]"
-            >
-              <LayoutDashboard className="size-4 shrink-0" />
-              Merchant dashboard
-            </a>
+            <Button asChild variant="ghost" className="w-full justify-start">
+              <a href="/a/dashboard">
+                <LayoutDashboard className="size-4 shrink-0" />
+                Merchant dashboard
+              </a>
+            </Button>
             <div className="flex items-center gap-2.5 px-3 py-1">
               <UserButton
                 appearance={{
@@ -597,18 +594,15 @@ function AdminConsoleInner() {
             {visibleNav.map((item) => {
               const active = nav === item.id;
               return (
-                <button
+                <Button
                   key={item.id}
                   type="button"
+                  size="sm"
+                  variant={active ? "default" : "secondary"}
                   onClick={() => goToNav(item.id)}
-                  className={`shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold transition ${
-                    active
-                      ? "bg-[#111] text-white"
-                      : "bg-black/[0.04] text-[#6b6f76]"
-                  }`}
                 >
                   {item.label}
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -794,7 +788,7 @@ function AdminConsoleInner() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="e.g. store name or user…"
-              className="mt-3 w-full rounded-xl border border-black/10 bg-black/[0.02] px-3 py-2.5 text-sm outline-none focus:border-black/25 focus:bg-white"
+              className={cn("mt-3", staffFieldClass)}
             />
           </div>
 
@@ -940,10 +934,11 @@ function AdminConsoleInner() {
                         sign-in as them.
                       </p>
                     </div>
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
                       disabled={busy != null}
-                      className="rounded-lg border border-emerald-300 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-emerald-950 disabled:opacity-45"
                       onClick={() => {
                         void (async () => {
                           setBusy("Revoke access");
@@ -969,7 +964,7 @@ function AdminConsoleInner() {
                       }}
                     >
                       {busy === "Revoke access" ? "Revoking…" : "Revoke"}
-                    </button>
+                    </Button>
                   </div>
                 ) : null}
 
@@ -1060,10 +1055,11 @@ function AdminConsoleInner() {
                     </div>
                     {canHelpSelected ? (
                       <div className="flex flex-wrap gap-2">
-                        <button
+                        <Button
                           type="button"
+                          variant="outline"
+                          size="sm"
                           disabled={busy != null || selected.plan === "pro"}
-                          className="rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-[12px] font-semibold disabled:opacity-45"
                           onClick={() => {
                             void (async () => {
                               setBusy("Set Pro");
@@ -1094,11 +1090,12 @@ function AdminConsoleInner() {
                           }}
                         >
                           Grant Pro
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          variant="outline"
+                          size="sm"
                           disabled={busy != null || selected.plan === "free"}
-                          className="rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-[12px] font-semibold disabled:opacity-45"
                           onClick={() => {
                             void (async () => {
                               setBusy("Set Free");
@@ -1129,7 +1126,7 @@ function AdminConsoleInner() {
                           }}
                         >
                           Set Free
-                        </button>
+                        </Button>
                       </div>
                     ) : null}
                   </div>
@@ -1168,7 +1165,7 @@ function AdminConsoleInner() {
                   onChange={(e) => setNote(e.target.value)}
                   rows={3}
                   placeholder="Why are you taking this action? e.g. Suspected takeover · merchant emailed support Mar 12"
-                  className="mt-1.5 w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-black/30"
+                  className={cn("mt-1.5", staffFieldClass)}
                 />
                 <p
                   className={`mt-1 text-[11px] ${
@@ -1335,7 +1332,7 @@ function AdminConsoleInner() {
                       value={reclaimStoreId}
                       onChange={(e) => setReclaimStoreId(e.target.value)}
                       placeholder="Lemon Squeezy store ID"
-                      className="min-w-0 flex-1 rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-black/30"
+                      className={cn("min-w-0 flex-1", staffFieldClass)}
                     />
                     <ActionButton
                       variant="primary"
@@ -1556,28 +1553,22 @@ function AdminConsoleInner() {
                 {showHistory ? (
                   <>
                     <div className="flex gap-2 border-t border-black/8 px-5 py-2.5">
-                      <button
+                      <Button
                         type="button"
+                        size="xs"
+                        variant={historyFilter === "all" ? "default" : "secondary"}
                         onClick={() => setHistoryFilter("all")}
-                        className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${
-                          historyFilter === "all"
-                            ? "bg-black text-white"
-                            : "bg-black/5 text-[#6b6f76]"
-                        }`}
                       >
                         All
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        size="xs"
+                        variant={historyFilter === "quota" ? "default" : "secondary"}
                         onClick={() => setHistoryFilter("quota")}
-                        className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${
-                          historyFilter === "quota"
-                            ? "bg-black text-white"
-                            : "bg-black/5 text-[#6b6f76]"
-                        }`}
                       >
                         Quota blocks
-                      </button>
+                      </Button>
                     </div>
                   <ul className="max-h-72 space-y-0 overflow-auto border-t border-black/8">
                     {historyRows === undefined ? (

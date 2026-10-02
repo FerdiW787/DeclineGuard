@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { SignedIn, SignedOut } from "@clerk/astro/react";
 import BrandLogo from "@/components/BrandLogo";
 import { useClerkClient } from "@/components/auth/useClerkClient";
+import { Button } from "@/components/ui/button";
 
 type HomeNavProps = {
   /** When false, hashes point at `/#…` and Pricing goes to `/pricing`. */
@@ -68,21 +69,18 @@ export function HomeNav({
 
           <div className="flex shrink-0 items-center gap-1">
             <SignedOut>
-              <a
-                href={signInHref}
-                className="hidden rounded-full px-3 py-1.5 text-[13px] text-[#8a8f98] transition-colors hover:text-[#08090a] sm:inline"
-              >
-                Log in
-              </a>
-              <a href="/a/sign-up" className="ln-btn ln-btn-nav">
-                Sign up
-              </a>
+              <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+                <a href={signInHref}>Log in</a>
+              </Button>
+              <Button asChild size="sm">
+                <a href="/a/sign-up">Sign up</a>
+              </Button>
             </SignedOut>
             <SignedIn>
               <HomeLogOut />
-              <a href="/a/dashboard" className="ln-btn ln-btn-nav">
-                Dashboard
-              </a>
+              <Button asChild size="sm">
+                <a href="/a/dashboard">Dashboard</a>
+              </Button>
             </SignedIn>
           </div>
         </div>
@@ -94,13 +92,15 @@ export function HomeNav({
 function HomeLogOut() {
   const { clerk, isLoaded } = useClerkClient();
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="sm"
       disabled={!isLoaded || !clerk}
       onClick={() => void clerk?.signOut({ redirectUrl: "/" })}
-      className="hidden rounded-full px-3 py-1.5 text-[13px] text-[#8a8f98] transition-colors hover:text-[#08090a] disabled:opacity-40 sm:inline"
+      className="hidden sm:inline-flex"
     >
       Log out
-    </button>
+    </Button>
   );
 }
