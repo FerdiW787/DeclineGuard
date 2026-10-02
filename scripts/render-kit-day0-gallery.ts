@@ -28,7 +28,6 @@ import {
 } from "../src/lib/emailBlockKits";
 import {
   markersToHtml,
-  resolveShellBackground,
   resolveShellBorder,
   resolveShellBorderColor,
   resolveShellBorderWidth,
@@ -51,6 +50,40 @@ import { EMAIL_FONTS, emailFontFamily } from "../src/lib/emailFonts";
 const OUT_DIR = "/opt/cursor/artifacts/email-kits-day0";
 const SCRAPE_DOMAIN = "dodopayments.com";
 const VARS = { product: "Pro Monthly", amount: "€29", firstName: "Maya" };
+/** Review pass: white email shell. CTA / brand / link stay scrape-locked. */
+const REVIEW_SHELL_BG = "#ffffff";
+const REVIEW_BODY_FALLBACK = "#0c0c0c";
+const REVIEW_MUTED_FALLBACK = "#6b6b70";
+
+function tokensForWhiteShellReview(scraped: EmailThemeTokens): EmailThemeTokens {
+  const scrapedBody = isDarkHex(scraped.emailTextColor)
+    ? scraped.emailTextColor
+    : isDarkHex(scraped.pageTextColor)
+      ? scraped.pageTextColor
+      : REVIEW_BODY_FALLBACK;
+  const hierarchy = ensureShellTextHierarchy(
+    REVIEW_SHELL_BG,
+    scrapedBody,
+    scraped.mutedTextColor,
+  );
+  return {
+    ...scraped,
+    pageBackgroundColor: REVIEW_SHELL_BG,
+    emailBackgroundColor: REVIEW_SHELL_BG,
+    pageTextColor: hierarchy.bodyText,
+    emailTextColor: hierarchy.bodyText,
+    mutedTextColor:
+      hierarchy.mutedText === scraped.mutedTextColor &&
+      !isDarkHex(hierarchy.mutedText)
+        ? REVIEW_MUTED_FALLBACK
+        : hierarchy.mutedText,
+    secondaryColor:
+      hierarchy.mutedText === scraped.mutedTextColor &&
+      !isDarkHex(hierarchy.mutedText)
+        ? REVIEW_MUTED_FALLBACK
+        : hierarchy.mutedText,
+  };
+}
 
 const NEUTRAL_TOKENS: EmailThemeTokens = {
   brandColor: "#111111",
@@ -237,29 +270,31 @@ function renderEmail(
   storeName: string,
   logoUrl: string | null,
 ): { html: string; doc: EmailDocument } {
+  const review = tokensForWhiteShellReview(theme);
   const doc = documentForKit("gentle", kitId);
-  const shellBg = resolveShellBackground(doc, theme.emailBackgroundColor);
+  const shellBg = REVIEW_SHELL_BG;
   const hierarchy = ensureShellTextHierarchy(
     shellBg,
-    theme.emailTextColor,
-    theme.mutedTextColor,
+    review.emailTextColor,
+    review.mutedTextColor,
   );
   const borderOn = resolveShellBorder(doc);
-  const borderColor = resolveShellBorderColor(doc, theme.brandColor);
-  const borderWidth = borderOn ? resolveShellBorderWidth(doc) : 0;
+  const borderColor = borderOn
+    ? resolveShellBorderColor(doc, review.brandColor)
+    : "rgba(0,0,0,0.08)";
+  const borderWidth = borderOn ? resolveShellBorderWidth(doc) : 1;
   const radius = resolveShellRadius(doc);
-  const dark = isDarkHex(shellBg);
-  const footerMuted = dark ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)";
-  const footerRule = dark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)";
+  const footerMuted = "rgba(0,0,0,0.45)";
+  const footerRule = "rgba(0,0,0,0.08)";
   const subject = applyCopyVars(doc.subject, VARS);
   const blocks = doc.blocks
-    .map((block) => renderBlock(block, theme, hierarchy))
+    .map((block) => renderBlock(block, review, hierarchy))
     .join("");
   const greeting = kitShowsGreeting(kitId)
     ? `<p style="margin:0 0 16px;font-size:17px;font-weight:600;letter-spacing:-0.02em;color:${escapeHtml(hierarchy.bodyText)}">Hi ${escapeHtml(VARS.firstName)},</p>`
     : "";
   const accent = kitShowsAccentBar(kitId)
-    ? `<div style="height:6px;background:${escapeHtml(theme.brandColor)}"></div>`
+    ? `<div style="height:6px;background:${escapeHtml(review.brandColor)}"></div>`
     : "";
 
   const html = `
@@ -272,11 +307,11 @@ function renderEmail(
       </div>
       ${accent}
       <div style="padding:${doc.emailPadding}px;background:${escapeHtml(shellBg)};color:${escapeHtml(hierarchy.bodyText)}">
-        ${renderHeader(storeName, logoUrl, theme.brandColor, hierarchy.bodyText, kitLogoAlign(kitId), kitShowsStoreName(kitId))}
+        ${renderHeader(storeName, logoUrl, review.brandColor, hierarchy.bodyText, kitLogoAlign(kitId), kitShowsStoreName(kitId))}
         ${greeting}
         ${blocks}
         <hr style="margin:32px 0 16px;border:0;border-top:1px solid ${footerRule}" />
-        <p style="margin:0;font-size:12px;color:${footerMuted}">Questions? <a href="#" style="color:${escapeHtml(theme.linkColor)}">support@${escapeHtml(SCRAPE_DOMAIN)}</a></p>
+        <p style="margin:0;font-size:12px;color:${footerMuted}">Questions? <a href="#" style="color:${escapeHtml(review.linkColor)}">support@${escapeHtml(SCRAPE_DOMAIN)}</a></p>
       </div>
     </article>`;
   return { html, doc };
@@ -284,7 +319,7 @@ function renderEmail(
 
 function galleryPage(scrape: ScrapeReport, cards: string): string {
   const status = scrape.ok
-    ? `Configured tokens from ${scrape.domain} scrape (${scrape.captureMethod}, confidence ${scrape.confidence}). CTA ${scrape.tokens.ctaBackgroundColor}.`
+    ? `Scrape ${scrape.domain} (${scrape.captureMethod}, confidence ${scrape.confidence}). Review shell #ffffff; CTA stays ${scrape.tokens.ctaBackgroundColor} / ${scrape.tokens.ctaTextColor} / ${scrape.tokens.ctaBorderRadiusPx}px.`
     : `Scrape failed for ${scrape.domain}: ${scrape.error}. Neutral placeholder tokens used — not a Dodo palette.`;
   const fontHref = EMAIL_FONTS[scrape.tokens.emailFont].googleHref;
   const fontLink = fontHref
@@ -346,7 +381,15 @@ async function main(): Promise<void> {
   await writeFile(galleryPath, galleryHtml, "utf8");
   await writeFile(
     path.join(OUT_DIR, "scrape.json"),
-    JSON.stringify(scrape, null, 2),
+    JSON.stringify(
+      {
+        ...scrape,
+        reviewShell: REVIEW_SHELL_BG,
+        reviewTokens: tokensForWhiteShellReview(scrape.tokens),
+      },
+      null,
+      2,
+    ),
     "utf8",
   );
 
