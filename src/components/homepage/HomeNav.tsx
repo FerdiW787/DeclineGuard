@@ -3,14 +3,25 @@ import { SignedIn, SignedOut } from "@clerk/astro/react";
 import BrandLogo from "@/components/BrandLogo";
 import { useClerkClient } from "@/components/auth/useClerkClient";
 
-const navLinks = [
-  { label: "Product", href: "#product" },
-  { label: "How it works", href: "#how" },
-  { label: "Pricing", href: "#plans" },
-  { label: "Requests", href: "/features" },
-];
+type HomeNavProps = {
+  /** When false, hashes point at `/#…` and Pricing goes to `/pricing`. */
+  homeAnchors?: boolean;
+  signInHref?: string;
+  current?: "pricing" | "requests";
+};
 
-export function HomeNav() {
+export function HomeNav({
+  homeAnchors = true,
+  signInHref = "/a/sign-in",
+  current,
+}: HomeNavProps) {
+  const navLinks = [
+    { label: "Product", href: homeAnchors ? "#product" : "/#product" },
+    { label: "How it works", href: homeAnchors ? "#how" : "/#how" },
+    { label: "Pricing", href: homeAnchors ? "#plans" : "/pricing" },
+    { label: "FAQ", href: homeAnchors ? "#faq" : "/#faq" },
+    { label: "Requests", href: "/features" },
+  ];
   const [solid, setSolid] = useState(false);
 
   useEffect(() => {
@@ -37,21 +48,28 @@ export function HomeNav() {
           <BrandLogo size="sm" href="/" />
 
           <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 text-[13px] text-[#8a8f98] md:flex">
-            {navLinks.map((l) => (
-              <a
-                key={l.label}
-                href={l.href}
-                className="rounded-full px-3 py-1.5 transition-colors hover:text-[#08090a]"
-              >
-                {l.label}
-              </a>
-            ))}
+            {navLinks.map((l) => {
+              const active =
+                (current === "pricing" && l.label === "Pricing") ||
+                (current === "requests" && l.label === "Requests");
+              return (
+                <a
+                  key={l.label}
+                  href={l.href}
+                  className={`rounded-full px-3 py-1.5 transition-colors hover:text-[#08090a] ${
+                    active ? "text-[#08090a]" : ""
+                  }`}
+                >
+                  {l.label}
+                </a>
+              );
+            })}
           </nav>
 
           <div className="flex shrink-0 items-center gap-1">
             <SignedOut>
               <a
-                href="/a/sign-in"
+                href={signInHref}
                 className="hidden rounded-full px-3 py-1.5 text-[13px] text-[#8a8f98] transition-colors hover:text-[#08090a] sm:inline"
               >
                 Log in

@@ -1,0 +1,326 @@
+/**
+ * Pure-function checks for admin analytics periods, kit mapping, and day attribution.
+ * Run: npx tsx scripts/assert-admin-analytics.ts
+ */
+import {
+  ALL_TIME_SERIES_YEARS,
+  MAX_NOW_MS,
+  MIN_NOW_MS,
+  assignedKitIdOrNull,
+  aggregateEvents,
+  allTimeSeriesStartMs,
+  assertNowMs,
+  bucketLabel,
+  clampUtcDay,
+  daysInUtcMonth,
+  emptyMetricPeriods,
+  enumerateBuckets,
+  inWindow,
+  isCountableRecovery,
+  lastSeriesBucketStart,
+  metricPeriodsFromEvents,
+  minusUtcMonth,
+  minusUtcYear,
+  periodTotalsMatchSeries,
+  periodWindows,
+  recoveryAttributedDay,
+  startOfUtcMonth,
+  startOfUtcYear,
+  rangeNewestByTime,
+  rowMatchesKit,
+  storedAssignedKitIdsFor,
+  takeNewestEvents,
+  utcDateMs,
+} from "../convex/lib/adminAnalytics";
+
+function assert(condition: boolean, message: string): void {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+const now = utcDateMs(2026, 10, 2, 15, 30, 0, 0);
+const windows = periodWindows(now);
+
+assert(windows.thisYear.startMs === utcDateMs(2026, 1, 1), "this year starts Jan 1 UTC 2026");
+assert(windows.thisYear.endMs === now, "this year ends at nowMs");
+assert(windows.lastYear.startMs === utcDateMs(2025, 1, 1), "last year comparable starts Jan 1 UTC 2025");
+assert(windows.lastYear.endMs === utcDateMs(2025, 10, 2, 15, 30, 0, 0), "last year comparable ends same UTC instant −1y");
+assert(windows.thisMonth.startMs === utcDateMs(2026, 10, 1), "this month starts Oct 1 UTC");
+assert(windows.lastMonth.startMs === utcDateMs(2025, 9, 1) || windows.lastMonth.startMs === utcDateMs(2026, 9, 1), "last month starts Sep 1 UTC");
+assert(windows.lastMonth.startMs === utcDateMs(2026, 9, 1), "last month start is 2026-09-01");
+assert(windows.lastMonth.endMs === utcDateMs(2026, 9, 2, 15, 30, 0, 0), "last month comparable ends Sep 2 15:30 UTC");
+
+assert(minusUtcYear(utcDateMs(2024, 2, 29)) === utcDateMs(2023, 2, 28), "leap day YoY clamps to Feb 28");
+assert(minusUtcMonth(utcDateMs(2026, 3, 31, 8)) === utcDateMs(2026, 2, 28, 8), "Mar 31 MoM clamps to Feb 28");
+assert(daysInUtcMonth(2026, 2) === 28, "2026 Feb has 28 days");
+assert(clampUtcDay(2024, 2, 31) === 29, "clamp 31 into leap Feb");
+
+assert(startOfUtcYear(now) === utcDateMs(2026, 1, 1), "startOfUtcYear");
+assert(startOfUtcMonth(now) === utcDateMs(2026, 10, 1), "startOfUtcMonth");
+
+const empty = metricPeriodsFromEvents([], now, "count");
+assert(empty.thisYear.total === 0, "empty thisYear total");
+assert(empty.lastYear.total === 0, "empty lastYear total");
+assert(empty.thisMonth.total === 0, "empty thisMonth total");
+assert(empty.lastMonth.total === 0, "empty lastMonth total");
+assert(empty.thisYear.series.length > 0, "empty thisYear still emits monthly buckets");
+assert(empty.thisYear.series.every((p) => p.value === 0), "empty thisYear series is zeros");
+assert(empty.thisMonth.series.every((p) => p.value === 0), "empty thisMonth series is zeros");
+assert(emptyMetricPeriods().allTime.total === 0, "emptyMetricPeriods allTime");
+
+const oct1 = utcDateMs(2026, 10, 1, 12);
+const sep1 = utcDateMs(2026, 9, 1, 12);
+const lastOct = utcDateMs(2025, 10, 1, 12);
+const events = [
+  { at: oct1 },
+  { at: sep1 },
+  { at: lastOct },
+  { at: utcDateMs(2024, 6, 1) },
+];
+const counted = metricPeriodsFromEvents(events, now, "count");
+assert(counted.allTime.total === 4, "all-time counts every event before now");
+assert(counted.thisYear.total === 2, "this year = Oct + Sep 2026");
+assert(counted.lastYear.total === 1, "last year comparable includes 2025-10-01 only");
+assert(counted.thisMonth.total === 1, "this month = Oct 1");
+assert(counted.lastMonth.total === 1, "last month comparable includes Sep 1");
+
+const cents = metricPeriodsFromEvents(
+  [
+    { at: oct1, value: 2900 },
+    { at: sep1, value: 1000 },
+  ],
+  now,
+  "sum",
+);
+assert(cents.thisMonth.total === 2900, "recovered $ this month sums cents");
+assert(cents.lastMonth.total === 1000, "recovered $ last month sums cents");
+
+assert(!inWindow(now, windows.thisYear), "nowMs itself is excluded from the window");
+assert(inWindow(now - 1, windows.thisYear), "instant before now is in this year");
+
+assert(bucketLabel(utcDateMs(2026, 10, 2), "month") === "2026-10", "month label");
+assert(bucketLabel(utcDateMs(2026, 10, 2), "day") === "2026-10-02", "day label");
+
+const monthBuckets = enumerateBuckets(windows.thisYear);
+assert(monthBuckets[0] === utcDateMs(2026, 1, 1), "first this-year bucket is January");
+assert(
+  aggregateEvents([], windows.thisMonth, "count").series.length ===
+    enumerateBuckets(windows.thisMonth).length,
+  "zero fill keeps bucket count",
+);
+
+assert(assignedKitIdOrNull(null) === null, "missing arm is not quiet-column");
+assert(assignedKitIdOrNull("") === null, "empty arm is not quiet-column");
+assert(assignedKitIdOrNull("unknown-kit") === null, "unknown arm is not quiet-column");
+assert(assignedKitIdOrNull("quiet-column") === "quiet-column", "Set A id passes through");
+assert(assignedKitIdOrNull("sonos") === "quiet-column", "sonos maps to quiet-column");
+assert(assignedKitIdOrNull("avocode") === "amount-due", "avocode maps to amount-due");
+
+assert(
+  recoveryAttributedDay({
+    recoveredAt: 300,
+    day0SentAt: 100,
+    day2SentAt: 200,
+    day5SentAt: 250,
+  }) === "day5",
+  "recovery after day5 attributes to day5",
+);
+assert(
+  recoveryAttributedDay({
+    recoveredAt: 220,
+    day0SentAt: 100,
+    day2SentAt: 200,
+  }) === "day2",
+  "recovery after day2 before day5 attributes to day2",
+);
+assert(
+  recoveryAttributedDay({
+    recoveredAt: 150,
+    day0SentAt: 100,
+  }) === "day0",
+  "recovery after day0 only attributes to day0",
+);
+assert(
+  recoveryAttributedDay({
+    recoveredAt: 50,
+    day0SentAt: 100,
+  }) === null,
+  "recovered before day0 is unattributed",
+);
+assert(
+  recoveryAttributedDay({ recoveredAt: 50 }) === null,
+  "recovered with no send is unattributed",
+);
+
+assert(
+  isCountableRecovery({
+    status: "recovered",
+    recoveredAt: 1,
+    testMode: false,
+  }),
+  "live recovered counts",
+);
+assert(
+  !isCountableRecovery({
+    status: "recovered",
+    recoveredAt: 1,
+    testMode: true,
+  }),
+  "test-mode recovered excluded",
+);
+assert(
+  !isCountableRecovery({
+    status: "recovered",
+    recoveredAt: 1,
+    deletedAt: 2,
+  }),
+  "soft-deleted recovered excluded",
+);
+assert(
+  !isCountableRecovery({ status: "open", recoveredAt: null }),
+  "open failure is not a recovery",
+);
+
+const emptyAllTimeLast = empty.allTime.series[empty.allTime.series.length - 1];
+assert(emptyAllTimeLast != null, "empty allTime still emits buckets through now");
+assert(emptyAllTimeLast.t === lastSeriesBucketStart(now), "empty allTime last bucket is current month");
+assert(periodTotalsMatchSeries(empty.allTime), "empty allTime total matches series sum");
+assert(
+  empty.allTime.series.length <= ALL_TIME_SERIES_YEARS * 12 + 1,
+  "allTime series is bounded to N years, not epoch→now",
+);
+
+const ancient = utcDateMs(1999, 1, 15);
+const mid = utcDateMs(2022, 3, 10);
+const current = utcDateMs(2026, 10, 1, 8);
+const spanning = metricPeriodsFromEvents(
+  [{ at: ancient }, { at: mid }, { at: current }],
+  now,
+  "count",
+);
+assert(spanning.allTime.series.length > 0, "spanning fixture emits allTime series");
+assert(
+  spanning.allTime.series[spanning.allTime.series.length - 1]!.t ===
+    lastSeriesBucketStart(now),
+  "allTime series last bucket aligns with now",
+);
+assert(spanning.allTime.total === 2, "allTime total drops events before the trailing window");
+assert(periodTotalsMatchSeries(spanning.allTime), "allTime total equals series sum (old→current fixture)");
+assert(
+  spanning.allTime.series.some((p) => p.label === "2026-10" && p.value === 1),
+  "allTime series includes current month",
+);
+assert(
+  !spanning.allTime.series.some((p) => p.label.startsWith("1999")),
+  "allTime series does not start at 1999",
+);
+
+const floor = allTimeSeriesStartMs(now);
+assert(floor === utcDateMs(2021, 10, 1), "default allTime floor is now − 5y month start");
+assert(allTimeSeriesStartMs(now, utcDateMs(2024, 6, 15)) === utcDateMs(2024, 6, 1), "allTime start lifts to first event");
+
+const oldFlood: { at: number }[] = [];
+for (let i = 0; i < 9000; i += 1) {
+  oldFlood.push({ at: utcDateMs(2020, 1, 1) + i * 1000 });
+}
+const recentFive = [
+  { at: utcDateMs(2026, 10, 1, 1) },
+  { at: utcDateMs(2026, 10, 1, 2) },
+  { at: utcDateMs(2026, 10, 1, 3) },
+  { at: utcDateMs(2026, 10, 2, 1) },
+  { at: utcDateMs(2026, 10, 2, 2) },
+];
+const newest = takeNewestEvents([...oldFlood, ...recentFive], 10);
+assert(newest.truncated, "newest-first marks truncated when over limit");
+assert(newest.events.length === 10, "newest-first keeps limit rows");
+assert(
+  newest.events.filter((e) => e.at >= utcDateMs(2026, 10, 1)).length === 5,
+  "newest-first keeps all recent-month events",
+);
+const newestPeriods = metricPeriodsFromEvents(newest.events, now, "count");
+assert(newestPeriods.thisMonth.total === 5, "truncated newest-first still counts thisMonth");
+assert(newestPeriods.thisYear.total === 5, "truncated newest-first prefers thisYear over 2020 flood");
+assert(newestPeriods.allTime.series[newestPeriods.allTime.series.length - 1]!.t === lastSeriesBucketStart(now), "truncated allTime still reaches now");
+
+let threw = false;
+try {
+  assertNowMs(Number.NaN);
+} catch {
+  threw = true;
+}
+assert(threw, "nowMs NaN rejected");
+threw = false;
+try {
+  assertNowMs(-1);
+} catch {
+  threw = true;
+}
+assert(threw, "nowMs negative rejected");
+threw = false;
+try {
+  assertNowMs(MAX_NOW_MS + 1);
+} catch {
+  threw = true;
+}
+assert(threw, "nowMs far-future rejected");
+assert(assertNowMs(now) === now, "valid nowMs accepted");
+assert(MIN_NOW_MS < now && now < MAX_NOW_MS, "fixture now is inside the allowed range");
+
+const signupStart = allTimeSeriesStartMs(now);
+const futureSignup = now + 60_000;
+const inWindowSignups = [signupStart + 1_000, signupStart + 2_000, now - 1_000];
+const futureFlood = Array.from({ length: 800 }, () => futureSignup);
+const naiveTake = [...futureFlood, ...inWindowSignups]
+  .sort((a, b) => b - a)
+  .slice(0, 800)
+  .filter((at) => at >= signupStart && at < now);
+assert(naiveTake.length === 0, "bare desc-take then filter drops in-window under future-dated flood");
+const rangedSignups = rangeNewestByTime(
+  [...futureFlood, ...inWindowSignups],
+  signupStart,
+  now,
+  800,
+);
+assert(rangedSignups.events.length === 3, "creation-time index range keeps in-window signups");
+assert(!rangedSignups.truncated, "in-window signup count is under the cap");
+assert(
+  rangedSignups.events.every((e) => e.at >= signupStart && e.at < now),
+  "ranged signups stay inside [start, now)",
+);
+
+assert(storedAssignedKitIdsFor("quiet-column").includes("sonos"), "sonos is a quiet-column leftover");
+assert(storedAssignedKitIdsFor("amount-due").includes("avocode"), "avocode is an amount-due leftover");
+assert(rowMatchesKit("sonos", "quiet-column"), "sonos maps onto quiet-column");
+assert(rowMatchesKit("quiet-column", "quiet-column"), "Set A id matches itself");
+assert(!rowMatchesKit("sonos", "amount-due"), "sonos does not map onto amount-due");
+
+const recoveredFixture = [
+  { assignedKitId: "sonos", recoveredAt: now - 3_000, amountCents: 1000 },
+  { assignedKitId: "quiet-column", recoveredAt: now - 2_000, amountCents: 2000 },
+  { assignedKitId: "avocode", recoveredAt: now - 1_000, amountCents: 500 },
+];
+const listQuiet = recoveredFixture.filter(
+  (row) => assignedKitIdOrNull(row.assignedKitId) === "quiet-column",
+);
+const detailQuiet = recoveredFixture.filter((row) =>
+  rowMatchesKit(row.assignedKitId, "quiet-column"),
+);
+const setAOnlyQuiet = recoveredFixture.filter(
+  (row) => row.assignedKitId === "quiet-column",
+);
+assert(listQuiet.length === 2, "listTemplates credits sonos + quiet-column");
+assert(setAOnlyQuiet.length === 1, "eq(assignedKitId, Set A) misses sonos");
+assert(
+  listQuiet.length === detailQuiet.length,
+  "getTemplateDetail totals match listTemplates when leftover assignedKitId maps in",
+);
+assert(
+  listQuiet.reduce((n, row) => n + row.amountCents, 0) ===
+    detailQuiet.reduce((n, row) => n + row.amountCents, 0),
+  "list and detail recovered $ agree for quiet-column leftovers",
+);
+
+console.log(
+  "asserts green: UTC comparable YoY/MoM, empty zero-fill, missing kit arm, day5>day2>day0 attribution, test-mode/deleted excluded, allTime reaches now, newest-first prefers recent, totals match series, signup index-range, list/detail leftover kit parity",
+);

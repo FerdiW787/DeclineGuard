@@ -5,6 +5,9 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { withConvexClerkProvider } from "@/lib/withConvexClerkProvider";
 import BrandLogo from "@/components/BrandLogo";
+import AdminOverview from "@/components/admin/AdminOverview";
+import AdminTemplates from "@/components/admin/AdminTemplates";
+import { AdminPageHeader } from "@/components/admin/adminUi";
 import LiveStaffLog from "@/components/admin/LiveStaffLog";
 import PageEnter, {
   type PageEnterHandle,
@@ -13,11 +16,13 @@ import StaffInbox from "@/components/support/StaffInbox";
 import {
   ArchiveRestore,
   Ban,
+  BarChart3,
   BookOpen,
   CheckCircle2,
   ChevronDown,
   Headphones,
   KeyRound,
+  Layers,
   LayoutDashboard,
   Lock,
   Radio,
@@ -31,18 +36,39 @@ import {
 const ADMIN_DOCS = "/a/admin/docs";
 
 const STAFF_NAV: {
-  id: "support" | "merchants" | "live" | "docs";
+  id: "overview" | "templates" | "support" | "merchants" | "live" | "docs";
   label: string;
   icon: typeof Headphones;
   adminOnly?: boolean;
 }[] = [
+  { id: "overview", label: "Overview", icon: BarChart3, adminOnly: true },
+  { id: "templates", label: "Templates", icon: Layers, adminOnly: true },
   { id: "support", label: "Support", icon: Headphones },
   { id: "merchants", label: "Merchants", icon: Users },
-  { id: "live", label: "Live log", icon: Radio, adminOnly: true },
+  { id: "live", label: "Live", icon: Radio, adminOnly: true },
   { id: "docs", label: "Guides", icon: BookOpen },
 ];
 
 type StaffNavId = (typeof STAFF_NAV)[number]["id"];
+
+const METRIC_NAV_IDS = new Set<StaffNavId>(["overview", "templates"]);
+
+function AdminNavGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="mb-4 last:mb-0">
+      <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8a8f98]">
+        {label}
+      </p>
+      <div className="flex flex-col gap-0.5">{children}</div>
+    </div>
+  );
+}
 
 function DocLink({
   hash,
@@ -89,7 +115,7 @@ function StepCard({
             <h3 className="font-display text-lg tracking-tight">{title}</h3>
             {docHash ? <DocLink hash={docHash} /> : null}
           </div>
-          <p className="mt-1 text-sm leading-relaxed text-black/55">{body}</p>
+          <p className="mt-1 text-sm leading-relaxed text-[#6b6f76]">{body}</p>
           <div className="mt-4">{children}</div>
         </div>
       </div>
@@ -381,8 +407,8 @@ function AdminConsoleInner() {
     return (
       <div className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center gap-4 bg-[#f7f8f8] px-6 text-center text-[#08090a]">
         <BrandLogo />
-        <h1 className="ln-h1 text-2xl">Staff only</h1>
-        <p className="text-sm text-[#6b6f76]">
+        <h1 className="font-display text-3xl tracking-tight">Staff only</h1>
+        <p className="text-sm leading-relaxed text-[#6b6f76]">
           This page is for DeclineGuard Staff and Admins. Ask an owner to set
           your Clerk{" "}
           <code className="rounded bg-black/5 px-1.5 py-0.5 text-[12px]">
@@ -446,6 +472,54 @@ function AdminConsoleInner() {
   const canHelpSelected =
     selected != null && canActOn(myRole, normalizeRole(selected.role));
   const privilegedTargetBlocked = selected != null && !canHelpSelected;
+  const metricNav = visibleNav.filter((item) => METRIC_NAV_IDS.has(item.id));
+  const workNav = visibleNav.filter((item) => !METRIC_NAV_IDS.has(item.id));
+
+  const renderStaffNavItem = (item: (typeof STAFF_NAV)[number]) => {
+    const Icon = item.icon;
+    const active = nav === item.id;
+    const waitingBadge =
+      item.id === "support" &&
+      typeof unclaimedCount === "number" &&
+      unclaimedCount > 0
+        ? unclaimedCount
+        : null;
+    const adminBadge =
+      item.id === "support" &&
+      iAmAdmin &&
+      typeof escalatedCount === "number" &&
+      escalatedCount > 0
+        ? escalatedCount
+        : null;
+    return (
+      <button
+        key={item.id}
+        type="button"
+        onClick={() => goToNav(item.id)}
+        className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition ${
+          active
+            ? "bg-black/[0.06] font-semibold text-[#08090a]"
+            : "font-medium text-[#8a8f98] hover:bg-black/[0.04] hover:text-[#08090a]"
+        }`}
+      >
+        <Icon className="size-4 shrink-0" />
+        <span className="flex-1 text-left">{item.label}</span>
+        {waitingBadge != null ? (
+          <span className="rounded-full bg-[#111] px-1.5 py-0.5 text-[10px] font-bold text-white">
+            {waitingBadge}
+          </span>
+        ) : null}
+        {adminBadge != null ? (
+          <span
+            className="rounded-full bg-violet-700 px-1.5 py-0.5 text-[10px] font-bold text-white"
+            title="Needs Admin"
+          >
+            {adminBadge}
+          </span>
+        ) : null}
+      </button>
+    );
+  };
 
   return (
     <div className="dg-shell light ln-surface relative flex h-dvh overflow-hidden bg-[#f7f8f8] text-[#08090a]">
@@ -463,52 +537,21 @@ function AdminConsoleInner() {
             </span>
           </div>
 
-          <nav className="flex flex-1 flex-col gap-0.5 px-3">
-            {visibleNav.map((item) => {
-              const Icon = item.icon;
-              const active = nav === item.id;
-              const waitingBadge =
-                item.id === "support" &&
-                typeof unclaimedCount === "number" &&
-                unclaimedCount > 0
-                  ? unclaimedCount
-                  : null;
-              const adminBadge =
-                item.id === "support" &&
-                iAmAdmin &&
-                typeof escalatedCount === "number" &&
-                escalatedCount > 0
-                  ? escalatedCount
-                  : null;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => goToNav(item.id)}
-                  className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition ${
-                    active
-                      ? "bg-black/[0.06] font-semibold text-[#08090a]"
-                      : "font-medium text-[#8a8f98] hover:bg-black/[0.04] hover:text-[#08090a]"
-                  }`}
-                >
-                  <Icon className="size-4 shrink-0" />
-                  <span className="flex-1 text-left">{item.label}</span>
-                  {waitingBadge != null ? (
-                    <span className="rounded-full bg-[#111] px-1.5 py-0.5 text-[10px] font-bold text-white">
-                      {waitingBadge}
-                    </span>
-                  ) : null}
-                  {adminBadge != null ? (
-                    <span
-                      className="rounded-full bg-violet-700 px-1.5 py-0.5 text-[10px] font-bold text-white"
-                      title="Needs Admin"
-                    >
-                      {adminBadge}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
+          <nav className="flex flex-1 flex-col px-3">
+            {metricNav.length > 0 ? (
+              <>
+                <AdminNavGroup label="Metrics">
+                  {metricNav.map(renderStaffNavItem)}
+                </AdminNavGroup>
+                <AdminNavGroup label="Work">
+                  {workNav.map(renderStaffNavItem)}
+                </AdminNavGroup>
+              </>
+            ) : (
+              <div className="flex flex-col gap-0.5">
+                {workNav.map(renderStaffNavItem)}
+              </div>
+            )}
           </nav>
 
           <div className="mt-auto space-y-2 px-3 py-4">
@@ -529,7 +572,7 @@ function AdminConsoleInner() {
                 <p className="truncate text-sm font-semibold text-black">
                   {me.userName}
                 </p>
-                <p className="truncate text-xs text-black/45">
+                <p className="truncate text-xs text-[#8a8f98]">
                   {roleLabel(myRole)}
                 </p>
               </div>
@@ -561,7 +604,7 @@ function AdminConsoleInner() {
                   className={`shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold transition ${
                     active
                       ? "bg-[#111] text-white"
-                      : "bg-black/[0.04] text-black/55"
+                      : "bg-black/[0.04] text-[#6b6f76]"
                   }`}
                 >
                   {item.label}
@@ -573,17 +616,21 @@ function AdminConsoleInner() {
 
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <PageEnter ref={pageEnterRef} pageKey={nav}>
+            {nav === "overview" && iAmAdmin ? (
+              <AdminOverview />
+            ) : null}
+
+            {nav === "templates" && iAmAdmin ? (
+              <AdminTemplates />
+            ) : null}
+
             {nav === "support" ? (
-              <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-1 flex-col px-5 py-5 md:px-8">
-                <div className="mb-4 shrink-0" data-enter>
-                  <h1 className="font-display text-2xl tracking-tight">
-                    Support
-                  </h1>
-                  <p className="mt-1 text-sm text-black/55">
-                    Claim a chat, help the merchant, mark done — or ask an
-                    Admin when you’re stuck.
-                  </p>
-                </div>
+              <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-1 flex-col px-5 py-6 md:px-8 md:py-8">
+                <AdminPageHeader
+                  eyebrow="Inbox"
+                  title="Support"
+                  description="Claim a chat, help the merchant, mark done — or ask an Admin when you’re stuck."
+                />
                 <div className="min-h-0 flex-1" data-enter>
                   <StaffInbox
                     isAdmin={iAmAdmin}
@@ -603,18 +650,14 @@ function AdminConsoleInner() {
 
             {nav === "live" && iAmAdmin ? (
               <div
-                className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-1 flex-col px-5 py-5 md:px-8"
+                className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-1 flex-col px-5 py-6 md:px-8 md:py-8"
                 data-enter
               >
-                <div className="mb-4 shrink-0">
-                  <h1 className="font-display text-2xl tracking-tight">
-                    Live staff log
-                  </h1>
-                  <p className="mt-1 text-sm text-black/55">
-                    Watch privileged actions in real time. Revoke freeze or ban
-                    if something looks wrong.
-                  </p>
-                </div>
+                <AdminPageHeader
+                  eyebrow="Audit"
+                  title="Live"
+                  description="Watch privileged actions in real time. Revoke freeze or ban if something looks wrong."
+                />
                 <div className="min-h-0 flex-1">
                   <LiveStaffLog fillHeight />
                 </div>
@@ -623,25 +666,26 @@ function AdminConsoleInner() {
 
             {nav === "docs" ? (
               <div
-                className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-1 flex-col overflow-y-auto px-5 py-5 md:px-8"
+                className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-1 flex-col overflow-y-auto px-5 py-6 md:px-8 md:py-8"
                 data-enter
               >
-                <h1 className="font-display text-2xl tracking-tight">
-                  Staff guides
-                </h1>
-                <p className="mt-1 text-sm text-black/55">
-                  How recovery tools and support chat work — open in a new tab
-                  when you need the full write-up.
-                </p>
-                <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <AdminPageHeader
+                  eyebrow="Docs"
+                  title="Guides"
+                  description="How recovery tools and support chat work — open in a new tab when you need the full write-up."
+                />
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <a
                     href={`${ADMIN_DOCS}#overview`}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-2xl border border-black/8 bg-white px-5 py-4 transition hover:border-black/15 hover:bg-black/[0.02]"
+                    className="rounded-2xl border border-black/8 bg-white px-5 py-5 transition hover:border-black/15 hover:bg-black/[0.02]"
                   >
-                    <p className="text-sm font-semibold">Recovery console</p>
-                    <p className="mt-1 text-[13px] text-black/50">
+                    <ShieldAlert className="size-4 text-[#8a8f98]" />
+                    <p className="mt-3 text-sm font-semibold text-[#08090a]">
+                      Recovery console
+                    </p>
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-[#6b6f76]">
                       Freeze, kick sessions, restore, reclaim store, unlock, ban
                     </p>
                   </a>
@@ -649,10 +693,13 @@ function AdminConsoleInner() {
                     href="/a/admin/docs/support"
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-2xl border border-black/8 bg-white px-5 py-4 transition hover:border-black/15 hover:bg-black/[0.02]"
+                    className="rounded-2xl border border-black/8 bg-white px-5 py-5 transition hover:border-black/15 hover:bg-black/[0.02]"
                   >
-                    <p className="text-sm font-semibold">Support chat</p>
-                    <p className="mt-1 text-[13px] text-black/50">
+                    <Headphones className="size-4 text-[#8a8f98]" />
+                    <p className="mt-3 text-sm font-semibold text-[#08090a]">
+                      Support chat
+                    </p>
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-[#6b6f76]">
                       Claim, reply, mark done, escalate to Admin, close as spam
                     </p>
                   </a>
@@ -660,10 +707,13 @@ function AdminConsoleInner() {
                     href={`${ADMIN_DOCS}#roles`}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-2xl border border-black/8 bg-white px-5 py-4 transition hover:border-black/15 hover:bg-black/[0.02]"
+                    className="rounded-2xl border border-black/8 bg-white px-5 py-5 transition hover:border-black/15 hover:bg-black/[0.02]"
                   >
-                    <p className="text-sm font-semibold">Roles</p>
-                    <p className="mt-1 text-[13px] text-black/50">
+                    <Users className="size-4 text-[#8a8f98]" />
+                    <p className="mt-3 text-sm font-semibold text-[#08090a]">
+                      Roles
+                    </p>
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-[#6b6f76]">
                       What Staff vs Admin can do
                     </p>
                   </a>
@@ -672,35 +722,33 @@ function AdminConsoleInner() {
             ) : null}
 
             {nav === "merchants" ? (
-              <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-1 flex-col overflow-y-auto px-5 py-5 md:px-8">
-                <div className="mb-6 shrink-0" data-enter>
-                  <h1 className="font-display text-2xl tracking-tight md:text-[1.75rem]">
-                    Merchants
-                  </h1>
-                  <p className="mt-1.5 text-sm leading-relaxed text-black/55">
-                    Find the account, stop the damage, put their data back, then
-                    unlock them.
-                  </p>
-                </div>
+              <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-1 flex-col overflow-y-auto px-5 py-6 md:px-8 md:py-8">
+                <AdminPageHeader
+                  eyebrow="Accounts"
+                  title="Merchants"
+                  description="Find the account, stop the damage, put their data back, then unlock them."
+                />
 
                 <section
                   className="mb-6 shrink-0 rounded-2xl border border-black/8 bg-white"
                   data-enter
                 >
                   <div className="px-5 py-4">
-                    <p className="text-sm font-semibold">Resend quota</p>
-                    <p className="mt-0.5 text-[13px] text-black/50">
+                    <p className="text-sm font-semibold text-[#08090a]">
+                      Resend quota
+                    </p>
+                    <p className="mt-1 text-[13px] leading-relaxed text-[#6b6f76]">
                       Provider 429 / quota blocks — sequences skip that send,
                       they are not merchant plan overage.
                     </p>
                   </div>
                   <ul className="max-h-48 overflow-auto border-t border-black/8">
                     {quotaBlocked === undefined ? (
-                      <li className="px-5 py-3 text-sm text-black/40">
+                      <li className="px-5 py-3 text-sm text-[#8a8f98]">
                         Loading…
                       </li>
                     ) : quotaBlocked.length === 0 ? (
-                      <li className="px-5 py-3 text-sm text-black/40">
+                      <li className="px-5 py-3 text-sm text-[#8a8f98]">
                         No Resend quota blocks
                       </li>
                     ) : (
@@ -711,11 +759,11 @@ function AdminConsoleInner() {
                         >
                           <span className="text-sm font-medium">
                             {row.targetName ?? "Unknown merchant"}
-                            <span className="ml-2 text-[12px] font-normal text-black/45">
+                            <span className="ml-2 text-[12px] font-normal text-[#8a8f98]">
                               {humanAction(row.action)}
                             </span>
                           </span>
-                          <span className="text-[12px] text-black/40">
+                          <span className="text-[12px] text-[#8a8f98]">
                             {new Date(row.createdAt).toLocaleString()}
                           </span>
                         </li>
@@ -733,12 +781,12 @@ function AdminConsoleInner() {
           <div className="rounded-2xl border border-black/8 bg-white p-4">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-sm font-semibold">
-                <Search className="size-4 text-black/50" />
+                <Search className="size-4 text-[#6b6f76]" />
                 1. Find the merchant
               </div>
               <DocLink hash="overview" label="Guide" />
             </div>
-            <p className="mt-1 text-[13px] leading-relaxed text-black/50">
+            <p className="mt-1 text-[13px] leading-relaxed text-[#6b6f76]">
               Search by their name, email-ish Clerk id, or Lemon Squeezy store
               name / id.
             </p>
@@ -752,15 +800,15 @@ function AdminConsoleInner() {
 
           <ul className="overflow-hidden rounded-2xl border border-black/8 bg-white">
             {!searchQ ? (
-              <li className="px-4 py-8 text-center text-sm text-black/40">
+              <li className="px-4 py-8 text-center text-sm text-[#8a8f98]">
                 Type at least 2 characters to search
               </li>
             ) : results === undefined ? (
-              <li className="px-4 py-8 text-center text-sm text-black/40">
+              <li className="px-4 py-8 text-center text-sm text-[#8a8f98]">
                 Searching…
               </li>
             ) : results.length === 0 ? (
-              <li className="px-4 py-8 text-center text-sm text-black/40">
+              <li className="px-4 py-8 text-center text-sm text-[#8a8f98]">
                 No merchants matched
               </li>
             ) : (
@@ -801,7 +849,7 @@ function AdminConsoleInner() {
                           </span>
                         </span>
                       </span>
-                      <span className="truncate text-[12px] text-black/45">
+                      <span className="truncate text-[12px] text-[#8a8f98]">
                         {row.connection
                           ? row.connection.storeName
                           : "No Lemon Squeezy store linked"}
@@ -819,21 +867,21 @@ function AdminConsoleInner() {
         <div className="min-w-0 space-y-4">
           {!selectedId ? (
             <div className="rounded-2xl border border-dashed border-black/15 bg-black/[0.015] px-6 py-14 text-center">
-              <ShieldAlert className="mx-auto size-8 text-black/25" />
-              <h2 className="font-display mt-4 text-xl tracking-tight">
+              <ShieldAlert className="mx-auto size-8 text-[#8a8f98]" />
+              <h2 className="font-display mt-4 text-xl tracking-tight text-[#08090a]">
                 Pick a merchant on the left
               </h2>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-black/50">
+              <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-[#6b6f76]">
                 You’ll get a clear checklist: freeze if needed, restore wiped
                 data, reclaim a stolen store, then unlock them again.
               </p>
             </div>
           ) : selected === undefined ? (
-            <div className="rounded-2xl border border-black/8 bg-white px-5 py-12 text-center text-sm text-black/40">
+            <div className="rounded-2xl border border-black/8 bg-white px-5 py-12 text-center text-sm text-[#8a8f98]">
               Loading merchant…
             </div>
           ) : selected === null ? (
-            <div className="rounded-2xl border border-black/8 bg-white px-5 py-12 text-center text-sm text-black/40">
+            <div className="rounded-2xl border border-black/8 bg-white px-5 py-12 text-center text-sm text-[#8a8f98]">
               Merchant not found
             </div>
           ) : (
@@ -842,7 +890,7 @@ function AdminConsoleInner() {
               <section className="rounded-2xl border border-black/8 bg-white p-5 md:p-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-black/40">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8a8f98]">
                       Working on
                     </p>
                     <h2 className="font-display mt-1 text-2xl tracking-tight">
@@ -871,7 +919,7 @@ function AdminConsoleInner() {
                 </div>
 
                 {status ? (
-                  <p className="mt-3 text-sm leading-relaxed text-black/60">
+                  <p className="mt-3 text-sm leading-relaxed text-[#6b6f76]">
                     {status.meaning}
                   </p>
                 ) : null}
@@ -949,7 +997,7 @@ function AdminConsoleInner() {
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-3">
                   <div className="rounded-xl bg-black/[0.03] px-3.5 py-3">
-                    <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-black/40">
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#8a8f98]">
                       <Store className="size-3.5" />
                       Store
                     </div>
@@ -958,7 +1006,7 @@ function AdminConsoleInner() {
                         ? selected.connection.storeName
                         : "None linked"}
                     </p>
-                    <p className="mt-0.5 text-[12px] text-black/45">
+                    <p className="mt-0.5 text-[12px] text-[#8a8f98]">
                       {storeArchived
                         ? "Disconnected (backup kept)"
                         : selected.connection
@@ -967,25 +1015,25 @@ function AdminConsoleInner() {
                     </p>
                   </div>
                   <div className="rounded-xl bg-black/[0.03] px-3.5 py-3">
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-black/40">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-[#8a8f98]">
                       Open failures
                     </div>
                     <p className="mt-1 text-sm font-medium">
                       {selected.openFailureCount}
                     </p>
-                    <p className="mt-0.5 text-[12px] text-black/45">
+                    <p className="mt-0.5 text-[12px] text-[#8a8f98]">
                       {selected.activityCount} activity events visible
                     </p>
                   </div>
                   <div className="rounded-xl bg-black/[0.03] px-3.5 py-3">
-                    <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-black/40">
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#8a8f98]">
                       <ArchiveRestore className="size-3.5" />
                       Backup
                     </div>
                     <p className="mt-1 text-sm font-medium">
                       {needsRestore ? "Available to restore" : "Nothing archived"}
                     </p>
-                    <p className="mt-0.5 text-[12px] text-black/45">
+                    <p className="mt-0.5 text-[12px] text-[#8a8f98]">
                       Kept ~90 days after disconnect
                     </p>
                   </div>
@@ -994,13 +1042,13 @@ function AdminConsoleInner() {
                 <div className="mt-3 rounded-xl bg-black/[0.03] px-3.5 py-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-black/40">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8a8f98]">
                         Plan
                       </p>
                       <p className="mt-1 text-sm font-medium capitalize">
                         {selected.plan}
                       </p>
-                      <p className="mt-0.5 text-[12px] text-black/45">
+                      <p className="mt-0.5 text-[12px] text-[#8a8f98]">
                         {selected.lsSubscriptionId
                           ? `LS ${selected.lsSubscriptionId}${
                               selected.lsSubscriptionStatus
@@ -1109,9 +1157,9 @@ function AdminConsoleInner() {
                 <div className="mb-3">
                   <DocLink hash="kick-sessions" label="About Kick sessions" />
                 </div>
-                <label className="block text-[12px] font-medium text-black/50">
+                <label className="block text-[12px] font-medium text-[#6b6f76]">
                   Required comment{" "}
-                  <span className="font-normal text-black/35">
+                  <span className="font-normal text-[#8a8f98]">
                     (Staff and Admins — shown in the live log)
                   </span>
                 </label>
@@ -1124,7 +1172,7 @@ function AdminConsoleInner() {
                 />
                 <p
                   className={`mt-1 text-[11px] ${
-                    commentReady ? "text-black/35" : "text-amber-800"
+                    commentReady ? "text-[#8a8f98]" : "text-amber-800"
                   }`}
                 >
                   {commentReady
@@ -1200,7 +1248,7 @@ function AdminConsoleInner() {
                       {busy === "Unban" ? "Unbanning…" : "Lift ban"}
                     </ActionButton>
                   ) : (
-                    <p className="w-full text-sm text-black/50">
+                    <p className="w-full text-sm text-[#6b6f76]">
                       This account is banned. Only an Admin can lift the ban.
                     </p>
                   )}
@@ -1241,7 +1289,7 @@ function AdminConsoleInner() {
                 </div>
                 {needsRestore ? (
                   <>
-                    <p className="mb-3 text-sm text-black/55">
+                    <p className="mb-3 text-sm text-[#6b6f76]">
                       We found archived data for this merchant.
                     </p>
                     <ActionButton
@@ -1268,7 +1316,7 @@ function AdminConsoleInner() {
                     </ActionButton>
                   </>
                 ) : (
-                  <p className="flex items-start gap-2 text-sm text-black/50">
+                  <p className="flex items-start gap-2 text-sm text-[#6b6f76]">
                     <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
                     Nothing to restore right now. Skip this step.
                   </p>
@@ -1278,7 +1326,7 @@ function AdminConsoleInner() {
                   <p className="text-sm font-semibold">
                     Stolen Lemon Squeezy API key?
                   </p>
-                  <p className="mt-1 text-[13px] leading-relaxed text-black/50">
+                  <p className="mt-1 text-[13px] leading-relaxed text-[#6b6f76]">
                     Point this store’s webhooks back to this merchant. Then tell
                     them to rotate the LS API key and change their password.
                   </p>
@@ -1322,14 +1370,14 @@ function AdminConsoleInner() {
                 body="When the incident is handled, unfreeze (or lift the ban) so the merchant can work again."
                 docHash="unlock"
               >
-                <ul className="mb-3 space-y-1.5 text-sm text-black/55">
+                <ul className="mb-3 space-y-1.5 text-sm text-[#6b6f76]">
                   <li>• Ask them to change their DeclineGuard password</li>
                   <li>• Ask them to rotate their Lemon Squeezy API key</li>
                   <li>• Unfreeze / lift ban when you’re done</li>
                 </ul>
                 {selected.accountStatus !== "active" ? (
                   selected.accountStatus === "disabled" && !iAmAdmin ? (
-                    <p className="text-sm text-black/50">
+                    <p className="text-sm text-[#6b6f76]">
                       Banned accounts can only be unlocked by an Admin.
                     </p>
                   ) : (
@@ -1371,7 +1419,7 @@ function AdminConsoleInner() {
                     </ActionButton>
                   )
                 ) : (
-                  <p className="flex items-start gap-2 text-sm text-black/50">
+                  <p className="flex items-start gap-2 text-sm text-[#6b6f76]">
                     <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
                     Already unlocked — nothing to do here.
                   </p>
@@ -1475,10 +1523,10 @@ function AdminConsoleInner() {
               </section>
               ) : (
                 <section className="rounded-2xl border border-black/8 bg-black/[0.02] px-5 py-4">
-                  <p className="text-sm font-semibold text-black/70">
+                  <p className="text-sm font-semibold text-[#08090a]">
                     Ban is Admin-only
                   </p>
-                  <p className="mt-1 text-[13px] leading-relaxed text-black/50">
+                  <p className="mt-1 text-[13px] leading-relaxed text-[#6b6f76]">
                     For safety, Staff cannot ban accounts. Freeze a merchant if
                     you need to pause them, and escalate to an Admin for bans.
                   </p>
@@ -1497,12 +1545,12 @@ function AdminConsoleInner() {
                 >
                   <span>
                     <span className="text-sm font-semibold">Staff history</span>
-                    <span className="mt-0.5 block text-[13px] text-black/50">
+                    <span className="mt-0.5 block text-[13px] text-[#6b6f76]">
                       What you (and other staff) already did on this account
                     </span>
                   </span>
                   <ChevronDown
-                    className={`size-4 shrink-0 text-black/40 transition ${showHistory ? "rotate-180" : ""}`}
+                    className={`size-4 shrink-0 text-[#8a8f98] transition ${showHistory ? "rotate-180" : ""}`}
                   />
                 </button>
                 {showHistory ? (
@@ -1514,7 +1562,7 @@ function AdminConsoleInner() {
                         className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${
                           historyFilter === "all"
                             ? "bg-black text-white"
-                            : "bg-black/5 text-black/60"
+                            : "bg-black/5 text-[#6b6f76]"
                         }`}
                       >
                         All
@@ -1525,7 +1573,7 @@ function AdminConsoleInner() {
                         className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${
                           historyFilter === "quota"
                             ? "bg-black text-white"
-                            : "bg-black/5 text-black/60"
+                            : "bg-black/5 text-[#6b6f76]"
                         }`}
                       >
                         Quota blocks
@@ -1533,11 +1581,11 @@ function AdminConsoleInner() {
                     </div>
                   <ul className="max-h-72 space-y-0 overflow-auto border-t border-black/8">
                     {historyRows === undefined ? (
-                      <li className="px-5 py-4 text-sm text-black/40">
+                      <li className="px-5 py-4 text-sm text-[#8a8f98]">
                         Loading…
                       </li>
                     ) : historyRows.length === 0 ? (
-                      <li className="px-5 py-4 text-sm text-black/40">
+                      <li className="px-5 py-4 text-sm text-[#8a8f98]">
                         {historyFilter === "quota"
                           ? "No Resend quota blocks on this account"
                           : "No staff actions yet"}
@@ -1559,17 +1607,17 @@ function AdminConsoleInner() {
                             <span className="text-sm font-medium">
                               {humanAction(row.action)}
                               {row.revokedAt ? (
-                                <span className="ml-2 text-[11px] font-normal text-black/40">
+                                <span className="ml-2 text-[11px] font-normal text-[#8a8f98]">
                                   (revoked)
                                 </span>
                               ) : null}
                             </span>
-                            <span className="text-[12px] text-black/40">
+                            <span className="text-[12px] text-[#8a8f98]">
                               {new Date(row.createdAt).toLocaleString()}
                             </span>
                           </div>
                           {row.reason ? (
-                            <p className="mt-1 text-[13px] text-black/50">
+                            <p className="mt-1 text-[13px] text-[#6b6f76]">
                               {row.reason}
                             </p>
                           ) : null}
