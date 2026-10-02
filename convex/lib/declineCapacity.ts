@@ -172,6 +172,33 @@ export function webhookSendsAfterUpsert(args: {
   );
 }
 
+/** Release emails rows that are already nudge/push at unhold time. */
+export function releaseSchedulesEmail(
+  recoveryAction: "wait" | "nudge_update_pm" | "push_update_pm" | "stop" | null,
+): boolean {
+  return (
+    recoveryAction === "nudge_update_pm" ||
+    recoveryAction === "push_update_pm"
+  );
+}
+
+/**
+ * Webhook must not schedule sendForFailure when this upsert's lazy
+ * release already scheduled the same failureId (held open already
+ * nudge/push). Wait→nudge still webhook-sends (release saw wait).
+ */
+export function webhookSchedulesAfterUpsert(args: {
+  quotaHeld: boolean;
+  recoveryAction: "wait" | "nudge_update_pm" | "push_update_pm" | "stop";
+  releaseScheduledThisFailure: boolean;
+}): boolean {
+  if (args.releaseScheduledThisFailure) return false;
+  return webhookSendsAfterUpsert({
+    quotaHeld: args.quotaHeld,
+    recoveryAction: args.recoveryAction,
+  });
+}
+
 /** Hold-queue clock is wall time. Receipt `paidAt` must never rewind stamps. */
 export function holdQueueNowMs(nowMs: number): number {
   if (!Number.isFinite(nowMs) || nowMs <= 0) return 0;

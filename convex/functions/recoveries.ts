@@ -343,6 +343,7 @@ export const upsertFailedPayment = internalMutation({
     attemptIndex: v.number(),
     recoveryAction: recoveryActionValidator,
     quotaHeld: v.boolean(),
+    releaseScheduledEmail: v.boolean(),
   }),
   handler: async (ctx, args) => {
     const open = await ctx.db
@@ -360,13 +361,17 @@ export const upsertFailedPayment = internalMutation({
     let quotaHeld = false;
 
     const owner = await ctx.db.get(args.userId);
+    const scheduledFromRelease = new Set<string>();
     if (owner) {
-      await releaseHeldAndSchedule(ctx, {
+      const released = await releaseHeldAndSchedule(ctx, {
         userId: owner._id,
         plan: resolvePlan(owner),
         packExtra: owner.declinePackExtra,
         nowMs: Date.now(),
       });
+      for (const id of released.scheduledFailureIds) {
+        scheduledFromRelease.add(id);
+      }
     }
 
     if (open) {
@@ -450,7 +455,13 @@ export const upsertFailedPayment = internalMutation({
       occurredAt: args.failedAt,
     });
 
-    return { failureId, attemptIndex, recoveryAction, quotaHeld };
+    return {
+      failureId,
+      attemptIndex,
+      recoveryAction,
+      quotaHeld,
+      releaseScheduledEmail: scheduledFromRelease.has(failureId),
+    };
   },
 });
 
@@ -499,7 +510,7 @@ export const releaseHeldDeclinesForUser = internalMutation({
   handler: async (ctx, args) => {
     const user = await ctx.db.get(args.userId);
     if (!user) return { released: 0 };
-    const released = await releaseHeldAndSchedule(ctx, {
+    const { released } = await releaseHeldAndSchedule(ctx, {
       userId: user._id,
       plan: resolvePlan(user),
       packExtra: user.declinePackExtra,

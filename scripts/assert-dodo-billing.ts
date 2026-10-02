@@ -36,10 +36,12 @@ import {
   matchesPackProduct,
   packQuantityPreferringCart,
   quotaHeldAfterLazyRelease,
+  releaseSchedulesEmail,
   shouldHoldNewDecline,
   shouldUnholdOnMonthRollover,
   shouldUnholdOnPlanPromote,
   utcMonthStartMs,
+  webhookSchedulesAfterUpsert,
   webhookSendsAfterUpsert,
 } from "../convex/lib/declineCapacity";
 import {
@@ -614,6 +616,34 @@ assert(
   "wait→nudge at month boundary schedules/sends after lazy unhold",
 );
 assert(
+  !releaseSchedulesEmail("wait") &&
+    webhookSchedulesAfterUpsert({
+      quotaHeld: false,
+      recoveryAction: "nudge_update_pm",
+      releaseScheduledThisFailure: false,
+    }),
+  "wait→nudge: release does not schedule; webhook sends once",
+);
+const dualHeldNudgeRelease = releaseSchedulesEmail("nudge_update_pm");
+const dualHeldNudgeWebhook = webhookSchedulesAfterUpsert({
+  quotaHeld: false,
+  recoveryAction: "nudge_update_pm",
+  releaseScheduledThisFailure: dualHeldNudgeRelease,
+});
+assert(
+  dualHeldNudgeRelease && !dualHeldNudgeWebhook,
+  "held open already nudge + lazy unhold: release sends, webhook must not dual-schedule",
+);
+assert(
+  releaseSchedulesEmail("push_update_pm") &&
+    !webhookSchedulesAfterUpsert({
+      quotaHeld: false,
+      recoveryAction: "push_update_pm",
+      releaseScheduledThisFailure: true,
+    }),
+  "held open already push + lazy unhold: no dual sendForFailure",
+);
+assert(
   !webhookSendsAfterUpsert({
     quotaHeld: quotaHeldAfterLazyRelease({ rowStillHeld: true }),
     recoveryAction: "nudge_update_pm",
@@ -647,6 +677,16 @@ assert(
   recoveriesSrc.includes("listHeldDeclineUserPage") &&
     holdActionsSrc.includes("paginationOpts"),
   "month cron paginates held users (no take(2000) cap)",
+);
+const lemonWebhookSrc = readFileSync(
+  join(repoRoot, "convex/lemonWebhook.ts"),
+  "utf8",
+);
+assert(
+  recoveriesSrc.includes("releaseScheduledEmail") &&
+    recoveriesSrc.includes("scheduledFailureIds") &&
+    lemonWebhookSrc.includes("releaseScheduledEmail"),
+  "upsert returns releaseScheduledEmail; webhook skips dual sendForFailure",
 );
 
 console.log("assert-dodo-billing: ok");

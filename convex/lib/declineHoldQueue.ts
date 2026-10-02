@@ -6,6 +6,7 @@ import {
   availableDeclineCapacity,
   countsTowardDeclineCapacity,
   declineCapacity,
+  releaseSchedulesEmail,
   shouldHoldNewDecline,
   shouldUnholdOnMonthRollover,
   utcMonthStartMs,
@@ -104,19 +105,18 @@ export async function releaseHeldDeclinesForCapacity(
 async function scheduleReleasedFailureEmails(
   ctx: MutationCtx,
   released: Array<Doc<"failedPayments">>,
-): Promise<void> {
+): Promise<Array<Id<"failedPayments">>> {
+  const scheduled: Array<Id<"failedPayments">> = [];
   for (const row of released) {
-    if (
-      row.recoveryAction === "nudge_update_pm" ||
-      row.recoveryAction === "push_update_pm"
-    ) {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.functions.recoveryEmails.sendForFailure,
-        { failureId: row._id },
-      );
-    }
+    if (!releaseSchedulesEmail(row.recoveryAction ?? null)) continue;
+    await ctx.scheduler.runAfter(
+      0,
+      internal.functions.recoveryEmails.sendForFailure,
+      { failureId: row._id },
+    );
+    scheduled.push(row._id);
   }
+  return scheduled;
 }
 
 /**
@@ -132,9 +132,16 @@ export async function releaseHeldAndSchedule(
     nowMs: number;
     force?: boolean;
   },
-): Promise<Array<Doc<"failedPayments">>> {
+): Promise<{
+  released: Array<Doc<"failedPayments">>;
+  scheduledFailureIds: Array<Id<"failedPayments">>;
+}> {
+  const empty = {
+    released: [] as Array<Doc<"failedPayments">>,
+    scheduledFailureIds: [] as Array<Id<"failedPayments">>,
+  };
   const user = await ctx.db.get(args.userId);
-  if (!user) return [];
+  if (!user) return empty;
   if (
     !args.force &&
     !shouldUnholdOnMonthRollover({
@@ -142,7 +149,7 @@ export async function releaseHeldAndSchedule(
       nowMs: args.nowMs,
     })
   ) {
-    return [];
+    return empty;
   }
 
   const released = await releaseHeldDeclinesForCapacity(ctx, {
@@ -151,9 +158,9 @@ export async function releaseHeldAndSchedule(
     packExtra: args.packExtra,
     nowMs: args.nowMs,
   });
-  await scheduleReleasedFailureEmails(ctx, released);
+  const scheduledFailureIds = await scheduleReleasedFailureEmails(ctx, released);
   await ctx.db.patch(args.userId, {
     declineHoldReleasedMonthStart: utcMonthStartMs(args.nowMs),
   });
-  return released;
+  return { released, scheduledFailureIds };
 }

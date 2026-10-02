@@ -259,6 +259,7 @@ export const handleLemonSqueezyWebhook = httpAction(
         // Attempt 1 = wait (don't stack on LS's own failure email)
         if (
           !result.quotaHeld &&
+          !result.releaseScheduledEmail &&
           (result.recoveryAction === "nudge_update_pm" ||
             result.recoveryAction === "push_update_pm")
         ) {

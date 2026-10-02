@@ -492,7 +492,7 @@ export const creditDodoPackPurchase = internalMutation({
       declinePackExtra: nextExtra,
     });
 
-    const released = await releaseHeldAndSchedule(ctx, {
+    const { released } = await releaseHeldAndSchedule(ctx, {
       userId: user._id,
       plan: resolvePlan(user),
       packExtra: nextExtra,
