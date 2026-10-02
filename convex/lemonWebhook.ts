@@ -258,8 +258,9 @@ export const handleLemonSqueezyWebhook = httpAction(
         // Only send recovery emails when policy says to (attempt >= 2)
         // Attempt 1 = wait (don't stack on LS's own failure email)
         if (
-          result.recoveryAction === "nudge_update_pm" ||
-          result.recoveryAction === "push_update_pm"
+          !result.quotaHeld &&
+          (result.recoveryAction === "nudge_update_pm" ||
+            result.recoveryAction === "push_update_pm")
         ) {
           await ctx.scheduler.runAfter(
             0,

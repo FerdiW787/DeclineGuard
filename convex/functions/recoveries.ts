@@ -31,6 +31,7 @@ import {
   assignKitForNewSequence,
   recordKitRecovery,
 } from "../lib/kitExperiment";
+import { shouldHoldInsert } from "../lib/declineHoldQueue";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -333,6 +334,7 @@ export const upsertFailedPayment = internalMutation({
     failureId: v.id("failedPayments"),
     attemptIndex: v.number(),
     recoveryAction: recoveryActionValidator,
+    quotaHeld: v.boolean(),
   }),
   handler: async (ctx, args) => {
     const open = await ctx.db
@@ -347,11 +349,14 @@ export const upsertFailedPayment = internalMutation({
 
     let failureId: Id<"failedPayments">;
     let attemptIndex: number;
+    let quotaHeld = false;
 
     if (open) {
-      // Increment attempt index for each new failure webhook on the same open failure
+      // Increment attempt index for each new failure webhook on the same open failure.
+      // In-flight sequences are never flipped to held.
       attemptIndex = (open.attemptIndex ?? 1) + 1;
       const recoveryAction = computeRecoveryAction(attemptIndex);
+      quotaHeld = open.quotaHeld === true;
 
       await ctx.db.patch(open._id, {
         userId: args.userId,
@@ -375,6 +380,13 @@ export const upsertFailedPayment = internalMutation({
       // First failure for this subscription — attempt 1 → wait
       attemptIndex = 1;
       const recoveryAction = computeRecoveryAction(attemptIndex);
+      const owner = await ctx.db.get(args.userId);
+      if (owner) {
+        quotaHeld = await shouldHoldInsert(ctx, owner, {
+          testMode: args.testMode,
+          nowMs: args.failedAt,
+        });
+      }
 
       const assignedKitId = await assignKitForNewSequence(ctx, args.userId);
       failureId = await ctx.db.insert("failedPayments", {
@@ -397,6 +409,7 @@ export const upsertFailedPayment = internalMutation({
         attemptIndex,
         recoveryAction,
         assignedKitId,
+        quotaHeld,
       });
     }
 
@@ -417,7 +430,7 @@ export const upsertFailedPayment = internalMutation({
       occurredAt: args.failedAt,
     });
 
-    return { failureId, attemptIndex, recoveryAction };
+    return { failureId, attemptIndex, recoveryAction, quotaHeld };
   },
 });
 
@@ -455,6 +468,7 @@ export const getFailureEmailPayload = internalQuery({
   handler: async (ctx, args) => {
     const failure = await ctx.db.get(args.failureId);
     if (!failure || failure.deletedAt != null) return null;
+    if (failure.quotaHeld === true) return null;
 
     const owner = await ctx.db.get(failure.userId);
     if (!owner) return null;
@@ -1429,9 +1443,12 @@ export const listOpenFailures = query({
         q.eq("userId", user._id).eq("status", "open"),
       )
       .order("desc")
-      .take(limit);
+      .take(800);
 
-    return rows.filter((row) => row.deletedAt == null).map(mapOpenFailure);
+    return rows
+      .filter((row) => row.deletedAt == null && row.quotaHeld !== true)
+      .slice(0, limit)
+      .map(mapOpenFailure);
   },
 });
 

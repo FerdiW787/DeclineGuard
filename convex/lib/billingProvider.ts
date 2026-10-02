@@ -170,7 +170,8 @@ export const DECLINE_PACK_EXTRA_DECLINES = 10;
 
 export function packExtraDeclines(quantity: number): number {
   if (!Number.isFinite(quantity) || quantity <= 0) return 0;
-  return Math.floor(quantity) * DECLINE_PACK_EXTRA_DECLINES;
+  const clamped = Math.min(20, Math.floor(quantity));
+  return clamped * DECLINE_PACK_EXTRA_DECLINES;
 }
 
 export function nextDeclinePackExtra(

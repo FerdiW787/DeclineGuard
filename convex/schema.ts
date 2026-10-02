@@ -256,10 +256,16 @@ export default defineSchema({
         at: v.number(),
       }),
     ),
+    /**
+     * New decline held for monthly Free 50 / Pro 500 (+ pack extra) capacity.
+     * In-flight sequences are never flipped to held.
+     */
+    quotaHeld: v.optional(v.boolean()),
     deletedAt: v.optional(v.number()),
     deletedBy: v.optional(deletedByValidator),
   })
     .index("by_user_status_failedAt", ["userId", "status", "failedAt"])
+    .index("by_user_quotaHeld_failedAt", ["userId", "quotaHeld", "failedAt"])
     .index("by_user_status_recoveredAt", ["userId", "status", "recoveredAt"])
     .index("by_user_failedAt", ["userId", "failedAt"])
     .index("by_store_subscription_status", [

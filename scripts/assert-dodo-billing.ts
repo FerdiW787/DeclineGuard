@@ -2,6 +2,9 @@
  * Pure-function checks for Dodo billing flag, no dual-charge, webhook keys.
  * Run: npx tsx scripts/assert-dodo-billing.ts
  */
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   canPinBillingProvider,
   dodoPlatformEventAction,
@@ -22,6 +25,16 @@ import {
   usageIngestSettlesFeePeriod,
 } from "../convex/lib/billingProvider";
 import { existingClaimBlocksNewCharge } from "../convex/lib/feeBilling";
+import {
+  availableDeclineCapacity,
+  clampPackQuantity,
+  declineCapacity,
+  dodoPackCreditDecision,
+  includedDeclinesPerMonth,
+  matchesPackProduct,
+  packQuantityPreferringCart,
+  shouldHoldNewDecline,
+} from "../convex/lib/declineCapacity";
 import {
   dodoUsageEventId,
   extractDodoUserRefs,
@@ -333,6 +346,154 @@ assert(
     nowSec,
   })),
   "invalid signature must fail",
+);
+
+assert(includedDeclinesPerMonth("free") === 50, "Free included declines is 50");
+assert(includedDeclinesPerMonth("pro") === 500, "Pro included declines is 500");
+assert(
+  declineCapacity({ plan: "free", packExtra: 0 }) === 50,
+  "Free capacity without packs is 50",
+);
+assert(
+  declineCapacity({ plan: "pro", packExtra: 0 }) === 500,
+  "Pro capacity without packs is 500",
+);
+const usedAtFreeCap = 50;
+const capacityBeforePack = availableDeclineCapacity({
+  plan: "free",
+  packExtra: 0,
+  usedActive: usedAtFreeCap,
+});
+const capacityAfterPack = availableDeclineCapacity({
+  plan: "free",
+  packExtra: packExtraDeclines(1),
+  usedActive: usedAtFreeCap,
+});
+assert(
+  capacityBeforePack === 0 && capacityAfterPack === 10,
+  "packExtraDeclines increases available decline capacity (not a dead write)",
+);
+assert(
+  shouldHoldNewDecline({
+    usedActive: usedAtFreeCap,
+    capacity: declineCapacity({ plan: "free", packExtra: 0 }),
+  }),
+  "new declines hold at Free 50 without a pack",
+);
+assert(
+  !shouldHoldNewDecline({
+    usedActive: usedAtFreeCap,
+    capacity: declineCapacity({
+      plan: "free",
+      packExtra: packExtraDeclines(1),
+    }),
+  }),
+  "purchased +10 unblocks hold-queue capacity",
+);
+
+assert(clampPackQuantity(100) === 20, "pack quantity clamps at 20");
+assert(packExtraDeclines(100) === 200, "credit quantity clamp is ≤20 packs");
+assert(
+  packQuantityPreferringCart({ cartQuantity: 3, metadataQuantity: 99 }) === 3,
+  "product_cart qty wins over metadata",
+);
+assert(
+  packQuantityPreferringCart({ cartQuantity: null, metadataQuantity: 2 }) === 2,
+  "metadata qty is fallback when cart missing",
+);
+assert(
+  matchesPackProduct({
+    productId: "pack_live",
+    expectedProductId: "pack_live",
+  }),
+  "pack product id match",
+);
+assert(
+  !matchesPackProduct({
+    productId: "fee_live",
+    expectedProductId: "pack_live",
+  }),
+  "pack product id mismatch",
+);
+assert(
+  !matchesPackProduct({ productId: "pack_live", expectedProductId: null }),
+  "unset PACK_PRODUCT_ID cannot credit",
+);
+
+const ignoredPack = dodoPackCreditDecision({
+  testMode: true,
+  allowTestBilling: undefined,
+  productId: "pack_live",
+  expectedProductId: "pack_live",
+  quantity: 1,
+});
+assert(
+  ignoredPack.credit === false && ignoredPack.reason === "test_mode_ignored",
+  "pack credit uses same test_mode_ignored contract as applyDodoSubscription",
+);
+assert(
+  dodoPackCreditDecision({
+    testMode: true,
+    allowTestBilling: "true",
+    productId: "pack_live",
+    expectedProductId: "pack_live",
+    quantity: 1,
+  }).credit === true,
+  "ALLOW_DODO_TEST_BILLING=true applies pack credit",
+);
+assert(
+  dodoPackCreditDecision({
+    testMode: false,
+    productId: "other",
+    expectedProductId: "pack_live",
+    quantity: 1,
+  }).reason === "product_mismatch",
+  "pack credit requires PACK_PRODUCT_ID match",
+);
+assert(
+  dodoPackCreditDecision({
+    testMode: false,
+    productId: "pack_live",
+    expectedProductId: "pack_live",
+    quantity: 99,
+  }).extraDeclines === 200,
+  "pack credit clamps quantity ≤20",
+);
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+const packActionsSrc = readFileSync(
+  join(repoRoot, "convex/functions/dodoBillingActions.ts"),
+  "utf8",
+);
+const creditSrc = readFileSync(
+  join(repoRoot, "convex/functions/dodoBilling.ts"),
+  "utf8",
+);
+const recoveriesSrc = readFileSync(
+  join(repoRoot, "convex/functions/recoveries.ts"),
+  "utf8",
+);
+assert(
+  packActionsSrc.includes("export const createPackCheckout"),
+  "Jules createPackCheckout still exists",
+);
+assert(
+  packActionsSrc.includes("DODO_PAYMENTS_PACK_PRODUCT_ID"),
+  "createPackCheckout throws not-configured when PACK_PRODUCT_ID unset",
+);
+assert(
+  !packActionsSrc.includes("Pack checkout is disabled until"),
+  "createPackCheckout is not hard-disabled (capacity consumer shipped)",
+);
+assert(
+  creditSrc.includes("dodoPackCreditDecision") &&
+    creditSrc.includes("releaseHeldDeclinesForCapacity"),
+  "pack webhook credits through decision + hold-queue release",
+);
+assert(
+  recoveriesSrc.includes("shouldHoldInsert") &&
+    recoveriesSrc.includes("quotaHeld"),
+  "upsertFailedPayment consumes decline capacity / hold-queue",
 );
 
 console.log("assert-dodo-billing: ok");

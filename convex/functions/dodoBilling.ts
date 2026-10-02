@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { internal } from "../_generated/api";
 import type { Doc } from "../_generated/dataModel";
 import {
   internalMutation,
@@ -15,12 +16,13 @@ import {
   dodoPlatformEventAction,
   isActiveSubscriptionStatus,
   nextDeclinePackExtra,
-  packExtraDeclines,
   planAfterForeignDemotion,
   resolveBillingProvider,
   type BillingProviderId,
 } from "../lib/billingProvider";
 import { checkoutNonceMatches, PRO_CHECKOUT_NONCE_TTL_MS } from "../lib/billingPlan";
+import { dodoPackCreditDecision } from "../lib/declineCapacity";
+import { releaseHeldDeclinesForCapacity } from "../lib/declineHoldQueue";
 import {
   getDodoPaymentsConfig,
   matchesDodoProProduct,
@@ -348,6 +350,7 @@ export const creditDodoPackPurchase = internalMutation({
   args: {
     paymentId: v.string(),
     quantity: v.number(),
+    productId: v.optional(v.string()),
     convexUserId: v.optional(v.string()),
     clerkUserId: v.optional(v.string()),
     dodoCustomerId: v.optional(v.string()),
@@ -358,6 +361,7 @@ export const creditDodoPackPurchase = internalMutation({
     credited: v.boolean(),
     alreadyCredited: v.boolean(),
     extraDeclines: v.number(),
+    releasedHeld: v.number(),
     reason: v.string(),
   }),
   handler: async (ctx, args) => {
@@ -367,6 +371,7 @@ export const creditDodoPackPurchase = internalMutation({
         credited: false,
         alreadyCredited: false,
         extraDeclines: 0,
+        releasedHeld: 0,
         reason: "missing_payment_id",
       };
     }
@@ -380,7 +385,46 @@ export const creditDodoPackPurchase = internalMutation({
         credited: true,
         alreadyCredited: true,
         extraDeclines: existing.extraDeclines,
+        releasedHeld: 0,
         reason: "already_credited",
+      };
+    }
+
+    const config = getDodoPaymentsConfig();
+    const decision = dodoPackCreditDecision({
+      testMode: args.testMode,
+      productId: args.productId ?? null,
+      expectedProductId: config?.packProductId ?? null,
+      quantity: args.quantity,
+    });
+    if (!decision.credit) {
+      if (decision.reason === "test_mode_ignored") {
+        const ignoredUser = await findDodoBillingUser(ctx, {
+          convexUserId: args.convexUserId,
+          clerkUserId: args.clerkUserId,
+          dodoCustomerId: args.dodoCustomerId,
+        });
+        if (ignoredUser) {
+          await writeAuditLog(ctx, {
+            actorUserId: null,
+            targetUserId: ignoredUser._id,
+            action: "pack_credit:test_mode_ignored",
+            reason: "Dodo test_mode pack ignored (live capacity unchanged)",
+            metadata: {
+              paymentId,
+              productId: args.productId ?? null,
+              quantity: args.quantity,
+              testMode: true,
+            },
+          });
+        }
+      }
+      return {
+        credited: false,
+        alreadyCredited: false,
+        extraDeclines: 0,
+        releasedHeld: 0,
+        reason: decision.reason,
       };
     }
 
@@ -394,20 +438,14 @@ export const creditDodoPackPurchase = internalMutation({
         credited: false,
         alreadyCredited: false,
         extraDeclines: 0,
+        releasedHeld: 0,
         reason: "user_not_found",
       };
     }
 
-    const quantity = Math.max(1, Math.floor(args.quantity));
-    const extraDeclines = packExtraDeclines(quantity);
-    if (extraDeclines <= 0) {
-      return {
-        credited: false,
-        alreadyCredited: false,
-        extraDeclines: 0,
-        reason: "invalid_quantity",
-      };
-    }
+    const quantity = decision.quantity;
+    const extraDeclines = decision.extraDeclines;
+    const nextExtra = nextDeclinePackExtra(user.declinePackExtra, quantity);
 
     await ctx.db.insert("dodoPackPurchases", {
       userId: user._id,
@@ -417,8 +455,28 @@ export const creditDodoPackPurchase = internalMutation({
       creditedAt: args.paidAt,
     });
     await ctx.db.patch(user._id, {
-      declinePackExtra: nextDeclinePackExtra(user.declinePackExtra, quantity),
+      declinePackExtra: nextExtra,
     });
+
+    const released = await releaseHeldDeclinesForCapacity(ctx, {
+      userId: user._id,
+      plan: resolvePlan(user),
+      packExtra: nextExtra,
+      nowMs: args.paidAt,
+    });
+    for (const row of released) {
+      if (
+        row.recoveryAction === "nudge_update_pm" ||
+        row.recoveryAction === "push_update_pm"
+      ) {
+        await ctx.scheduler.runAfter(
+          0,
+          internal.functions.recoveryEmails.sendForFailure,
+          { failureId: row._id },
+        );
+      }
+    }
+
     await writeAuditLog(ctx, {
       actorUserId: null,
       targetUserId: user._id,
@@ -430,6 +488,8 @@ export const creditDodoPackPurchase = internalMutation({
         paymentId,
         quantity,
         extraDeclines,
+        releasedHeld: released.length,
+        productId: args.productId ?? null,
         testMode: args.testMode,
       },
     });
@@ -438,6 +498,7 @@ export const creditDodoPackPurchase = internalMutation({
       credited: true,
       alreadyCredited: false,
       extraDeclines,
+      releasedHeld: released.length,
       reason: "ok",
     };
   },

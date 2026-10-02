@@ -75,7 +75,7 @@ Until these exist in the live/test Dodo business, checkout/fees throw “not con
 1. **Pro $29.99/mo** subscription product → `DODO_PAYMENTS_PRO_PRODUCT_ID`
 2. **Recovery-fee** one-time product (amount override in cents) → `DODO_PAYMENTS_FEE_PRODUCT_ID`
 3. **Usage meter is not a settlement path.** Fees use `DODO_PAYMENTS_FEE_PRODUCT_ID` one-time checkout; `payment.succeeded` + `claim_key` marks paid.
-4. **Pack** product if `$0.99 +10` should charge on Dodo → `DODO_PAYMENTS_PACK_PRODUCT_ID`. `payment.succeeded` with `billing_kind=pack` credits `users.declinePackExtra`.
+4. **Pack** product if `$0.99 +10` should charge on Dodo → `DODO_PAYMENTS_PACK_PRODUCT_ID`. `payment.succeeded` credits `users.declinePackExtra` only when the product id matches (cart qty preferred, clamp ≤20). Extra declines raise Free 50 / Pro 500 hold-queue capacity and unhold oldest held rows. Test-mode packs use the same `test_mode_ignored` gate as plan webhooks.
 5. Webhook signing secret → `DODO_PAYMENTS_WEBHOOK_KEY`
 
 ## Migration / grandfather
@@ -101,7 +101,9 @@ Dodo has no subscription import. Approach: **soft per-user flag + migrate-on-nex
 | `convex/lib/billingProvider.ts` | Flag resolve + no-dual-charge |
 | `convex/lib/dodoPayments.ts` | HTTP adapter (checkout, portal, usage) |
 | `convex/lib/standardWebhooks.ts` | Svix-style signature + event key |
-| `convex/functions/dodoBilling.ts` | Apply sub, webhook claim, per-user resolve |
+| `convex/lib/declineCapacity.ts` | Free 50 / Pro 500 + pack extra hold-queue math |
+| `convex/lib/declineHoldQueue.ts` | Count used declines; hold inserts; unhold on pack |
+| `convex/functions/dodoBilling.ts` | Apply sub, webhook claim, pack credit + unhold |
 | `convex/functions/dodoBillingActions.ts` | Checkout / portal / pack |
 | `convex/dodoWebhook.ts` | `POST /dodo` |
 | `convex/functions/lemonSqueezyActions.ts` | Stable `createProCheckout` / `createBillingPortal` |

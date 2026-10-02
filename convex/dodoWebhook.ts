@@ -5,12 +5,18 @@ import {
   collectDodoWebhookSecrets,
   extractDodoMetadata,
   extractDodoUserRefs,
+  getDodoPaymentsConfig,
   isDodoPaymentEvent,
   isDodoSubscriptionEvent,
   parseDodoEnvironment,
   statusFromDodoEvent,
   stringifyDodoId,
 } from "./lib/dodoPayments";
+import {
+  matchesPackProduct,
+  packQuantityPreferringCart,
+  parsePositiveInt,
+} from "./lib/declineCapacity";
 import { isFeeInvoiceClaimKey } from "./lib/feeBilling";
 import {
   dodoWebhookEventKey,
@@ -161,7 +167,14 @@ async function handlePaymentEvent(
 
   const metadata = extractDodoMetadata(data.metadata);
   const refs = extractDodoUserRefs(metadata);
-  if (refs.billingKind === "pack") {
+  const productId =
+    stringifyDodoId(data.product_id) ?? extractProductIdFromNested(data);
+  const packProductId = getDodoPaymentsConfig()?.packProductId ?? null;
+  const packProductMatch = matchesPackProduct({
+    productId,
+    expectedProductId: packProductId,
+  });
+  if (refs.billingKind === "pack" || packProductMatch) {
     const paymentId = stringifyDodoId(data.payment_id);
     if (!paymentId) {
       throw new Error("Dodo pack payment.succeeded missing payment_id");
@@ -171,6 +184,7 @@ async function handlePaymentEvent(
       {
         paymentId,
         quantity: packQuantityFromPayload(data, metadata),
+        productId: productId ?? undefined,
         convexUserId: refs.convexUserId ?? undefined,
         clerkUserId: refs.clerkUserId ?? undefined,
         dodoCustomerId: extractCustomerId(data) ?? undefined,
@@ -240,17 +254,16 @@ function packQuantityFromPayload(
   data: Record<string, unknown>,
   metadata: Record<string, string>,
 ): number {
-  const fromMeta = Number(metadata.quantity ?? metadata.pack_quantity ?? "");
-  if (Number.isFinite(fromMeta) && fromMeta >= 1) {
-    return Math.floor(fromMeta);
-  }
   const items = data.product_cart;
+  let cartQuantity: number | null = null;
   if (Array.isArray(items) && items[0] && typeof items[0] === "object") {
     const rec = items[0] as Record<string, unknown>;
-    const q = typeof rec.quantity === "number" ? rec.quantity : Number(rec.quantity);
-    if (Number.isFinite(q) && q >= 1) return Math.floor(q);
+    cartQuantity = parsePositiveInt(rec.quantity);
   }
-  return 1;
+  const metadataQuantity = parsePositiveInt(
+    metadata.quantity ?? metadata.pack_quantity,
+  );
+  return packQuantityPreferringCart({ cartQuantity, metadataQuantity });
 }
 
 function extractCustomerId(data: Record<string, unknown>): string | null {

@@ -10,6 +10,7 @@ import {
   getDodoPaymentsConfig,
 } from "../lib/dodoPayments";
 import { dodoPlatformPathBlocked } from "../lib/billingProvider";
+import { clampPackQuantity } from "../lib/declineCapacity";
 
 /**
  * Dodo Payments hosted checkout / portal.
@@ -138,7 +139,7 @@ export const createPackCheckoutInternal = internalAction({
     }
     const quantity =
       args.quantity != null && Number.isFinite(args.quantity)
-        ? Math.max(1, Math.min(Math.floor(args.quantity), 20))
+        ? clampPackQuantity(args.quantity)
         : 1;
     const session = await createDodoCheckoutSession(config, {
       kind: "pack",
@@ -205,7 +206,7 @@ export const createPackCheckout = action({
     }
     const quantity =
       args.quantity != null && Number.isFinite(args.quantity)
-        ? Math.max(1, Math.min(Math.floor(args.quantity), 20))
+        ? clampPackQuantity(args.quantity)
         : 1;
     const session = await createDodoCheckoutSession(config, {
       kind: "pack",
