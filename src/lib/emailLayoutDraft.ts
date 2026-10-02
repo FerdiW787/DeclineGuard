@@ -16,8 +16,8 @@ const STORAGE_KEY = "dg.emailLayoutDraft.v1";
 /**
  * Riley-shaped FE draft. recoverySettings will store stylingMode +
  * layoutPresetId (default poster-notice; legacy quiet-verify / sonos map here)
- * when Convex tips; until then this stays in localStorage. FE catalog is 10
- * kits; Riley BE still accepts older ids — persist errors should surface.
+ * when Convex tips; until then this stays in localStorage. FE catalog is
+ * Set A (5 kits). Merchants do not persist a chosen template id.
  */
 export type EmailLayoutDraft = {
   stylingMode: StylingMode;
@@ -130,8 +130,9 @@ export type PersistableEmailLayoutFields = {
  *
  * Writes the Riley-shaped draft to localStorage. Color fields that
  * `saveEmailCustomizations` already accepts are returned for the live
- * save path. `stylingMode` + `layoutPresetId` persist via
- * `setStylingMode` / `setLayoutPresetId` when those refs exist.
+ * save path. `stylingMode` persists via `setStylingMode` when that
+ * ref exists. `layoutPresetId` is BE-owned (A/B assignment) — FE
+ * must not persist a merchant-chosen template id.
  */
 export function persistEmailLayoutSettings(input: {
   draft: EmailLayoutDraft;

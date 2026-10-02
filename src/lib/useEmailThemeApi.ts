@@ -106,15 +106,14 @@ export function useImportBrandFromStorefront() {
 
 export function usePersistEmailTheme() {
   const setMode = useSetStylingMode();
-  const setLayout = useSetLayoutPresetId();
   return useCallback(
     async (patch: {
       stylingMode?: StylingMode;
+      /** Ignored — kit assignment is BE-owned. Merchants do not persist a template id. */
       layoutPresetId?: string;
     }): Promise<void> => {
       if (patch.stylingMode) await setMode(patch.stylingMode);
-      if (patch.layoutPresetId) await setLayout(patch.layoutPresetId);
     },
-    [setLayout, setMode],
+    [setMode],
   );
 }

@@ -1,12 +1,10 @@
 /**
  * Layout kits influence block document structure (align, shell, padding).
  * Canonical IDs: poster-notice | amount-due | plain-letter | what-happened
- *   | quiet-column | italic-lead | status-word | deck-headline | hold-open
- *   | folio-mark.
+ *   | quiet-column. Merchants do not pick a kit.
  *
- * Kit ids are FE-local until Riley’s BE catalog accepts the full 10.
- * Persist may fail on the five new ids — keep the local draft and surface
- * that error; do not remap on hydrate.
+ * Kit ids are FE-local until Riley’s BE catalog accepts Set A.
+ * FE does not persist a merchant-chosen template id.
  */
 
 import { documentForKit, seedCopyWithKit } from "./emailBlockKits";

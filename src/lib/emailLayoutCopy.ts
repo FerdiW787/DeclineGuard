@@ -102,11 +102,6 @@ const LAYOUT_CHROME: Record<
   "plain-letter": {},
   "what-happened": {},
   "quiet-column": {},
-  "italic-lead": {},
-  "status-word": {},
-  "deck-headline": {},
-  "hold-open": {},
-  "folio-mark": {},
 };
 
 export function defaultLayoutCopy(

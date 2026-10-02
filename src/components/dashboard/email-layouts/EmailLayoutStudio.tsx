@@ -1,18 +1,15 @@
 import { useState } from "react";
-import LayoutPresetPicker from "./LayoutPresetPicker";
 import EmailLayoutPreview from "./EmailLayoutPreview";
 import SegmentedControl from "../SegmentedControl";
 import {
   DEFAULT_LIFECYCLE_EMAIL_TYPE,
   LIFECYCLE_EMAIL_META,
   LIFECYCLE_EMAIL_TYPES,
-  layoutPresetMeta,
   type LifecycleEmailType,
 } from "@/lib/emailLayoutPresets";
 import {
   resolveTheme,
   type EmailThemeTokens,
-  type LayoutPresetId,
   type StylingMode,
 } from "@/lib/emailTheme";
 import { buildLifecycleEmail } from "@/lib/lifecycleEmailTemplate";
@@ -119,7 +116,6 @@ export default function EmailLayoutStudio({
     theme: resolved,
   });
 
-  const meta = layoutPresetMeta(draft.layoutPresetId);
   const copyOverride = draft.copyOverrides[emailType];
   const showFields = variant === "page" || variant === "onboarding";
 
@@ -164,8 +160,8 @@ export default function EmailLayoutStudio({
             Email layout
           </p>
           <p className="mt-1 text-[13px] text-[#6b6f76]">
-            {meta.label} for every lifecycle email. Preview any type without
-            changing the layout.
+            Same layout on every lifecycle email. Brand colors and the CTA
+            stay yours — we assign the kit.
           </p>
         </div>
         <SegmentedControl
@@ -179,15 +175,6 @@ export default function EmailLayoutStudio({
           idPrefix="email-styling"
         />
       </div>
-
-      <LayoutPresetPicker
-        value={draft.layoutPresetId}
-        onChange={(id: LayoutPresetId) => {
-          setDraft((prev) => ({ ...prev, layoutPresetId: id }));
-          onPersistTheme?.({ layoutPresetId: id });
-        }}
-        className="mt-4"
-      />
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
         <p className="text-[11px] text-[#8a8f98]">
@@ -243,7 +230,7 @@ export default function EmailLayoutStudio({
               </legend>
               <p className="text-[11px] leading-relaxed text-[#8a8f98]">
                 {draft.stylingMode === "preset"
-                  ? "Edits apply when you switch to Configured. The selected layout stays."
+                  ? "Edits apply when you switch to Configured. The layout stays."
                   : "These are your store tokens."}
               </p>
               <ColorField

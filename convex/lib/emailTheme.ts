@@ -24,9 +24,10 @@ export type StylingMode = (typeof STYLING_MODES)[number];
 export const QUIET_VERIFY_LAYOUT_ID = "quiet-verify";
 
 /**
- * FE catalog target (src/lib/emailTheme.ts LAYOUT_PRESET_IDS) — 10 kits:
+ * FE catalog target (src/lib/emailTheme.ts LAYOUT_PRESET_IDS) — Set A (5):
  *   poster-notice | amount-due | plain-letter | what-happened | quiet-column
- *   italic-lead | status-word | deck-headline | hold-open | folio-mark
+ *
+ * Merchants do not pick a kit. Riley BE assigns / promotes winners.
  *
  * This BE file still validates the legacy Quiet Verify id. Riley must
  * extend LAYOUT_PRESET_IDS / recoveryBlockKits before merchants can

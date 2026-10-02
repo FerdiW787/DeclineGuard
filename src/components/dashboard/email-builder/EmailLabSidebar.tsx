@@ -4,62 +4,12 @@ import {
   kitShowsStoreName,
   type KitCopy,
 } from "@/lib/emailBlockKits";
-import {
-  LAYOUT_PRESET_STRUCTURE_META,
-  type LayoutPresetId,
-  type StylingMode,
-} from "@/lib/emailLayoutPresets";
-import { LAYOUT_PRESET_CATALOG, LAYOUT_PRESET_IDS } from "@/lib/emailTheme";
+import { type LayoutPresetId, type StylingMode } from "@/lib/emailLayoutPresets";
+import { LAYOUT_PRESET_CATALOG } from "@/lib/emailTheme";
 import type { EmailThemeTokens } from "@/lib/emailTheme";
 import { cn } from "@/lib/utils";
 import EmailStoreHeader from "../EmailStoreHeader";
 import { Panel } from "../dashboardUi";
-
-const KIT_LABEL: Record<
-  LayoutPresetId,
-  { title: string; source: string }
-> = {
-  "poster-notice": {
-    title: "Poster notice",
-    source: "One announcement, then the button",
-  },
-  "amount-due": {
-    title: "Amount due",
-    source: "Money first, then the problem",
-  },
-  "plain-letter": {
-    title: "Plain letter",
-    source: "A short letter, then the ask",
-  },
-  "what-happened": {
-    title: "What happened",
-    source: "Two beats: happened, then do",
-  },
-  "quiet-column": {
-    title: "Quiet column",
-    source: "Wide type, almost nothing else",
-  },
-  "italic-lead": {
-    title: "Italic lead",
-    source: "Italic problem line as the hero",
-  },
-  "status-word": {
-    title: "Status word",
-    source: "One status word, then the ask",
-  },
-  "deck-headline": {
-    title: "Deck headline",
-    source: "Tiny deck, then a large left hed",
-  },
-  "hold-open": {
-    title: "Hold open",
-    source: "Reassurance first, then the problem",
-  },
-  "folio-mark": {
-    title: "Folio mark",
-    source: "Right folio, then a left notice",
-  },
-};
 
 type Props = {
   layoutPresetId: LayoutPresetId;
@@ -68,7 +18,6 @@ type Props = {
   storeName: string;
   storeLogoUrl: string | null;
   previewCopy: KitCopy;
-  onSelectKit: (id: LayoutPresetId) => void;
   onStylingModeChange: (mode: StylingMode) => void;
 };
 
@@ -79,7 +28,6 @@ export default function EmailLabSidebar({
   storeName,
   storeLogoUrl,
   previewCopy,
-  onSelectKit,
   onStylingModeChange,
 }: Props) {
   return (
@@ -89,44 +37,10 @@ export default function EmailLabSidebar({
           Lab
         </p>
         <p className="mt-1 text-[12px] leading-relaxed text-[#6b6f76]">
-          Ten recovery layouts. Each kit is a different structure — alignment,
-          density, hero, and CTA placement. Same layout on Day 0, Day 2, and
-          Day 5 — only the copy changes.
+          We A/B five recovery layouts. Day 0, Day 2, and Day 5 share the same
+          kit — only the copy changes. Merchants set brand colors and the CTA.
+          Assignment stays on the backend.
         </p>
-        <div
-          className="mt-3 space-y-1"
-          role="listbox"
-          aria-label="Email layout templates"
-        >
-          {LAYOUT_PRESET_IDS.map((id) => {
-            const meta = LAYOUT_PRESET_STRUCTURE_META[id];
-            const rge = KIT_LABEL[id];
-            const active = id === layoutPresetId;
-            return (
-              <button
-                key={id}
-                type="button"
-                role="option"
-                aria-selected={active}
-                onClick={() => onSelectKit(id)}
-                className={cn(
-                  "dg-interactive flex w-full flex-col items-start rounded-md border px-2.5 py-2 text-left",
-                  active
-                    ? "border-black/12 bg-[#f7f8f8]"
-                    : "border-transparent",
-                )}
-              >
-                <span className="text-[13px] font-semibold text-[#08090a]">
-                  {rge.title}
-                </span>
-                <span className="mt-0.5 text-[11px] leading-snug text-[#8a8f98]">
-                  {rge.source}
-                </span>
-                <span className="sr-only">{meta.hint}</span>
-              </button>
-            );
-          })}
-        </div>
       </Panel>
 
       <Panel className="p-5">
@@ -236,10 +150,10 @@ function EmailLabKitPreview({
         borderRadius: spec.shellRadius,
       }}
     >
-        {spec.showAccentBar ? (
-          <div className="h-1 w-full" style={{ background: theme.brandColor }} />
-        ) : null}
-        <div className={cn("px-3 py-3", alignClass)}>
+      {spec.showAccentBar ? (
+        <div className="h-1 w-full" style={{ background: theme.brandColor }} />
+      ) : null}
+      <div className={cn("px-3 py-3", alignClass)}>
         <EmailStoreHeader
           storeName={storeName}
           storeLogoUrl={storeLogoUrl}
@@ -258,44 +172,7 @@ function EmailLabKitPreview({
             €29
           </p>
         ) : null}
-        {kitId === "status-word" ? (
-          <p
-            className="mb-1 text-[13px] font-semibold leading-none"
-            style={{ color: theme.emailTextColor }}
-          >
-            Failed
-          </p>
-        ) : null}
-        {kitId === "hold-open" ? (
-          <p
-            className="mb-1 text-[9px]"
-            style={{ color: theme.emailTextColor }}
-          >
-            Access is still on.
-          </p>
-        ) : null}
-        {kitId === "folio-mark" ? (
-          <p
-            className="mb-1 text-right text-[7px]"
-            style={{ color: theme.mutedTextColor }}
-          >
-            Notice
-          </p>
-        ) : null}
-        {kitId === "deck-headline" ? (
-          <p
-            className="text-[7px]"
-            style={{ color: theme.mutedTextColor }}
-          >
-            Card update needed
-          </p>
-        ) : null}
-        <p
-          className={cn(
-            "mt-1 line-clamp-2 text-[11px] font-semibold leading-snug tracking-tight",
-            kitId === "italic-lead" && "italic",
-          )}
-        >
+        <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-snug tracking-tight">
           {copy.headline}
         </p>
         {kitId === "what-happened" ? (
@@ -325,7 +202,7 @@ function EmailLabKitPreview({
         >
           {copy.cta}
         </span>
-        </div>
+      </div>
     </div>
   );
 }

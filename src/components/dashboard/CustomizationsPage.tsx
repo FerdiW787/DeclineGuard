@@ -37,10 +37,7 @@ import {
   shortCopyFromDocument,
   type ShortCopyField,
 } from "@/lib/emailBlockCopy";
-import {
-  applyLayoutStructureToCopy,
-  seedEmptyDaysWithKit,
-} from "@/lib/emailLayoutStructure";
+import { seedEmptyDaysWithKit } from "@/lib/emailLayoutStructure";
 import {
   kitCopyFromDocument,
   kitLogoAlign,
@@ -76,7 +73,6 @@ import {
   persistEmailLayoutSettings,
 } from "@/lib/emailLayoutDraft";
 import { useEmailLayoutDraft } from "@/lib/useEmailLayoutDraft";
-import type { LayoutPresetId } from "@/lib/emailLayoutPresets";
 import { ArrowRight, FlaskConical } from "lucide-react";
 
 const TEMPLATE_ORDER: RecoveryTemplateId[] = ["gentle", "direct", "urgent"];
@@ -588,7 +584,6 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
         });
         await onPersistThemeRef.current?.({
           stylingMode: draft.stylingMode,
-          layoutPresetId: draft.layoutPresetId,
         });
         await onSaveRef.current(current);
         ok = true;
@@ -687,17 +682,6 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
       setLive((prev) => ({ ...prev, [key]: value }));
     };
 
-    const onLayoutPresetChange = (id: LayoutPresetId) => {
-      if (id === layoutDraft.layoutPresetId) return;
-      pushEmailCopyHistory();
-      setLayoutDraft((prev) => ({ ...prev, layoutPresetId: id }));
-      onPersistTheme?.({ layoutPresetId: id });
-      setLive((prev) => ({
-        ...prev,
-        emailCopy: applyLayoutStructureToCopy(prev.emailCopy, id),
-      }));
-    };
-
     const onStylingModeChange = (next: StylingMode) => {
       setLayoutDraft((prev) => ({ ...prev, stylingMode: next }));
       onPersistTheme?.({ stylingMode: next });
@@ -711,8 +695,8 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
           title="Recovery emails"
           description={
             labMode
-              ? "QA the ten starter kits across Day 0, Day 2, and Day 5. Exit Lab to restore the usual chrome."
-              : "One in-email layout for Day 0, Day 2, and Day 5. Click a block to edit it in place."
+              ? "Preview the assigned recovery kit across Day 0, Day 2, and Day 5. Brand colors and the CTA stay yours."
+              : "One in-email layout for Day 0, Day 2, and Day 5. Set brand colors and the CTA — we assign the kit."
           }
           actions={
             <div className="flex flex-wrap items-center gap-2">
@@ -782,19 +766,17 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
                 {dayMeta.day} · {dayMeta.label}
               </p>
               <p className="mt-2 text-[12px] text-[#6b6f76]">
-                {hasSelection
-                  ? "Editing this block. Esc clears the selection."
-                  : labMode
-                    ? "Switch kits on the right. Day 0 / 2 / 5 reuse this layout."
-                    : "Click a block to edit copy, the button, or the link."}
+                {labMode
+                  ? "Day 0 / 2 / 5 reuse this layout. Colors and the CTA stay on the right."
+                  : "Brand colors and the CTA stay on the right. We pick the layout."}
               </p>
             </div>
             <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto rounded-md bg-[#f7f8f8] px-3 py-5 md:px-6">
               <EmailBuilderCanvas
                 document={activeDoc}
                 device="desktop"
-                readOnly={false}
-                inlineEdit
+                readOnly
+                inlineEdit={false}
                 selectionApiRef={focusSelectionRef}
                 onSelect={(id) => {
                   setHasSelection(id != null);
@@ -849,8 +831,6 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
             >
               <EmailCustomizeSidebar
                 stylingMode={layoutDraft.stylingMode}
-                layoutPresetId={layoutDraft.layoutPresetId}
-                onLayoutPresetChange={onLayoutPresetChange}
                 colors={{
                   brandColor: live.brandColor,
                   ctaBackgroundColor: live.ctaBackgroundColor,
@@ -888,9 +868,6 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
                 storeName={storeName}
                 storeLogoUrl={storeLogoUrl}
                 previewCopy={labPreviewCopy}
-                onSelectKit={(id) => {
-                  onLayoutPresetChange(id);
-                }}
                 onStylingModeChange={onStylingModeChange}
               />
             </div>

@@ -53,11 +53,6 @@ export const LAYOUT_PRESET_STRUCTURE_META: Record<
   "plain-letter": { label: "Plain letter", hint: "Two paragraphs" },
   "what-happened": { label: "What happened", hint: "Two labeled beats" },
   "quiet-column": { label: "Quiet column", hint: "Wide type only" },
-  "italic-lead": { label: "Italic lead", hint: "Italic problem as hero" },
-  "status-word": { label: "Status word", hint: "One display word" },
-  "deck-headline": { label: "Deck headline", hint: "Deck, then a large hed" },
-  "hold-open": { label: "Hold open", hint: "Reassurance first" },
-  "folio-mark": { label: "Folio mark", hint: "Right folio, left notice" },
 };
 
 export const LIFECYCLE_EMAIL_META: Record<

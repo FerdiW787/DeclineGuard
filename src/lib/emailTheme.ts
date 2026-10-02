@@ -21,11 +21,12 @@ export const POSTER_NOTICE_LAYOUT_ID = "poster-notice";
  * Recovery starter kits — structure only. Hard reset: these IDs replace
  * the RGE / invoice-stack generation. Tokens are not a brand palette.
  *
- * FE catalog is 10. Riley BE still knows older IDs (sonos…). New ids
- * stay on the local draft until Convex validators catch up.
+ * FE catalog is Set A (5). Riley BE still knows older IDs (sonos…).
+ * Assigned kit is BE-owned — FE does not persist a merchant-chosen id.
  *
  *   poster-notice | amount-due | plain-letter | what-happened | quiet-column
- *   italic-lead | status-word | deck-headline | hold-open | folio-mark
+ *
+ * Merchants do not pick a kit. We A/B these five; Riley BE assigns.
  */
 export const LAYOUT_PRESET_IDS = [
   "poster-notice",
@@ -33,11 +34,6 @@ export const LAYOUT_PRESET_IDS = [
   "plain-letter",
   "what-happened",
   "quiet-column",
-  "italic-lead",
-  "status-word",
-  "deck-headline",
-  "hold-open",
-  "folio-mark",
 ] as const;
 
 /** IDs Riley BE is expected to accept today. New FE kits persist locally. */
@@ -145,36 +141,6 @@ export const LAYOUT_PRESET_CATALOG: Record<string, LayoutPreset> = {
     description: "Wide type, almost nothing else.",
     tokens: SONOS_TOKENS,
   },
-  "italic-lead": {
-    id: "italic-lead",
-    name: "Italic lead",
-    description: "Italic problem line as the hero.",
-    tokens: SONOS_TOKENS,
-  },
-  "status-word": {
-    id: "status-word",
-    name: "Status word",
-    description: "One status word, then the ask.",
-    tokens: SONOS_TOKENS,
-  },
-  "deck-headline": {
-    id: "deck-headline",
-    name: "Deck headline",
-    description: "Tiny deck, then a large left hed.",
-    tokens: SONOS_TOKENS,
-  },
-  "hold-open": {
-    id: "hold-open",
-    name: "Hold open",
-    description: "Reassurance first, then the problem.",
-    tokens: SONOS_TOKENS,
-  },
-  "folio-mark": {
-    id: "folio-mark",
-    name: "Folio mark",
-    description: "Right folio, then a left notice.",
-    tokens: SONOS_TOKENS,
-  },
 };
 
 export const NEW_MERCHANT_THEME_DEFAULTS = {
@@ -226,6 +192,11 @@ const LEGACY_LAYOUT_PRESET_IDS: Record<string, LayoutPresetId> = {
   "postscript-note": "poster-notice",
   "stub-header": "amount-due",
   "end-action": "poster-notice",
+  "italic-lead": "poster-notice",
+  "status-word": "poster-notice",
+  "deck-headline": "poster-notice",
+  "hold-open": "poster-notice",
+  "folio-mark": "poster-notice",
 };
 
 export function isStylingMode(value: unknown): value is StylingMode {
