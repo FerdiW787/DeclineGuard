@@ -1,6 +1,6 @@
 /**
  * DeclineGuard plan definitions — single source of truth for marketing + billing UI.
- * Pro checkout is Lemon Squeezy $29.99/mo (see createProCheckout).
+ * Pro checkout is $29.99/mo via createProCheckout (Lemon or Dodo by provider).
  */
 
 export type PlanId = "free" | "pro";
