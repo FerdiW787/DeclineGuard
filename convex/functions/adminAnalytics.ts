@@ -9,6 +9,8 @@ import {
   ANALYTICS_TIMEZONE,
   PRO_UPGRADE_AUDIT_ACTIONS,
   SET_A_KIT_IDS,
+  allTimeSeriesStartMs,
+  assertNowMs,
   assignedKitIdOrNull,
   isCountableRecovery,
   metricPeriodsFromEvents,
@@ -51,13 +53,19 @@ function emptyDays(): Record<RecoveryDayStep | "unattributed", number> {
   return { day0: 0, day2: 0, day5: 0, unattributed: 0 };
 }
 
+const AUDIT_SCAN_LIMIT = Math.floor(ADMIN_ANALYTICS_SCAN_LIMIT / 2);
+
 async function loadEmailSendEvents(
   ctx: QueryCtx,
+  nowMs: number,
 ): Promise<{ events: AnalyticsEvent[]; truncated: boolean }> {
+  const startMs = allTimeSeriesStartMs(nowMs);
   const rows = await ctx.db
     .query("emailSends")
-    .withIndex("by_sentAt")
-    .order("asc")
+    .withIndex("by_sentAt", (q) =>
+      q.gte("sentAt", startMs).lt("sentAt", nowMs),
+    )
+    .order("desc")
     .take(ADMIN_ANALYTICS_SCAN_LIMIT);
   return {
     events: rows.map((row) => ({ at: row.sentAt })),
@@ -67,11 +75,15 @@ async function loadEmailSendEvents(
 
 async function loadRecoveredPayments(
   ctx: QueryCtx,
+  nowMs: number,
 ): Promise<{ rows: Doc<"failedPayments">[]; truncated: boolean }> {
+  const startMs = allTimeSeriesStartMs(nowMs);
   const rows = await ctx.db
     .query("failedPayments")
-    .withIndex("by_status_recoveredAt", (q) => q.eq("status", "recovered"))
-    .order("asc")
+    .withIndex("by_status_recoveredAt", (q) =>
+      q.eq("status", "recovered").gte("recoveredAt", startMs).lt("recoveredAt", nowMs),
+    )
+    .order("desc")
     .take(ADMIN_ANALYTICS_SCAN_LIMIT);
   const countable = rows.filter((row) => isCountableRecovery(row));
   return {
@@ -80,36 +92,70 @@ async function loadRecoveredPayments(
   };
 }
 
+async function loadRecoveredPaymentsForKit(
+  ctx: QueryCtx,
+  kitId: string,
+  nowMs: number,
+): Promise<{ rows: Doc<"failedPayments">[]; truncated: boolean }> {
+  const startMs = allTimeSeriesStartMs(nowMs);
+  const rows = await ctx.db
+    .query("failedPayments")
+    .withIndex("by_assignedKitId_recoveredAt", (q) =>
+      q.eq("assignedKitId", kitId).gte("recoveredAt", startMs).lt("recoveredAt", nowMs),
+    )
+    .order("desc")
+    .take(ADMIN_ANALYTICS_SCAN_LIMIT);
+  const countable = rows.filter(
+    (row) =>
+      isCountableRecovery(row) && assignedKitIdOrNull(row.assignedKitId) === kitId,
+  );
+  return {
+    rows: countable,
+    truncated: rows.length >= ADMIN_ANALYTICS_SCAN_LIMIT,
+  };
+}
+
 async function loadSignupEvents(
   ctx: QueryCtx,
+  nowMs: number,
 ): Promise<{ events: AnalyticsEvent[]; truncated: boolean }> {
+  const startMs = allTimeSeriesStartMs(nowMs);
   const rows = await ctx.db
     .query("users")
-    .order("asc")
+    .order("desc")
     .take(ADMIN_ANALYTICS_SCAN_LIMIT);
+  const events: AnalyticsEvent[] = [];
+  for (const row of rows) {
+    if (row._creationTime >= startMs && row._creationTime < nowMs) {
+      events.push({ at: row._creationTime });
+    }
+  }
   return {
-    events: rows.map((row) => ({ at: row._creationTime })),
+    events,
     truncated: rows.length >= ADMIN_ANALYTICS_SCAN_LIMIT,
   };
 }
 
 async function loadProUpgradeEvents(
   ctx: QueryCtx,
+  nowMs: number,
 ): Promise<{ events: AnalyticsEvent[]; truncated: boolean }> {
+  const startMs = allTimeSeriesStartMs(nowMs);
   const events: AnalyticsEvent[] = [];
   let truncated = false;
   for (const action of PRO_UPGRADE_AUDIT_ACTIONS) {
     const rows = await ctx.db
       .query("auditLogs")
-      .withIndex("by_action_createdAt", (q) => q.eq("action", action))
-      .order("asc")
-      .take(ADMIN_ANALYTICS_SCAN_LIMIT);
-    if (rows.length >= ADMIN_ANALYTICS_SCAN_LIMIT) truncated = true;
+      .withIndex("by_action_createdAt", (q) =>
+        q.eq("action", action).gte("createdAt", startMs).lt("createdAt", nowMs),
+      )
+      .order("desc")
+      .take(AUDIT_SCAN_LIMIT);
+    if (rows.length >= AUDIT_SCAN_LIMIT) truncated = true;
     for (const row of rows) {
       events.push({ at: row.createdAt });
     }
   }
-  events.sort((a, b) => a.at - b.at);
   return { events, truncated };
 }
 
@@ -183,6 +229,10 @@ function dayEvents(
 /**
  * Platform-wide overview (all merchants). Admin only.
  * Totals + UTC series: monthly for all-time/YoY, daily for MoM.
+ *
+ * Reads: one newest-first index range per source, capped at
+ * ADMIN_ANALYTICS_SCAN_LIMIT (800) from the trailing 5y window
+ * (~3.2k docs worst case, not 8k×4). Jules shapes unchanged.
  */
 export const getOverview = query({
   args: { nowMs: v.number() },
@@ -199,11 +249,11 @@ export const getOverview = query({
   }),
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
-    const nowMs = args.nowMs;
-    const sends = await loadEmailSendEvents(ctx);
-    const recovered = await loadRecoveredPayments(ctx);
-    const signups = await loadSignupEvents(ctx);
-    const upgrades = await loadProUpgradeEvents(ctx);
+    const nowMs = assertNowMs(args.nowMs);
+    const sends = await loadEmailSendEvents(ctx, nowMs);
+    const recovered = await loadRecoveredPayments(ctx, nowMs);
+    const signups = await loadSignupEvents(ctx, nowMs);
+    const upgrades = await loadProUpgradeEvents(ctx, nowMs);
     return {
       timezone: ANALYTICS_TIMEZONE,
       asOfMs: nowMs,
@@ -244,10 +294,11 @@ export const listTemplates = query({
   }),
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
-    const recovered = await loadRecoveredPayments(ctx);
+    const nowMs = assertNowMs(args.nowMs);
+    const recovered = await loadRecoveredPayments(ctx, nowMs);
     return {
       timezone: ANALYTICS_TIMEZONE,
-      asOfMs: args.nowMs,
+      asOfMs: nowMs,
       truncated: recovered.truncated,
       kits: kitRowsFromRecoveries(recovered.rows),
     };
@@ -277,11 +328,9 @@ export const getTemplateDetail = query({
   }),
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
-    const recovered = await loadRecoveredPayments(ctx);
-    const rows = recovered.rows.filter(
-      (row) => assignedKitIdOrNull(row.assignedKitId) === args.kitId,
-    );
-    const nowMs = args.nowMs;
+    const nowMs = assertNowMs(args.nowMs);
+    const recovered = await loadRecoveredPaymentsForKit(ctx, args.kitId, nowMs);
+    const rows = recovered.rows;
     return {
       timezone: ANALYTICS_TIMEZONE,
       asOfMs: nowMs,

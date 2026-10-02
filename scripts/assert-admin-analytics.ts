@@ -3,8 +3,13 @@
  * Run: npx tsx scripts/assert-admin-analytics.ts
  */
 import {
+  ALL_TIME_SERIES_YEARS,
+  MAX_NOW_MS,
+  MIN_NOW_MS,
   assignedKitIdOrNull,
   aggregateEvents,
+  allTimeSeriesStartMs,
+  assertNowMs,
   bucketLabel,
   clampUtcDay,
   daysInUtcMonth,
@@ -12,13 +17,16 @@ import {
   enumerateBuckets,
   inWindow,
   isCountableRecovery,
+  lastSeriesBucketStart,
   metricPeriodsFromEvents,
   minusUtcMonth,
   minusUtcYear,
+  periodTotalsMatchSeries,
   periodWindows,
   recoveryAttributedDay,
   startOfUtcMonth,
   startOfUtcYear,
+  takeNewestEvents,
   utcDateMs,
 } from "../convex/lib/adminAnalytics";
 
@@ -171,6 +179,91 @@ assert(
   "open failure is not a recovery",
 );
 
+const emptyAllTimeLast = empty.allTime.series[empty.allTime.series.length - 1];
+assert(emptyAllTimeLast != null, "empty allTime still emits buckets through now");
+assert(emptyAllTimeLast.t === lastSeriesBucketStart(now), "empty allTime last bucket is current month");
+assert(periodTotalsMatchSeries(empty.allTime), "empty allTime total matches series sum");
+assert(
+  empty.allTime.series.length <= ALL_TIME_SERIES_YEARS * 12 + 1,
+  "allTime series is bounded to N years, not epoch→now",
+);
+
+const ancient = utcDateMs(1999, 1, 15);
+const mid = utcDateMs(2022, 3, 10);
+const current = utcDateMs(2026, 10, 1, 8);
+const spanning = metricPeriodsFromEvents(
+  [{ at: ancient }, { at: mid }, { at: current }],
+  now,
+  "count",
+);
+assert(spanning.allTime.series.length > 0, "spanning fixture emits allTime series");
+assert(
+  spanning.allTime.series[spanning.allTime.series.length - 1]!.t ===
+    lastSeriesBucketStart(now),
+  "allTime series last bucket aligns with now",
+);
+assert(spanning.allTime.total === 2, "allTime total drops events before the trailing window");
+assert(periodTotalsMatchSeries(spanning.allTime), "allTime total equals series sum (old→current fixture)");
+assert(
+  spanning.allTime.series.some((p) => p.label === "2026-10" && p.value === 1),
+  "allTime series includes current month",
+);
+assert(
+  !spanning.allTime.series.some((p) => p.label.startsWith("1999")),
+  "allTime series does not start at 1999",
+);
+
+const floor = allTimeSeriesStartMs(now);
+assert(floor === utcDateMs(2021, 10, 1), "default allTime floor is now − 5y month start");
+assert(allTimeSeriesStartMs(now, utcDateMs(2024, 6, 15)) === utcDateMs(2024, 6, 1), "allTime start lifts to first event");
+
+const oldFlood: { at: number }[] = [];
+for (let i = 0; i < 9000; i += 1) {
+  oldFlood.push({ at: utcDateMs(2020, 1, 1) + i * 1000 });
+}
+const recentFive = [
+  { at: utcDateMs(2026, 10, 1, 1) },
+  { at: utcDateMs(2026, 10, 1, 2) },
+  { at: utcDateMs(2026, 10, 1, 3) },
+  { at: utcDateMs(2026, 10, 2, 1) },
+  { at: utcDateMs(2026, 10, 2, 2) },
+];
+const newest = takeNewestEvents([...oldFlood, ...recentFive], 10);
+assert(newest.truncated, "newest-first marks truncated when over limit");
+assert(newest.events.length === 10, "newest-first keeps limit rows");
+assert(
+  newest.events.filter((e) => e.at >= utcDateMs(2026, 10, 1)).length === 5,
+  "newest-first keeps all recent-month events",
+);
+const newestPeriods = metricPeriodsFromEvents(newest.events, now, "count");
+assert(newestPeriods.thisMonth.total === 5, "truncated newest-first still counts thisMonth");
+assert(newestPeriods.thisYear.total === 5, "truncated newest-first prefers thisYear over 2020 flood");
+assert(newestPeriods.allTime.series[newestPeriods.allTime.series.length - 1]!.t === lastSeriesBucketStart(now), "truncated allTime still reaches now");
+
+let threw = false;
+try {
+  assertNowMs(Number.NaN);
+} catch {
+  threw = true;
+}
+assert(threw, "nowMs NaN rejected");
+threw = false;
+try {
+  assertNowMs(-1);
+} catch {
+  threw = true;
+}
+assert(threw, "nowMs negative rejected");
+threw = false;
+try {
+  assertNowMs(MAX_NOW_MS + 1);
+} catch {
+  threw = true;
+}
+assert(threw, "nowMs far-future rejected");
+assert(assertNowMs(now) === now, "valid nowMs accepted");
+assert(MIN_NOW_MS < now && now < MAX_NOW_MS, "fixture now is inside the allowed range");
+
 console.log(
-  "asserts green: UTC comparable YoY/MoM, empty zero-fill, missing kit arm, day5>day2>day0 attribution, test-mode/deleted excluded",
+  "asserts green: UTC comparable YoY/MoM, empty zero-fill, missing kit arm, day5>day2>day0 attribution, test-mode/deleted excluded, allTime reaches now, newest-first prefers recent, totals match series",
 );

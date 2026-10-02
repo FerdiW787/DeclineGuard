@@ -17,7 +17,17 @@ import {
 
 export const ANALYTICS_TIMEZONE = "UTC" as const;
 
-export const ADMIN_ANALYTICS_SCAN_LIMIT = 8000;
+/** Trailing allTime series — always includes the current UTC month through nowMs. */
+export const ALL_TIME_SERIES_YEARS = 5;
+
+/** Per-table cap. Overview loads ≤4 sources; keep a single query well under Convex reads. */
+export const ADMIN_ANALYTICS_SCAN_LIMIT = 800;
+
+const ENUMERATE_BUCKET_GUARD = 240;
+
+/** Soft floor/ceiling for client `nowMs` (not Date.now() — queries stay deterministic). */
+export const MIN_NOW_MS = Date.UTC(2018, 0, 1);
+export const MAX_NOW_MS = Date.UTC(2100, 0, 1);
 
 export const SET_A_KIT_IDS = LAYOUT_PRESET_IDS;
 
@@ -172,11 +182,79 @@ export type PeriodWindow = {
 
 export type PeriodWindows = Record<PeriodKey, PeriodWindow>;
 
+export function minusUtcYears(ms: number, years: number): number {
+  const p = utcParts(ms);
+  const year = p.year - years;
+  return utcDateMs(
+    year,
+    p.month,
+    clampUtcDay(year, p.month, p.day),
+    p.hour,
+    p.minute,
+    p.second,
+    p.ms,
+  );
+}
+
+/**
+ * allTime series start: max(earliest event, now − N years), month-aligned.
+ * Empty data still opens N years back so the last bucket can reach nowMs.
+ */
+export function allTimeSeriesStartMs(
+  nowMs: number,
+  earliestEventMs?: number | null,
+): number {
+  const floor = startOfUtcMonth(minusUtcYears(nowMs, ALL_TIME_SERIES_YEARS));
+  if (earliestEventMs == null || !Number.isFinite(earliestEventMs)) {
+    return floor;
+  }
+  return Math.max(floor, startOfUtcMonth(earliestEventMs));
+}
+
+export function earliestEventMs(
+  events: readonly AnalyticsEvent[],
+): number | null {
+  let min: number | null = null;
+  for (const event of events) {
+    if (!Number.isFinite(event.at)) continue;
+    if (min == null || event.at < min) min = event.at;
+  }
+  return min;
+}
+
+export function assertNowMs(nowMs: number): number {
+  if (!Number.isFinite(nowMs) || nowMs < MIN_NOW_MS || nowMs > MAX_NOW_MS) {
+    throw new Error("Invalid nowMs");
+  }
+  return nowMs;
+}
+
+/**
+ * Newest-first cap — when truncated, recent windows keep their events.
+ */
+export function takeNewestEvents(
+  events: readonly AnalyticsEvent[],
+  limit: number,
+): { events: AnalyticsEvent[]; truncated: boolean } {
+  if (limit <= 0) return { events: [], truncated: events.length > 0 };
+  if (events.length <= limit) {
+    return { events: [...events], truncated: false };
+  }
+  const sorted = [...events].sort((a, b) => b.at - a.at);
+  return { events: sorted.slice(0, limit), truncated: true };
+}
+
 /**
  * Inclusive start, exclusive end. YoY / MoM use comparable end instants
  * (same UTC month/day last year / last month).
+ *
+ * allTime is a trailing series (default 5y, or first event if later) so
+ * monthly buckets always reach `nowMs` and total === sum(series).
  */
-export function periodWindows(nowMs: number): PeriodWindows {
+export function periodWindows(
+  nowMs: number,
+  earliestEventMsValue?: number | null,
+): PeriodWindows {
   const thisYearStart = startOfUtcYear(nowMs);
   const lastYearNow = minusUtcYear(nowMs);
   const lastYearStart = startOfUtcYear(lastYearNow);
@@ -185,7 +263,7 @@ export function periodWindows(nowMs: number): PeriodWindows {
   const lastMonthStart = startOfUtcMonth(lastMonthNow);
   return {
     allTime: {
-      startMs: 0,
+      startMs: allTimeSeriesStartMs(nowMs, earliestEventMsValue),
       endMs: nowMs,
       granularity: "month",
     },
@@ -254,7 +332,7 @@ export function enumerateBuckets(window: PeriodWindow): number[] {
   const out: number[] = [];
   let cursor = first;
   let guard = 0;
-  while (cursor < window.endMs && guard < 400) {
+  while (cursor < window.endMs && guard < ENUMERATE_BUCKET_GUARD) {
     out.push(cursor);
     cursor = nextBucketStart(cursor, window.granularity);
     guard += 1;
@@ -293,7 +371,7 @@ export function metricPeriodsFromEvents(
   nowMs: number,
   mode: "count" | "sum",
 ): MetricPeriods {
-  const windows = periodWindows(nowMs);
+  const windows = periodWindows(nowMs, earliestEventMs(events));
   return {
     allTime: aggregateEvents(events, windows.allTime, mode),
     thisYear: aggregateEvents(events, windows.thisYear, mode),
@@ -301,6 +379,15 @@ export function metricPeriodsFromEvents(
     thisMonth: aggregateEvents(events, windows.thisMonth, mode),
     lastMonth: aggregateEvents(events, windows.lastMonth, mode),
   };
+}
+
+export function lastSeriesBucketStart(nowMs: number): number {
+  return startOfUtcMonth(nowMs - 1);
+}
+
+export function periodTotalsMatchSeries(period: PeriodTotals): boolean {
+  const seriesSum = period.series.reduce((n, point) => n + point.value, 0);
+  return period.total === seriesSum;
 }
 
 /**
