@@ -82,6 +82,8 @@ function tokensForWhiteShellReview(scraped: EmailThemeTokens): EmailThemeTokens 
       !isDarkHex(hierarchy.mutedText)
         ? REVIEW_MUTED_FALLBACK
         : hierarchy.mutedText,
+    // Lime on white fails contrast; keep #c6fe1e on the CTA only.
+    linkColor: hierarchy.bodyText,
   };
 }
 

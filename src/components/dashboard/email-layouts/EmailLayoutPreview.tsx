@@ -292,8 +292,8 @@ function AmountDue({ theme, storeName, storeLogoUrl, emailFont, copy, vars }: La
       >
         {copy.headline}
       </h2>
-      <p className="mt-2.5 text-[15px] leading-relaxed" style={{ color: theme.mutedTextColor }}>
-        {copy.body}
+      <p className="mt-2 text-[15px] leading-relaxed" style={{ color: theme.mutedTextColor }}>
+        Update the card to keep access on — about a minute.
       </p>
       <div className="mt-6">
         <Cta theme={theme} label={copy.cta} />
@@ -325,6 +325,9 @@ function PlainLetter({ theme, storeName, storeLogoUrl, emailFont, copy }: Layout
       </p>
       <p className="mt-4 text-[16px] leading-relaxed" style={{ color: theme.mutedTextColor }}>
         Updating the card keeps the same plan on. Nothing else changes.
+      </p>
+      <p className="mt-5 text-[16px]" style={{ color: theme.emailTextColor }}>
+        Thanks,
       </p>
       <div className="mt-7">
         <Cta theme={theme} label={copy.cta} />
@@ -368,6 +371,9 @@ function RuledEditorial({ theme, copy }: LayoutProps) {
     : "rgba(0,0,0,0.12)";
   return (
     <div className="px-10 py-12 text-center">
+      <p className="mb-4 text-[11px]" style={{ color: theme.mutedTextColor }}>
+        Payment failed
+      </p>
       <hr style={{ borderColor: rule }} />
       <h2
         className="py-5 text-[28px] font-semibold leading-tight tracking-[-0.03em]"
@@ -451,14 +457,22 @@ function WhatHappened({ theme, storeName, storeLogoUrl, emailFont, copy }: Layou
       <p className="mt-1.5 text-[15px] leading-relaxed" style={{ color: theme.emailTextColor }}>
         {copy.body}
       </p>
+      <hr
+        className="my-5"
+        style={{
+          borderColor: isDarkHex(theme.emailBackgroundColor)
+            ? "rgba(255,255,255,0.12)"
+            : "rgba(0,0,0,0.08)",
+        }}
+      />
       <p
-        className="mt-5 text-[11px] uppercase tracking-[0.12em]"
+        className="text-[11px] uppercase tracking-[0.12em]"
         style={{ color: theme.mutedTextColor }}
       >
         What to do
       </p>
       <p className="mt-1.5 text-[15px] leading-relaxed" style={{ color: theme.emailTextColor }}>
-        Update the card. Takes about a minute.
+        Open billing and update the card.
       </p>
       <div className="mt-6">
         <Cta theme={theme} label={copy.cta} />
@@ -474,7 +488,7 @@ function QuietColumn({ theme, copy }: LayoutProps) {
   return (
     <div className="px-12 py-14">
       <h2
-        className="text-[26px] font-semibold leading-snug tracking-[-0.03em]"
+        className="text-[32px] font-semibold leading-snug tracking-[-0.03em]"
         style={{ color: theme.emailTextColor }}
       >
         {copy.headline}

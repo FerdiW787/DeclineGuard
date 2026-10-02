@@ -173,13 +173,13 @@ export const BLOCK_KIT_SPEC: Record<LayoutPresetId, BlockKitSpec> = {
     showStoreName: false,
     showGreeting: false,
     showAccentBar: false,
-    emailPadding: 56,
+    emailPadding: 64,
     shellBorder: false,
     shellBorderWidth: 1,
     shellRadius: 0,
     eyebrowSize: 11,
-    headlineSize: 26,
-    bodySize: 17,
+    headlineSize: 32,
+    bodySize: 18,
   },
   "stub-header": {
     align: "left",
@@ -201,7 +201,7 @@ export const BLOCK_KIT_SPEC: Record<LayoutPresetId, BlockKitSpec> = {
     ctaAlign: "center",
     logoAlign: "left",
     showStoreName: true,
-    showGreeting: true,
+    showGreeting: false,
     showAccentBar: false,
     emailPadding: 36,
     shellBorder: false,
@@ -241,7 +241,7 @@ const DAY_COPY: Record<RecoveryTemplateId, KitCopy> = {
 };
 
 const CHROME_LINE =
-  /^(what happened|what to do|amount due|p\.?s\.|access stays on|your workspace stays|updating the card|nothing else changes|or\s)/i;
+  /^(what happened|what to do|amount due|payment failed|thanks,?|p\.?s\.|access stays on|your workspace stays|updating the card|nothing else changes|open billing|or\s)/i;
 
 const BILLING_ECHO =
   /open the billing page|to update your card|to continue\.?/i;
@@ -390,9 +390,9 @@ function blocksForAmountDue(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
       bold: true,
       align: "left",
       marginTop: 0,
-      marginBottom: 10,
+      marginBottom: 8,
     }),
-    createTextBlock(boldTokens(copy.body), {
+    createTextBlock("Update the card to keep access on — about a minute.", {
       copySlot: "body",
       fontSize: spec.bodySize,
       color: "muted",
@@ -436,9 +436,16 @@ function blocksForPlainLetter(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
         color: "muted",
         align: "left",
         marginTop: 0,
-        marginBottom: 0,
+        marginBottom: 20,
       },
     ),
+    createTextBlock("Thanks,", {
+      fontSize: spec.bodySize,
+      color: "default",
+      align: "left",
+      marginTop: 0,
+      marginBottom: 0,
+    }),
     createSpacerBlock(28),
     createButtonBlock(copy.cta, { align: "left", marginBottom: 14 }),
     createBillingLinkTextBlock({
@@ -482,6 +489,13 @@ function blocksForCtaLead(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
 
 function blocksForRuledEditorial(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] {
   return [
+    createTextBlock("Payment failed", {
+      fontSize: spec.eyebrowSize,
+      color: "muted",
+      align: "center",
+      marginTop: 0,
+      marginBottom: 16,
+    }),
     divider(0, 22),
     createTextBlock(copy.headline, {
       copySlot: "headline",
@@ -561,7 +575,7 @@ function blocksForWhatHappened(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] 
       marginTop: 0,
       marginBottom: 24,
     }),
-    createTextBlock("What happened", {
+    createTextBlock("WHAT HAPPENED", {
       fontSize: 11,
       color: "muted",
       align: "left",
@@ -574,16 +588,17 @@ function blocksForWhatHappened(spec: BlockKitSpec, copy: KitCopy): EmailBlock[] 
       color: "default",
       align: "left",
       marginTop: 0,
-      marginBottom: 18,
+      marginBottom: 0,
     }),
-    createTextBlock("What to do", {
+    divider(18, 18),
+    createTextBlock("WHAT TO DO", {
       fontSize: 11,
       color: "muted",
       align: "left",
       marginTop: 0,
       marginBottom: 6,
     }),
-    createTextBlock("Update the card. Takes about a minute.", {
+    createTextBlock("Open billing and update the card.", {
       fontSize: spec.bodySize,
       color: "default",
       align: "left",
