@@ -23,6 +23,16 @@ export type StylingMode = (typeof STYLING_MODES)[number];
 
 export const QUIET_VERIFY_LAYOUT_ID = "quiet-verify";
 
+/**
+ * FE catalog target (src/lib/emailTheme.ts LAYOUT_PRESET_IDS) — 10 kits:
+ *   sonos | avocode | benchmark | fontbase | nordvpn-structure
+ *   invoice-stack | checklist-card | split-banner | step-rail | tight-notice
+ *
+ * This BE file still validates the legacy Quiet Verify id. Riley must
+ * extend LAYOUT_PRESET_IDS / recoveryBlockKits before merchants can
+ * persist the newer FE ids. Do not invent a parallel palette here.
+ */
+
 /** MVP lifecycle emails — same layout via the single global layoutPresetId. */
 export const LIFECYCLE_EMAIL_TYPES = [
   "verify",

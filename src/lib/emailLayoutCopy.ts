@@ -140,6 +140,11 @@ const LAYOUT_CHROME: Record<
       eyebrow: "Needs a card update",
     },
   },
+  "invoice-stack": {},
+  "checklist-card": {},
+  "split-banner": {},
+  "step-rail": {},
+  "tight-notice": {},
 };
 
 export function defaultLayoutCopy(

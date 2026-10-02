@@ -16,8 +16,34 @@ export type StylingMode = (typeof STYLING_MODES)[number];
 export const QUIET_VERIFY_LAYOUT_ID = "quiet-verify";
 export const SONOS_LAYOUT_ID = "sonos";
 
-/** Starter block kits — 1:1 RGE refs. Legacy quiet-verify → sonos. */
+/**
+ * Starter block kits — structure only.
+ * First five match the RGE refs. Five more are FE structural variants.
+ * Legacy quiet-verify → sonos. Default remains sonos.
+ *
+ * FE catalog is 10. Riley BE `LAYOUT_PRESET_IDS` / recoveryBlockKits
+ * currently accept the first five only. New ids stay on the local draft
+ * until Convex validators catch up — do not remap on hydrate.
+ *
+ * FE+BE parity target (comment only; do not invent a BE palette here):
+ *   sonos | avocode | benchmark | fontbase | nordvpn-structure
+ *   invoice-stack | checklist-card | split-banner | step-rail | tight-notice
+ */
 export const LAYOUT_PRESET_IDS = [
+  "sonos",
+  "avocode",
+  "benchmark",
+  "fontbase",
+  "nordvpn-structure",
+  "invoice-stack",
+  "checklist-card",
+  "split-banner",
+  "step-rail",
+  "tight-notice",
+] as const;
+
+/** IDs Riley BE is expected to accept today. New FE kits persist locally. */
+export const BE_LAYOUT_PRESET_IDS = [
   "sonos",
   "avocode",
   "benchmark",
@@ -180,6 +206,39 @@ export const LAYOUT_PRESET_CATALOG: Record<string, LayoutPreset> = {
       ctaTextColor: "#ffffff",
       ctaBorderRadiusPx: 8,
     }),
+  },
+  // Structure-only kits. Catalog tokens reuse Sonos so we never invent a
+  // parallel brand palette. Configured/scrape BrandKit tokens win via
+  // resolveTheme({ stylingMode: "configured" }).
+  "invoice-stack": {
+    id: "invoice-stack",
+    name: "Invoice stack",
+    description: "Receipt meta first — amount, then copy.",
+    tokens: SONOS_TOKENS,
+  },
+  "checklist-card": {
+    id: "checklist-card",
+    name: "Checklist card",
+    description: "Rounded card — greeting, then checklist.",
+    tokens: SONOS_TOKENS,
+  },
+  "split-banner": {
+    id: "split-banner",
+    name: "Split banner",
+    description: "Right-aligned — headline, then eyebrow.",
+    tokens: SONOS_TOKENS,
+  },
+  "step-rail": {
+    id: "step-rail",
+    name: "Step rail",
+    description: "Numbered path first, then the ask.",
+    tokens: SONOS_TOKENS,
+  },
+  "tight-notice": {
+    id: "tight-notice",
+    name: "Tight notice",
+    description: "Compact bands — CTA, then a reassurance row.",
+    tokens: SONOS_TOKENS,
   },
 };
 

@@ -711,7 +711,7 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
           title="Recovery emails"
           description={
             labMode
-              ? "QA the five RGE starter kits across Day 0, Day 2, and Day 5. Exit Lab to restore the usual chrome."
+              ? "QA the ten starter kits across Day 0, Day 2, and Day 5. Exit Lab to restore the usual chrome."
               : "One in-email layout for Day 0, Day 2, and Day 5. Click a block to edit it in place."
           }
           actions={
@@ -890,9 +890,6 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
                 previewCopy={labPreviewCopy}
                 onSelectKit={(id) => {
                   onLayoutPresetChange(id);
-                  if (layoutDraft.stylingMode !== "preset") {
-                    onStylingModeChange("preset");
-                  }
                 }}
                 onStylingModeChange={onStylingModeChange}
               />

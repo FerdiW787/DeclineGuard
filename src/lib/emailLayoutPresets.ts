@@ -4,6 +4,7 @@
  */
 
 export {
+  BE_LAYOUT_PRESET_IDS,
   DEFAULT_LAYOUT_PRESET_ID,
   DEFAULT_LIFECYCLE_EMAIL_TYPE,
   DEFAULT_STYLING_MODE,
@@ -52,6 +53,11 @@ export const LAYOUT_PRESET_STRUCTURE_META: Record<
   benchmark: { label: "Benchmark", hint: "Your data is safe" },
   fontbase: { label: "FontBase", hint: "Upcoming renewal" },
   "nordvpn-structure": { label: "NordVPN", hint: "Your account has expired" },
+  "invoice-stack": { label: "Invoice stack", hint: "Receipt meta first" },
+  "checklist-card": { label: "Checklist card", hint: "Rounded card + list" },
+  "split-banner": { label: "Split banner", hint: "Right-aligned headline" },
+  "step-rail": { label: "Step rail", hint: "Numbered path first" },
+  "tight-notice": { label: "Tight notice", hint: "Compact bands" },
 };
 
 export const LIFECYCLE_EMAIL_META: Record<

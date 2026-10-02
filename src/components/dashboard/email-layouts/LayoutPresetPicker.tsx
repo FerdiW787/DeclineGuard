@@ -143,6 +143,87 @@ function LayoutThumb({ id }: { id: LayoutPresetId }) {
           </div>
         </div>
       );
+    case "invoice-stack":
+      return (
+        <div
+          className="flex h-16 flex-col justify-center gap-1 rounded-sm px-2.5"
+          style={{ background: theme.emailBackgroundColor }}
+        >
+          <span className="ml-auto h-1 w-5 rounded-full bg-black/20" />
+          <span className="h-3 w-8 bg-black/15" />
+          <span className="h-px w-full bg-black/10" />
+          <span
+            className="h-2 w-7 rounded-sm"
+            style={{ background: theme.ctaBackgroundColor }}
+          />
+        </div>
+      );
+    case "checklist-card":
+      return (
+        <div
+          className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl px-2.5"
+          style={{ background: theme.emailBackgroundColor }}
+        >
+          <span className="h-1 w-10 rounded-full bg-black/18" />
+          <span className="h-1 w-7 rounded-full bg-black/10" />
+          <span className="h-1 w-8 rounded-full bg-black/10" />
+          <span
+            className="mt-0.5 h-2 w-6 rounded-full"
+            style={{ background: theme.ctaBackgroundColor }}
+          />
+        </div>
+      );
+    case "split-banner":
+      return (
+        <div
+          className="flex h-16 flex-col overflow-hidden"
+          style={{ background: theme.emailBackgroundColor }}
+        >
+          <span className="h-1 w-full" style={{ background: theme.brandColor }} />
+          <div className="flex flex-1 flex-col items-end justify-center gap-1 px-2.5">
+            <span className="h-1.5 w-11 bg-black/20" />
+            <span className="h-1 w-6 rounded-full bg-black/10" />
+            <span
+              className="mt-0.5 h-2 w-7"
+              style={{ background: theme.ctaBackgroundColor }}
+            />
+          </div>
+        </div>
+      );
+    case "step-rail":
+      return (
+        <div
+          className="flex h-16 flex-col justify-center gap-1 rounded-md px-2.5"
+          style={{ background: theme.emailBackgroundColor }}
+        >
+          <span className="h-1 w-6 rounded-full bg-black/12" />
+          <span className="h-1 w-9 rounded-full bg-black/20" />
+          <span className="h-1 w-8 rounded-full bg-black/20" />
+          <span className="h-px w-full bg-black/10" />
+          <span
+            className="h-2 w-7 rounded-md"
+            style={{ background: theme.ctaBackgroundColor }}
+          />
+        </div>
+      );
+    case "tight-notice":
+      return (
+        <div
+          className="flex h-16 flex-col overflow-hidden"
+          style={{ background: theme.emailBackgroundColor }}
+        >
+          <span className="h-1 w-full" style={{ background: theme.brandColor }} />
+          <div className="flex flex-1 flex-col items-center justify-center gap-1 px-2">
+            <span className="h-px w-full bg-black/10" />
+            <span className="h-1 w-8 rounded-full bg-black/18" />
+            <span
+              className="h-2 w-6"
+              style={{ background: theme.ctaBackgroundColor }}
+            />
+            <span className="h-px w-full bg-black/10" />
+          </div>
+        </div>
+      );
     default: {
       const _exhaustive: never = id;
       return _exhaustive;

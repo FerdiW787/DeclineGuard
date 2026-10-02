@@ -1,10 +1,11 @@
 /**
  * Layout kits influence block document structure (align, shell, padding).
- * Canonical IDs: sonos | avocode | benchmark | fontbase | nordvpn-structure.
+ * Canonical IDs: sonos | avocode | benchmark | fontbase | nordvpn-structure
+ *   | invoice-stack | checklist-card | split-banner | step-rail | tight-notice.
  *
- * Kit ids are FE-local until Riley’s BE catalog accepts them. Persist may
- * fail on unknown ids — keep the local draft and surface that error; do
- * not remap on hydrate.
+ * Kit ids are FE-local until Riley’s BE catalog accepts the full 10.
+ * Persist may fail on the five new ids — keep the local draft and surface
+ * that error; do not remap on hydrate.
  */
 
 import { documentForKit, seedCopyWithKit } from "./emailBlockKits";

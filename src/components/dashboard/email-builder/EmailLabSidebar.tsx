@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import EmailStoreHeader from "../EmailStoreHeader";
 import { Panel } from "../dashboardUi";
 
-const RGE_LABEL: Record<
+const KIT_LABEL: Record<
   LayoutPresetId,
   { title: string; source: string }
 > = {
@@ -38,6 +38,26 @@ const RGE_LABEL: Record<
   "nordvpn-structure": {
     title: "NordVPN",
     source: "Your account has expired",
+  },
+  "invoice-stack": {
+    title: "Invoice stack",
+    source: "Receipt meta first",
+  },
+  "checklist-card": {
+    title: "Checklist card",
+    source: "Rounded card + list",
+  },
+  "split-banner": {
+    title: "Split banner",
+    source: "Right-aligned headline",
+  },
+  "step-rail": {
+    title: "Step rail",
+    source: "Numbered path first",
+  },
+  "tight-notice": {
+    title: "Tight notice",
+    source: "Compact bands",
   },
 };
 
@@ -69,8 +89,9 @@ export default function EmailLabSidebar({
           Lab
         </p>
         <p className="mt-1 text-[12px] leading-relaxed text-[#6b6f76]">
-          Starter kits copied 1:1 from the Really Good Emails refs. Same layout
-          on Day 0, Day 2, and Day 5 — only the copy changes.
+          Ten starter kits. First five match the Really Good Emails refs; five
+          more change structure only. Same layout on Day 0, Day 2, and Day 5 —
+          only the copy changes.
         </p>
         <div
           className="mt-3 space-y-1"
@@ -79,7 +100,7 @@ export default function EmailLabSidebar({
         >
           {LAYOUT_PRESET_IDS.map((id) => {
             const meta = LAYOUT_PRESET_STRUCTURE_META[id];
-            const rge = RGE_LABEL[id];
+            const rge = KIT_LABEL[id];
             const active = id === layoutPresetId;
             return (
               <button
@@ -131,8 +152,9 @@ export default function EmailLabSidebar({
           Colors
         </p>
         <p className="mt-1 text-[12px] leading-relaxed text-[#8a8f98]">
-          Template tokens come from the kit. Personal tokens are your store
-          colors.
+          Template applies kit structure. Personal uses your store scrape
+          tokens. CTA and colors stay on BrandKit when configured — kits
+          never invent a palette.
         </p>
         <div className="mt-3 grid gap-2">
           <ConfigButton
@@ -191,7 +213,18 @@ function EmailLabKitPreview({
   copy: KitCopy;
 }) {
   const spec = BLOCK_KIT_SPEC[kitId];
-  const centered = spec.align === "center";
+  const alignClass =
+    spec.align === "center"
+      ? "text-center"
+      : spec.align === "right"
+        ? "text-right"
+        : "text-left";
+  const ctaClass =
+    spec.ctaAlign === "center"
+      ? "mx-auto"
+      : spec.ctaAlign === "right"
+        ? "ml-auto"
+        : "";
   return (
     <div
       className="overflow-hidden border border-black/8"
@@ -206,7 +239,7 @@ function EmailLabKitPreview({
         {spec.showAccentBar ? (
           <div className="h-1 w-full" style={{ background: theme.brandColor }} />
         ) : null}
-        <div className={cn("px-3 py-3", centered && "text-center")}>
+        <div className={cn("px-3 py-3", alignClass)}>
         <EmailStoreHeader
           storeName={storeName}
           storeLogoUrl={storeLogoUrl}
@@ -217,6 +250,22 @@ function EmailLabKitPreview({
           showName={kitShowsStoreName(kitId)}
           className="mb-3"
         />
+        {kitId === "invoice-stack" ? (
+          <p
+            className="mb-1 text-[9px] font-semibold"
+            style={{ color: theme.emailTextColor }}
+          >
+            €29
+          </p>
+        ) : null}
+        {kitId === "step-rail" ? (
+          <p
+            className="mb-1 text-[8px] font-semibold"
+            style={{ color: theme.brandColor }}
+          >
+            1 Open · 2 Update · 3 Keep
+          </p>
+        ) : null}
         {kitId === "benchmark" ? (
           <p
             className="mb-1 text-[8px] font-semibold"
@@ -224,7 +273,7 @@ function EmailLabKitPreview({
           >
             {copy.eyebrow}
           </p>
-        ) : (
+        ) : kitId === "split-banner" ? null : kitId === "checklist-card" ? null : (
           <p
             className="text-[8px] font-medium uppercase tracking-[0.14em]"
             style={{ color: theme.mutedTextColor }}
@@ -235,6 +284,14 @@ function EmailLabKitPreview({
         <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-snug tracking-tight">
           {copy.headline}
         </p>
+        {kitId === "split-banner" ? (
+          <p
+            className="mt-1 text-[8px] font-medium uppercase tracking-[0.14em]"
+            style={{ color: theme.mutedTextColor }}
+          >
+            {copy.eyebrow}
+          </p>
+        ) : null}
         {kitId === "avocode" ? (
           <div
             className="mt-1.5 rounded border px-1.5 py-1"
@@ -270,6 +327,14 @@ function EmailLabKitPreview({
             Nothing here is gone
           </p>
         ) : null}
+        {kitId === "checklist-card" ? (
+          <p
+            className="mt-1 text-[8px]"
+            style={{ color: theme.mutedTextColor }}
+          >
+            Same workspace · Same billing
+          </p>
+        ) : null}
         <p
           className="mt-1 line-clamp-2 text-[9px] leading-relaxed"
           style={{ color: theme.mutedTextColor }}
@@ -279,7 +344,7 @@ function EmailLabKitPreview({
         <span
           className={cn(
             "mt-2 inline-block px-2.5 py-1 text-[8px] font-semibold",
-            spec.ctaAlign === "center" && "mx-auto",
+            ctaClass,
           )}
           style={{
             background: theme.ctaBackgroundColor,
@@ -289,6 +354,14 @@ function EmailLabKitPreview({
         >
           {copy.cta}
         </span>
+        {kitId === "tight-notice" ? (
+          <p
+            className="mt-1.5 text-[7px]"
+            style={{ color: theme.mutedTextColor }}
+          >
+            Access stays on · Pro Monthly
+          </p>
+        ) : null}
         </div>
     </div>
   );
