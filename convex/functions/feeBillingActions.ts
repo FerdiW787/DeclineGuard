@@ -13,10 +13,7 @@ import {
 import { lemonPlatformPathBlocked } from "../lib/billingProvider";
 import {
   createDodoCheckoutSession,
-  createDodoCustomerPortal,
-  dodoUsageEventId,
   getDodoPaymentsConfig,
-  ingestDodoUsageEvents,
 } from "../lib/dodoPayments";
 import { allowHttpsUrl } from "../lib/safeUrl";
 import { resolveFromAddress } from "../lib/recoveryEmailFrom";
@@ -582,10 +579,6 @@ async function invoiceMerchantViaDodo(
     internal.functions.feeBilling.getUserBillingTarget,
     { userId },
   );
-  const provider = await ctx.runQuery(
-    internal.functions.dodoBilling.getUserBillingProvider,
-    { userId },
-  );
   const email = target
     ? await lookupClerkEmail(target.clerkUserId)
     : undefined;
@@ -633,71 +626,25 @@ async function invoiceMerchantViaDodo(
   const claimKey = feeInvoiceClaimKey(userId, periodKey);
   const expiresAt = nowMs + FEE_INVOICE_CHECKOUT_TTL_MS;
 
-  // One charge only: usage-on-sub when Pro + meter are ready; else one-time checkout.
-  const canReportUsage =
-    Boolean(config.usageEventName) && Boolean(provider?.dodoCustomerId);
-  const canCheckout = Boolean(config.feeProductId);
+  // One-time FEE_PRODUCT_ID checkout only. Usage ingest is not a paid
+  // confirmation and must not block/settle a fee period.
+  if (!config.feeProductId) {
+    await ctx.runMutation(internal.functions.feeBilling.markBillingClaimFailed, {
+      invoiceId,
+      error: "dodo_fee_product_unconfigured",
+      unlinkFees: true,
+    });
+    return {
+      outcome: "skipped_unconfigured",
+      invoiceId,
+      totalCents: claim.totalCents,
+      feeCount: claim.feeCount,
+      error: "not_configured",
+      ...emptyCheckoutFields(),
+    };
+  }
 
   try {
-    if (canReportUsage && config.usageEventName && provider?.dodoCustomerId) {
-      const eventId = dodoUsageEventId({
-        invoiceId,
-        claimKey,
-      });
-      await ingestDodoUsageEvents(config, [
-        {
-          eventId,
-          customerId: provider.dodoCustomerId,
-          eventName: config.usageEventName,
-          metadata: {
-            claim_key: claimKey,
-            billing_invoice_id: invoiceId,
-            fee_cents: String(claim.totalCents),
-            period_key: periodKey,
-            billing_kind: "fee",
-          },
-        },
-      ]);
-
-      let portalUrl: string | null = null;
-      try {
-        const portal = await createDodoCustomerPortal(config, {
-          customerId: provider.dodoCustomerId,
-          returnUrl: null,
-        });
-        portalUrl = allowHttpsUrl(portal.portalUrl);
-      } catch (err) {
-        console.warn("Fee invoice: Dodo portal URL unavailable", err);
-      }
-
-      await ctx.runMutation(internal.functions.feeBilling.attachDodoCheckout, {
-        invoiceId,
-        dodoCheckoutId: eventId,
-        checkoutUrl: portalUrl ?? undefined,
-        expiresAt,
-        nowMs,
-      });
-      await ctx.runMutation(internal.functions.feeBilling.recordFeeInvoiceCreated, {
-        invoiceId,
-        actorUserId,
-      });
-      return {
-        outcome: "created",
-        invoiceId,
-        totalCents: claim.totalCents,
-        feeCount: claim.feeCount,
-        error: null,
-        lsCheckoutId: eventId,
-        lsCheckoutUrl: portalUrl,
-        checkoutEmailSent: false,
-      };
-    }
-
-    if (!canCheckout || !config.feeProductId) {
-      throw new Error(
-        "Dodo fee product is not configured. Set DODO_PAYMENTS_FEE_PRODUCT_ID (or usage meter + customer).",
-      );
-    }
 
     const session = await createDodoCheckoutSession(config, {
       kind: "fee",

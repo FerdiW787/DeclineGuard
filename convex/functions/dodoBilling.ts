@@ -12,9 +12,12 @@ import {
 } from "../lib/accountGuard";
 import { writeAuditLog } from "../lib/admin";
 import {
+  dodoPlatformEventAction,
   isActiveSubscriptionStatus,
+  nextDeclinePackExtra,
+  packExtraDeclines,
+  planAfterForeignDemotion,
   resolveBillingProvider,
-  shouldSkipDodoPlatformCharge,
   type BillingProviderId,
 } from "../lib/billingProvider";
 import { checkoutNonceMatches, PRO_CHECKOUT_NONCE_TTL_MS } from "../lib/billingPlan";
@@ -229,8 +232,15 @@ export const applyDodoSubscription = internalMutation({
     }
 
     const user = await findDodoBillingUser(ctx, args);
-    if (user && shouldSkipDodoPlatformCharge(billingProviderForUser(user))) {
-      return { applied: false, reason: "provider_lemon" };
+    const nextPlanPreview = planFromDodoStatus(args.status);
+    if (user) {
+      const eventAction = dodoPlatformEventAction({
+        provider: billingProviderForUser(user),
+        nextPlan: nextPlanPreview,
+      });
+      if (eventAction === "skip_promote") {
+        return { applied: false, reason: "provider_lemon" };
+      }
     }
 
     if (shouldIgnoreDodoTestEvent(args.testMode)) {
@@ -285,21 +295,31 @@ export const applyDodoSubscription = internalMutation({
     }
 
     const priorPlan: Plan = resolvePlan(user);
+    const appliedPlan = planAfterForeignDemotion({
+      nextPlan,
+      otherMorActive: isActiveSubscriptionStatus(user.lsSubscriptionStatus),
+    });
     await ctx.db.patch(user._id, {
-      plan: nextPlan,
-      billingProvider: "dodo",
+      plan: appliedPlan,
+      billingProvider: nextPlan === "pro" ? "dodo" : user.billingProvider,
       dodoSubscriptionId: args.dodoSubscriptionId,
       dodoSubscriptionStatus: args.status,
       ...(args.dodoCustomerId ? { dodoCustomerId: args.dodoCustomerId } : {}),
       dodoCheckoutNonce: "",
       dodoCheckoutNonceExpiresAt: 0,
+      ...(nextPlan === "pro"
+        ? {
+            lsSubscriptionId: "",
+            lsSubscriptionStatus: "",
+          }
+        : {}),
     });
 
-    if (priorPlan !== nextPlan) {
+    if (priorPlan !== appliedPlan) {
       await writeAuditLog(ctx, {
         actorUserId: null,
         targetUserId: user._id,
-        action: `plan_webhook:${nextPlan}`,
+        action: `plan_webhook:${appliedPlan}`,
         reason: "Dodo Payments platform subscription webhook",
         metadata: {
           priorPlan,
@@ -314,8 +334,110 @@ export const applyDodoSubscription = internalMutation({
     }
 
     return {
-      applied: priorPlan !== nextPlan || !knownSub,
-      plan: nextPlan,
+      applied: priorPlan !== appliedPlan || !knownSub,
+      plan: appliedPlan,
+      reason: "ok",
+    };
+  },
+});
+
+/**
+ * Credit a paid Dodo +10 decline pack. Idempotent on paymentId.
+ */
+export const creditDodoPackPurchase = internalMutation({
+  args: {
+    paymentId: v.string(),
+    quantity: v.number(),
+    convexUserId: v.optional(v.string()),
+    clerkUserId: v.optional(v.string()),
+    dodoCustomerId: v.optional(v.string()),
+    paidAt: v.number(),
+    testMode: v.boolean(),
+  },
+  returns: v.object({
+    credited: v.boolean(),
+    alreadyCredited: v.boolean(),
+    extraDeclines: v.number(),
+    reason: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    const paymentId = args.paymentId.trim();
+    if (!paymentId) {
+      return {
+        credited: false,
+        alreadyCredited: false,
+        extraDeclines: 0,
+        reason: "missing_payment_id",
+      };
+    }
+
+    const existing = await ctx.db
+      .query("dodoPackPurchases")
+      .withIndex("by_paymentId", (q) => q.eq("paymentId", paymentId))
+      .unique();
+    if (existing) {
+      return {
+        credited: true,
+        alreadyCredited: true,
+        extraDeclines: existing.extraDeclines,
+        reason: "already_credited",
+      };
+    }
+
+    const user = await findDodoBillingUser(ctx, {
+      convexUserId: args.convexUserId,
+      clerkUserId: args.clerkUserId,
+      dodoCustomerId: args.dodoCustomerId,
+    });
+    if (!user) {
+      return {
+        credited: false,
+        alreadyCredited: false,
+        extraDeclines: 0,
+        reason: "user_not_found",
+      };
+    }
+
+    const quantity = Math.max(1, Math.floor(args.quantity));
+    const extraDeclines = packExtraDeclines(quantity);
+    if (extraDeclines <= 0) {
+      return {
+        credited: false,
+        alreadyCredited: false,
+        extraDeclines: 0,
+        reason: "invalid_quantity",
+      };
+    }
+
+    await ctx.db.insert("dodoPackPurchases", {
+      userId: user._id,
+      paymentId,
+      quantity,
+      extraDeclines,
+      creditedAt: args.paidAt,
+    });
+    await ctx.db.patch(user._id, {
+      declinePackExtra: nextDeclinePackExtra(user.declinePackExtra, quantity),
+    });
+    await writeAuditLog(ctx, {
+      actorUserId: null,
+      targetUserId: user._id,
+      action: "pack_credit:dodo",
+      reason: args.testMode
+        ? "Dodo pack payment (test_mode)"
+        : "Dodo pack payment",
+      metadata: {
+        paymentId,
+        quantity,
+        extraDeclines,
+        testMode: args.testMode,
+      },
+    });
+
+    return {
+      credited: true,
+      alreadyCredited: false,
+      extraDeclines,
       reason: "ok",
     };
   },

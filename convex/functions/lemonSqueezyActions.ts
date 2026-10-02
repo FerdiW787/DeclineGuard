@@ -6,6 +6,10 @@ import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { getPlatformBillingConfig } from "../lib/billingPlan";
 import {
+  isActiveSubscriptionStatus,
+  otherMorBlocksCheckout,
+} from "../lib/billingProvider";
+import {
   createDodoCheckoutSession,
   createDodoCustomerPortal,
   getDodoPaymentsConfig,
@@ -920,6 +924,19 @@ export const createProCheckout = action({
     if (viewer.hasActivePro) {
       throw new Error("You already have an active Pro subscription.");
     }
+    if (
+      otherMorBlocksCheckout({
+        target: viewer.billingProvider,
+        lsActive: isActiveSubscriptionStatus(viewer.lsSubscriptionStatus),
+        dodoActive: isActiveSubscriptionStatus(viewer.dodoSubscriptionStatus),
+      })
+    ) {
+      throw new Error(
+        viewer.billingProvider === "dodo"
+          ? "Cancel the active Lemon Squeezy Pro subscription before starting Dodo checkout."
+          : "Cancel the active Dodo Pro subscription before starting Lemon Squeezy checkout.",
+      );
+    }
 
     await ctx.runMutation(internal.functions.rateLimit.consume, {
       key: `ls:proCheckout:${identity.subject}`,
@@ -1055,10 +1072,7 @@ export const createBillingPortal = action({
       );
     }
 
-    if (viewer.billingProvider === "dodo") {
-      if (!viewer.dodoCustomerId) {
-        throw new Error("No Dodo Payments customer is on file for this account.");
-      }
+    if (viewer.billingProvider === "dodo" && viewer.dodoCustomerId) {
       const dodo = getDodoPaymentsConfig();
       if (!dodo) {
         throw new Error(
@@ -1076,40 +1090,44 @@ export const createBillingPortal = action({
       return { portalUrl };
     }
 
-    const config = getPlatformBillingConfig();
-    const apiKey = config?.apiKey ?? process.env.LEMONSQUEEZY_API_KEY?.trim();
-    if (!config || !apiKey || !viewer.lsSubscriptionId) {
-      throw new Error("No Lemon Squeezy subscription is on file for this account.");
-    }
+    const lsPortal = await lemonPortalUrl(viewer.lsSubscriptionId);
+    if (lsPortal) return { portalUrl: lsPortal };
 
-    const json = await lsFetch(
-      apiKey,
-      `/subscriptions/${viewer.lsSubscriptionId}`,
+    throw new Error(
+      viewer.billingProvider === "dodo"
+        ? "No Dodo customer yet — and no Lemon Squeezy portal is on file."
+        : "No Lemon Squeezy subscription is on file for this account.",
     );
-    const data = json.data;
-    const attrs =
-      data &&
-      typeof data === "object" &&
-      !Array.isArray(data) &&
-      "attributes" in data &&
-      data.attributes &&
-      typeof data.attributes === "object"
-        ? (data.attributes as Record<string, unknown>)
-        : null;
-    const urls =
-      attrs?.urls && typeof attrs.urls === "object"
-        ? (attrs.urls as Record<string, unknown>)
-        : null;
-    const raw =
-      typeof urls?.customer_portal === "string"
-        ? urls.customer_portal
-        : typeof urls?.update_payment_method === "string"
-          ? urls.update_payment_method
-          : null;
-    const portalUrl = allowHttpsUrl(raw);
-    if (!portalUrl) {
-      throw new Error("Lemon Squeezy returned an invalid portal URL");
-    }
-    return { portalUrl };
   },
 });
+
+async function lemonPortalUrl(
+  lsSubscriptionId: string | null,
+): Promise<string | null> {
+  const config = getPlatformBillingConfig();
+  const apiKey = config?.apiKey ?? process.env.LEMONSQUEEZY_API_KEY?.trim();
+  if (!config || !apiKey || !lsSubscriptionId) return null;
+
+  const json = await lsFetch(apiKey, `/subscriptions/${lsSubscriptionId}`);
+  const data = json.data;
+  const attrs =
+    data &&
+    typeof data === "object" &&
+    !Array.isArray(data) &&
+    "attributes" in data &&
+    data.attributes &&
+    typeof data.attributes === "object"
+      ? (data.attributes as Record<string, unknown>)
+      : null;
+  const urls =
+    attrs?.urls && typeof attrs.urls === "object"
+      ? (attrs.urls as Record<string, unknown>)
+      : null;
+  const raw =
+    typeof urls?.customer_portal === "string"
+      ? urls.customer_portal
+      : typeof urls?.update_payment_method === "string"
+        ? urls.update_payment_method
+        : null;
+  return allowHttpsUrl(raw);
+}

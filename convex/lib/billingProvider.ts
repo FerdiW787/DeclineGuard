@@ -89,6 +89,101 @@ export function isActiveSubscriptionStatus(
   return normalized === "active" || normalized === "paid";
 }
 
+export type PinBillingProviderResult =
+  | { ok: true }
+  | { ok: false; reason: "ls_subscription_active" | "dodo_subscription_active" };
+
+/** Staff cannot pin dodo while LS Pro is still the live entitlement. */
+export function canPinBillingProvider(args: {
+  next: BillingProviderId;
+  lsStatus?: string | null;
+  dodoStatus?: string | null;
+}): PinBillingProviderResult {
+  if (args.next === "dodo" && isActiveSubscriptionStatus(args.lsStatus)) {
+    return { ok: false, reason: "ls_subscription_active" };
+  }
+  if (args.next === "lemon" && isActiveSubscriptionStatus(args.dodoStatus)) {
+    return { ok: false, reason: "dodo_subscription_active" };
+  }
+  return { ok: true };
+}
+
+/**
+ * LS platform events: promotions no-op on a dodo pin (no dual charge).
+ * Demotions always apply so stale lsSubscriptionStatus cannot keep Pro.
+ */
+export function lsPlatformEventAction(args: {
+  provider: BillingProviderId;
+  nextPlan: "free" | "pro" | null;
+}): "apply" | "skip_promote" | "ignore" {
+  if (!args.nextPlan) return "ignore";
+  if (args.nextPlan === "pro" && args.provider === "dodo") {
+    return "skip_promote";
+  }
+  return "apply";
+}
+
+export function dodoPlatformEventAction(args: {
+  provider: BillingProviderId;
+  nextPlan: "free" | "pro" | null;
+}): "apply" | "skip_promote" | "ignore" {
+  if (!args.nextPlan) return "ignore";
+  if (args.nextPlan === "pro" && args.provider === "lemon") {
+    return "skip_promote";
+  }
+  return "apply";
+}
+
+/** After an LS demotion, keep Pro only if Dodo is still active. */
+export function planAfterForeignDemotion(args: {
+  nextPlan: "free" | "pro";
+  otherMorActive: boolean;
+}): "free" | "pro" {
+  if (args.nextPlan === "free" && args.otherMorActive) return "pro";
+  return args.nextPlan;
+}
+
+/** Block opening a MoR checkout while the other MoR is still entitled. */
+export function otherMorBlocksCheckout(args: {
+  target: BillingProviderId;
+  lsActive: boolean;
+  dodoActive: boolean;
+}): boolean {
+  if (args.target === "dodo" && args.lsActive) return true;
+  if (args.target === "lemon" && args.dodoActive) return true;
+  return false;
+}
+
+export function hasDualActiveSubscriptions(args: {
+  lsActive: boolean;
+  dodoActive: boolean;
+}): boolean {
+  return args.lsActive && args.dodoActive;
+}
+
+/** Usage ingest is not a paid confirmation — never settle/block a fee period on it. */
+export function usageIngestSettlesFeePeriod(): boolean {
+  return false;
+}
+
+export const DECLINE_PACK_EXTRA_DECLINES = 10;
+
+export function packExtraDeclines(quantity: number): number {
+  if (!Number.isFinite(quantity) || quantity <= 0) return 0;
+  return Math.floor(quantity) * DECLINE_PACK_EXTRA_DECLINES;
+}
+
+export function nextDeclinePackExtra(
+  current: number | undefined,
+  quantity: number,
+): number {
+  const base =
+    typeof current === "number" && Number.isFinite(current) && current > 0
+      ? Math.floor(current)
+      : 0;
+  return base + packExtraDeclines(quantity);
+}
+
 export function shouldSkipLemonPlatformCharge(
   provider: BillingProviderId,
 ): boolean {

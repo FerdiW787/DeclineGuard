@@ -79,6 +79,8 @@ export default defineSchema({
     dodoSubscriptionStatus: v.optional(v.string()),
     dodoCheckoutNonce: v.optional(v.string()),
     dodoCheckoutNonceExpiresAt: v.optional(v.number()),
+    /** Extra monthly declines from paid $0.99 +10 packs (sum of credited units). */
+    declinePackExtra: v.optional(v.number()),
   })
     .index("by_userId", ["userId"])
     .index("by_lsSubscriptionId", ["lsSubscriptionId"])
@@ -165,6 +167,17 @@ export default defineSchema({
     eventName: v.string(),
     receivedAt: v.number(),
   }).index("by_eventKey", ["eventKey"]),
+
+  /** Paid Dodo +10 decline packs. paymentId is the idempotency key. */
+  dodoPackPurchases: defineTable({
+    userId: v.id("users"),
+    paymentId: v.string(),
+    quantity: v.number(),
+    extraDeclines: v.number(),
+    creditedAt: v.number(),
+  })
+    .index("by_paymentId", ["paymentId"])
+    .index("by_user", ["userId"]),
 
   /** Open / recovered failed subscription renewals */
   failedPayments: defineTable({

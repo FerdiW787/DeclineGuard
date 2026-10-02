@@ -19,7 +19,10 @@ import {
 } from "../lib/admin";
 import { accountStatusOf, isSoftDeleted, resolvePlan } from "../lib/accountGuard";
 import { billingProviderValidator, planValidator } from "../schema";
-import { parseBillingProvider } from "../lib/billingProvider";
+import {
+  canPinBillingProvider,
+  parseBillingProvider,
+} from "../lib/billingProvider";
 
 const accountStatusValidator = v.union(
   v.literal("active"),
@@ -1055,6 +1058,28 @@ export const adminSetBillingProvider = mutation({
     if (!next) throw new Error("Invalid billing provider");
     const prior = user.billingProvider ?? null;
     if (prior === next) return null;
+
+    const pin = canPinBillingProvider({
+      next,
+      lsStatus: user.lsSubscriptionStatus,
+      dodoStatus: user.dodoSubscriptionStatus,
+    });
+    if (!pin.ok) {
+      switch (pin.reason) {
+        case "ls_subscription_active":
+          throw new Error(
+            "Cannot pin Dodo while Lemon Squeezy Pro is still active. Cancel or expire the LS subscription first.",
+          );
+        case "dodo_subscription_active":
+          throw new Error(
+            "Cannot pin Lemon Squeezy while Dodo Pro is still active. Cancel the Dodo subscription first.",
+          );
+        default: {
+          const _never: never = pin.reason;
+          throw new Error(_never);
+        }
+      }
+    }
 
     await ctx.db.patch(args.userId, { billingProvider: next });
     await writeAuditLog(ctx, {

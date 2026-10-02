@@ -151,6 +151,7 @@ export const createPackCheckoutInternal = internalAction({
         convex_user_id: viewer._id,
         clerk_user_id: viewer.clerkUserId,
         billing_kind: "pack",
+        quantity: String(quantity),
       },
     });
     const checkoutUrl = allowHttpsUrl(session.checkoutUrl);
@@ -191,6 +192,11 @@ export const createPackCheckout = action({
         "Decline packs on Lemon Squeezy are not wired. Switch this merchant to Dodo or use staff billing.",
       );
     }
+    await ctx.runMutation(internal.functions.rateLimit.consume, {
+      key: `dodo:packCheckout:${identity.subject}`,
+      limit: 5,
+      windowMs: 60_000,
+    });
     const config = getDodoPaymentsConfig();
     if (!config?.packProductId) {
       throw new Error(
@@ -212,6 +218,7 @@ export const createPackCheckout = action({
         convex_user_id: viewer._id,
         clerk_user_id: viewer.clerkUserId,
         billing_kind: "pack",
+        quantity: String(quantity),
       },
     });
     const checkoutUrl = allowHttpsUrl(session.checkoutUrl);

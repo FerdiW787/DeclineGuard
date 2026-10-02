@@ -161,6 +161,35 @@ async function handlePaymentEvent(
 
   const metadata = extractDodoMetadata(data.metadata);
   const refs = extractDodoUserRefs(metadata);
+  if (refs.billingKind === "pack") {
+    const paymentId = stringifyDodoId(data.payment_id);
+    if (!paymentId) {
+      throw new Error("Dodo pack payment.succeeded missing payment_id");
+    }
+    const credited = await ctx.runMutation(
+      internal.functions.dodoBilling.creditDodoPackPurchase,
+      {
+        paymentId,
+        quantity: packQuantityFromPayload(data, metadata),
+        convexUserId: refs.convexUserId ?? undefined,
+        clerkUserId: refs.clerkUserId ?? undefined,
+        dodoCustomerId: extractCustomerId(data) ?? undefined,
+        paidAt: parseIsoMs(
+          typeof data.created_at === "string"
+            ? data.created_at
+            : typeof data.updated_at === "string"
+              ? data.updated_at
+              : null,
+        ),
+        testMode: isDodoTestPayload(data),
+      },
+    );
+    if (!credited.credited && credited.reason === "user_not_found") {
+      throw new Error(`No user for Dodo pack payment ${paymentId}`);
+    }
+    return;
+  }
+
   const claimKey = refs.claimKey;
   if (!claimKey || !isFeeInvoiceClaimKey(claimKey)) {
     return;
@@ -205,6 +234,23 @@ async function handlePaymentEvent(
           : null,
     ),
   });
+}
+
+function packQuantityFromPayload(
+  data: Record<string, unknown>,
+  metadata: Record<string, string>,
+): number {
+  const fromMeta = Number(metadata.quantity ?? metadata.pack_quantity ?? "");
+  if (Number.isFinite(fromMeta) && fromMeta >= 1) {
+    return Math.floor(fromMeta);
+  }
+  const items = data.product_cart;
+  if (Array.isArray(items) && items[0] && typeof items[0] === "object") {
+    const rec = items[0] as Record<string, unknown>;
+    const q = typeof rec.quantity === "number" ? rec.quantity : Number(rec.quantity);
+    if (Number.isFinite(q) && q >= 1) return Math.floor(q);
+  }
+  return 1;
 }
 
 function extractCustomerId(data: Record<string, unknown>): string | null {

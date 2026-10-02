@@ -21,7 +21,11 @@ import {
   PRO_CHECKOUT_NONCE_TTL_MS,
   shouldIgnoreLsTestEvent,
 } from "../lib/billingPlan";
-import { shouldSkipLemonPlatformCharge } from "../lib/billingProvider";
+import {
+  isActiveSubscriptionStatus,
+  lsPlatformEventAction,
+  planAfterForeignDemotion,
+} from "../lib/billingProvider";
 import {
   billingProviderForUser,
   userHasActivePro,
@@ -102,9 +106,7 @@ export const getMyBilling = query({
       dodoSubscriptionStatus: user.dodoSubscriptionStatus ?? null,
       hasActivePro,
       portalAvailable:
-        billingProvider === "dodo"
-          ? Boolean(user.dodoCustomerId)
-          : Boolean(user.lsSubscriptionId),
+        Boolean(user.dodoCustomerId) || Boolean(user.lsSubscriptionId),
     };
   },
 });
@@ -192,11 +194,15 @@ export const applyPlatformSubscription = internalMutation({
     }
 
     const previewUser = await findPlatformBillingUser(ctx, args);
-    if (
-      previewUser &&
-      shouldSkipLemonPlatformCharge(billingProviderForUser(previewUser))
-    ) {
-      return { applied: false, reason: "provider_dodo" };
+    const nextPlanPreview = planFromLsStatus(args.status);
+    if (previewUser) {
+      const eventAction = lsPlatformEventAction({
+        provider: billingProviderForUser(previewUser),
+        nextPlan: nextPlanPreview,
+      });
+      if (eventAction === "skip_promote") {
+        return { applied: false, reason: "provider_dodo" };
+      }
     }
 
     if (shouldIgnoreLsTestEvent(args.testMode)) {
@@ -269,19 +275,29 @@ export const applyPlatformSubscription = internalMutation({
     }
 
     const priorPlan: Plan = resolvePlan(user);
+    const appliedPlan = planAfterForeignDemotion({
+      nextPlan,
+      otherMorActive: isActiveSubscriptionStatus(user.dodoSubscriptionStatus),
+    });
     await ctx.db.patch(user._id, {
-      plan: nextPlan,
+      plan: appliedPlan,
       lsSubscriptionId: args.lsSubscriptionId,
       lsSubscriptionStatus: args.status,
       lsCheckoutNonce: "",
       lsCheckoutNonceExpiresAt: 0,
+      ...(nextPlan === "pro"
+        ? {
+            dodoSubscriptionId: "",
+            dodoSubscriptionStatus: "",
+          }
+        : {}),
     });
 
-    if (priorPlan !== nextPlan) {
+    if (priorPlan !== appliedPlan) {
       await writeAuditLog(ctx, {
         actorUserId: null,
         targetUserId: user._id,
-        action: `plan_webhook:${nextPlan}`,
+        action: `plan_webhook:${appliedPlan}`,
         reason: "Lemon Squeezy platform subscription webhook",
         metadata: {
           priorPlan,
@@ -296,8 +312,8 @@ export const applyPlatformSubscription = internalMutation({
     }
 
     return {
-      applied: priorPlan !== nextPlan || !knownSub,
-      plan: nextPlan,
+      applied: priorPlan !== appliedPlan || !knownSub,
+      plan: appliedPlan,
       reason: "ok",
     };
   },

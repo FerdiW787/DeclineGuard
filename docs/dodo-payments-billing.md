@@ -11,7 +11,7 @@ Merchant store recovery emails stay on Lemon Squeezy. No PayPal. No price change
 | `users.billingProvider` | unset | Wins over env. Staff: `adminSetBillingProvider` |
 | Active LS Pro + unset user flag | — | Stays **lemon** even if env is `dodo` (grandfather) |
 
-When the resolved provider is `dodo`, Lemon `createProCheckout` / fee checkout / platform-store plan webhooks **no-op** for that merchant. Merchant-store LS recovery webhooks still run.
+When the resolved provider is `dodo`, Lemon **checkout and fee invoice** paths no-op (no dual charge). LS **cancel/expire demotions still apply** so a stale `lsSubscriptionStatus=active` cannot keep Pro. Staff cannot pin `dodo` while LS Pro is still active/paid. Portal falls back to LS until `dodoCustomerId` exists. Merchant-store LS recovery webhooks still run.
 
 ## Jules FE contract (names unchanged)
 
@@ -74,8 +74,8 @@ Until these exist in the live/test Dodo business, checkout/fees throw “not con
 
 1. **Pro $29.99/mo** subscription product → `DODO_PAYMENTS_PRO_PRODUCT_ID`
 2. **Recovery-fee** one-time product (amount override in cents) → `DODO_PAYMENTS_FEE_PRODUCT_ID`
-3. **Usage meter** on the Pro product (event name + sum of `fee_cents`) if we want one monthly invoice = Pro + 4%. Without it, fees use a separate one-time checkout.
-4. **Pack** product if `$0.99 +10` should charge on Dodo → `DODO_PAYMENTS_PACK_PRODUCT_ID`
+3. **Usage meter is not a settlement path.** Fees use `DODO_PAYMENTS_FEE_PRODUCT_ID` one-time checkout; `payment.succeeded` + `claim_key` marks paid.
+4. **Pack** product if `$0.99 +10` should charge on Dodo → `DODO_PAYMENTS_PACK_PRODUCT_ID`. `payment.succeeded` with `billing_kind=pack` credits `users.declinePackExtra`.
 5. Webhook signing secret → `DODO_PAYMENTS_WEBHOOK_KEY`
 
 ## Migration / grandfather
@@ -83,9 +83,9 @@ Until these exist in the live/test Dodo business, checkout/fees throw “not con
 Dodo has no subscription import. Approach: **soft per-user flag + migrate-on-next-renewal / admin-assisted**.
 
 1. Ship with `BILLING_PROVIDER=lemon`. Existing LS Pro keeps working.
-2. Smoke Dodo on staff accounts via `adminSetBillingProvider({ billingProvider: "dodo" })` then `createProCheckout`.
-3. Global cutover: `BILLING_PROVIDER=dodo`. Active LS Pro still resolves to lemon until they cancel or staff pins `dodo`.
-4. After LS period ends, merchant checks out on Dodo (new customer + subscription). Staff may pin `dodo` once the Dodo webhook has written `dodoSubscriptionId`.
+2. Smoke Dodo on staff accounts that do **not** have an active LS Pro (`adminSetBillingProvider` refuses `dodo` while LS is active/paid).
+3. Global cutover: `BILLING_PROVIDER=dodo`. Active LS Pro still resolves to lemon until they cancel. Activating Dodo clears LS entitlement; checkout is blocked while the other MoR is still active.
+4. After LS period ends, merchant checks out on Dodo. Staff may pin `dodo` only after LS is no longer active/paid.
 
 ## Tear-down (after smoke; do not delete LS merchant recovery)
 

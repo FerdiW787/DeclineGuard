@@ -3,14 +3,23 @@
  * Run: npx tsx scripts/assert-dodo-billing.ts
  */
 import {
+  canPinBillingProvider,
+  dodoPlatformEventAction,
   dodoPlatformPathBlocked,
+  hasDualActiveSubscriptions,
   isActiveSubscriptionStatus,
   lemonPlatformPathBlocked,
+  lsPlatformEventAction,
+  nextDeclinePackExtra,
+  otherMorBlocksCheckout,
+  packExtraDeclines,
   parseBillingProvider,
   parseBillingProviderEnv,
+  planAfterForeignDemotion,
   resolveBillingProvider,
   shouldSkipDodoPlatformCharge,
   shouldSkipLemonPlatformCharge,
+  usageIngestSettlesFeePeriod,
 } from "../convex/lib/billingProvider";
 import { existingClaimBlocksNewCharge } from "../convex/lib/feeBilling";
 import {
@@ -116,6 +125,96 @@ assert(planFromDodoStatus("updated") === null, "unknown dodo status ignored");
 assert(
   statusFromDodoEvent("subscription.active", "") === "active",
   "event name fills empty status",
+);
+
+const pinWhileLsActive = canPinBillingProvider({
+  next: "dodo",
+  lsStatus: "active",
+});
+assert(
+  pinWhileLsActive.ok === false &&
+    pinWhileLsActive.reason === "ls_subscription_active",
+  "refuse pin to dodo while LS Pro is active",
+);
+assert(
+  canPinBillingProvider({ next: "dodo", lsStatus: "cancelled" }).ok === true,
+  "pin to dodo ok after LS cancel",
+);
+assert(
+  canPinBillingProvider({ next: "lemon", dodoStatus: "active" }).ok === false,
+  "refuse pin to lemon while Dodo Pro is active",
+);
+
+assert(
+  lsPlatformEventAction({ provider: "dodo", nextPlan: "pro" }) ===
+    "skip_promote",
+  "LS promote no-ops when provider is dodo",
+);
+assert(
+  lsPlatformEventAction({ provider: "dodo", nextPlan: "free" }) === "apply",
+  "LS demotion still applies when provider is dodo",
+);
+assert(
+  planAfterForeignDemotion({ nextPlan: "free", otherMorActive: false }) ===
+    "free",
+  "LS demotion clears Pro when Dodo is not active",
+);
+assert(
+  planAfterForeignDemotion({ nextPlan: "free", otherMorActive: true }) ===
+    "pro",
+  "LS demotion keeps Pro only if Dodo is still active",
+);
+assert(
+  dodoPlatformEventAction({ provider: "lemon", nextPlan: "pro" }) ===
+    "skip_promote",
+  "Dodo promote no-ops when provider is lemon",
+);
+
+assert(
+  usageIngestSettlesFeePeriod() === false,
+  "fee path never settles on usage ingest",
+);
+
+assert(packExtraDeclines(1) === 10, "one pack credits +10 declines");
+assert(packExtraDeclines(2) === 20, "two packs credit +20 declines");
+assert(
+  nextDeclinePackExtra(10, 1) === 20,
+  "pack payment stacks extra declines",
+);
+const packRefs = extractDodoUserRefs({
+  convex_user_id: "user123",
+  billing_kind: "pack",
+  quantity: "2",
+});
+assert(packRefs.billingKind === "pack", "pack payment carries billing_kind");
+
+assert(
+  otherMorBlocksCheckout({
+    target: "dodo",
+    lsActive: true,
+    dodoActive: false,
+  }) === true,
+  "block Dodo checkout while LS is still active",
+);
+assert(
+  otherMorBlocksCheckout({
+    target: "lemon",
+    lsActive: false,
+    dodoActive: true,
+  }) === true,
+  "block Lemon checkout while Dodo is still active",
+);
+assert(
+  hasDualActiveSubscriptions({ lsActive: true, dodoActive: true }) === true,
+  "dual-sub is detected so activate must clear the other MoR",
+);
+assert(
+  !otherMorBlocksCheckout({
+    target: "dodo",
+    lsActive: false,
+    dodoActive: false,
+  }),
+  "checkout allowed when the other MoR is not active",
 );
 
 assert(!isDodoTestBillingAllowed(undefined), "unset must not allow test billing");
