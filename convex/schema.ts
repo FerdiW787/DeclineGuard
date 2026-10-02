@@ -227,7 +227,9 @@ export default defineSchema({
       "status",
     ])
     .index("by_invoice", ["subscriptionInvoiceId"])
-    .index("by_deletedAt", ["deletedAt"]),
+    .index("by_deletedAt", ["deletedAt"])
+    .index("by_status_recoveredAt", ["status", "recoveredAt"])
+    .index("by_assignedKitId_recoveredAt", ["assignedKitId", "recoveredAt"]),
 
   /** One row per Resend send (for deliverability webhooks) */
   emailSends: defineTable({
@@ -252,7 +254,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_resendMessageId", ["resendMessageId"])
-    .index("by_failure", ["failureId"]),
+    .index("by_failure", ["failureId"])
+    .index("by_sentAt", ["sentAt"]),
 
   /**
    * Recovery fee ledger (Free 10% / Pro 4%). Fees stay `owed` until the
