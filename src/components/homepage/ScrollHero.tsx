@@ -3,6 +3,7 @@ import { SignedIn, SignedOut } from "@clerk/astro/react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { Button } from "@/components/ui/button";
 import WelcomeIntro from "./WelcomeIntro";
 import {
   AskCard,
@@ -413,20 +414,17 @@ export default function ScrollHero({ welcome = false }: { welcome?: boolean }) {
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <SignedOut>
-              <a
-                href="/a/sign-in"
-                className="hidden rounded-full px-3 py-1.5 text-sm font-medium text-foreground/70 hover:bg-black/5 hover:text-foreground sm:inline"
-              >
-                Sign in
-              </a>
-              <a href="/a/sign-up" className="dg-btn dg-btn-nav">
-                Claim spot
-              </a>
+              <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+                <a href="/a/sign-in">Sign in</a>
+              </Button>
+              <Button asChild size="sm">
+                <a href="/a/sign-up">Claim spot</a>
+              </Button>
             </SignedOut>
             <SignedIn>
-              <a href="/a/dashboard" className="dg-btn dg-btn-nav">
-                Dashboard
-              </a>
+              <Button asChild size="sm">
+                <a href="/a/dashboard">Dashboard</a>
+              </Button>
             </SignedIn>
           </div>
         </div>
@@ -473,18 +471,18 @@ export default function ScrollHero({ welcome = false }: { welcome?: boolean }) {
             </p>
             <div className="pointer-events-auto mt-8 flex flex-wrap items-center justify-center gap-3">
               <SignedOut>
-                <a href="/a/sign-up" className="dg-btn dg-btn-primary">
-                  Grab a founding spot →
-                </a>
+                <Button asChild size="lg">
+                  <a href="/a/sign-up">Grab a founding spot →</a>
+                </Button>
               </SignedOut>
               <SignedIn>
-                <a href="/a/dashboard" className="dg-btn dg-btn-primary">
-                  Open dashboard →
-                </a>
+                <Button asChild size="lg">
+                  <a href="/a/dashboard">Open dashboard →</a>
+                </Button>
               </SignedIn>
-              <a href="#pricing" className="dg-btn dg-btn-secondary">
-                Peek at pricing
-              </a>
+              <Button asChild variant="outline" size="lg">
+                <a href="#pricing">Peek at pricing</a>
+              </Button>
             </div>
           </div>
         </div>

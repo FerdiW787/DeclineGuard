@@ -5,6 +5,7 @@ import {
   marketingProductTabs,
   type MarketingProductTab,
 } from "@/components/homepage/marketing/MarketingProductPreview";
+import { Button } from "@/components/ui/button";
 import { LinearCta } from "../LinearCta";
 
 type Props = {
@@ -63,18 +64,15 @@ export function LinearHero({ tab, onTabChange }: Props) {
         >
           <div className="mb-4 flex flex-wrap items-center justify-center gap-1.5">
             {marketingProductTabs.map((t) => (
-              <button
+              <Button
                 key={t.id}
                 type="button"
+                size="sm"
+                variant={tab === t.id ? "default" : "ghost"}
                 onClick={() => onTabChange(t.id)}
-                className={`cursor-pointer rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
-                  tab === t.id
-                    ? "bg-white text-black"
-                    : "text-[#8a8a8e] hover:bg-white/5 hover:text-white"
-                }`}
               >
                 {t.label}
-              </button>
+              </Button>
             ))}
           </div>
           <div className="overflow-hidden rounded-xl border border-white/10 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_40px_80px_-40px_rgba(0,0,0,0.8)]">

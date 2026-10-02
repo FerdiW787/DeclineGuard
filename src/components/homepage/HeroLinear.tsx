@@ -1,5 +1,6 @@
 import { SignedIn, SignedOut } from "@clerk/astro/react";
 import { ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { HomeNav } from "./HomeNav";
 import { YellowStory } from "./YellowStory";
 
@@ -38,19 +39,23 @@ export function HeroLinear() {
 
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <SignedOut>
-                  <a href="/a/sign-up" className="ln-btn ln-btn-primary">
-                    Start recovering free
-                    <ArrowRight className="size-4" />
-                  </a>
-                  <a href="/pricing" className="ln-btn ln-btn-ghost">
-                    See pricing
-                  </a>
+                  <Button asChild size="lg">
+                    <a href="/a/sign-up">
+                      Start recovering free
+                      <ArrowRight className="size-4" />
+                    </a>
+                  </Button>
+                  <Button asChild variant="outline" size="lg">
+                    <a href="/pricing">See pricing</a>
+                  </Button>
                 </SignedOut>
                 <SignedIn>
-                  <a href="/a/dashboard" className="ln-btn ln-btn-primary">
-                    Open dashboard
-                    <ArrowRight className="size-4" />
-                  </a>
+                  <Button asChild size="lg">
+                    <a href="/a/dashboard">
+                      Open dashboard
+                      <ArrowRight className="size-4" />
+                    </a>
+                  </Button>
                 </SignedIn>
               </div>
             </div>

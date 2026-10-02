@@ -18,6 +18,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import StaffDashboardSim from "@/components/support/StaffDashboardSim";
+import { Button } from "@/components/ui/button";
 
 const GIVE_ACCESS_TOKEN = "[Give Access]";
 const TAKEOVER_CONSENT_TOKEN = "[Allow Admin Takeover]";
@@ -363,21 +364,18 @@ export default function StaffInbox({
           {filters
             .filter((f) => !f.adminOnly || isAdmin)
             .map((f) => (
-              <button
+              <Button
                 key={f.id}
                 type="button"
                 role="tab"
+                size="sm"
+                variant={filter === f.id ? "default" : "ghost"}
                 aria-selected={filter === f.id}
                 title={f.hint}
                 onClick={() => {
                   setFilter(f.id);
                   setActiveId(null);
                 }}
-                className={`rounded-lg px-2.5 py-1.5 text-[12px] font-semibold transition ${
-                  filter === f.id
-                    ? "bg-[#111] text-white"
-                    : "text-black/50 hover:bg-black/[0.04]"
-                }`}
               >
                 {f.label}
                 {f.id === "unclaimed" &&
@@ -390,7 +388,7 @@ export default function StaffInbox({
                 escalatedCount > 0
                   ? ` · ${escalatedCount}`
                   : ""}
-              </button>
+              </Button>
             ))}
         </div>
       </div>
@@ -554,7 +552,7 @@ export default function StaffInbox({
 
                   <div className="flex flex-wrap items-center gap-1.5">
                     {needsClaim ? (
-                      <button
+                      <Button
                         type="button"
                         disabled={busy != null}
                         onClick={() =>
@@ -563,7 +561,6 @@ export default function StaffInbox({
                             setFilter("mine");
                           })
                         }
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-[#111] px-3.5 py-2 text-[13px] font-semibold text-white"
                       >
                         <UserPlus className="size-3.5" />
                         {busy === "claim"
@@ -571,31 +568,32 @@ export default function StaffInbox({
                           : isEscalated
                             ? "Claim as Admin"
                             : "Claim & help"}
-                      </button>
+                      </Button>
                     ) : null}
 
                     {isMine &&
                     active.status !== "resolved" &&
                     active.status !== "closed" ? (
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
                         disabled={busy != null}
                         onClick={() =>
                           void run("resolve", () =>
                             resolveThread({ threadId: active._id }),
                           )
                         }
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-[13px] font-semibold text-emerald-900"
                       >
                         <CheckCircle2 className="size-3.5" />
                         {busy === "resolve" ? "…" : "Mark done"}
-                      </button>
+                      </Button>
                     ) : null}
 
                     {isMine && active.status !== "closed" ? (
-                      <button
+                      <Button
                         type="button"
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-[12px] font-semibold text-violet-900"
+                        variant="outline"
+                        size="sm"
                         onClick={() => {
                           setShowEscalate(true);
                           setShowMore(false);
@@ -605,28 +603,26 @@ export default function StaffInbox({
                       >
                         <ArrowUpRight className="size-3.5" />
                         Ask an Admin
-                      </button>
+                      </Button>
                     ) : null}
 
                     {onOpenMerchant ? (
-                      <button
+                      <Button
                         type="button"
-                        className="inline-flex items-center gap-1 rounded-xl border border-black/10 px-3 py-2 text-[12px] font-semibold text-black/65"
+                        variant="outline"
+                        size="sm"
                         onClick={() => onOpenMerchant(active.userId)}
                       >
                         <ExternalLink className="size-3.5" />
                         Account tools
-                      </button>
+                      </Button>
                     ) : null}
 
                     {(isMine || isAdmin) && active.status !== "closed" ? (
-                      <button
+                      <Button
                         type="button"
-                        className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-2 text-[12px] font-semibold ${
-                          showMore
-                            ? "border-black/20 bg-black/[0.04] text-black"
-                            : "border-black/10 text-black/55"
-                        }`}
+                        variant={showMore ? "secondary" : "outline"}
+                        size="sm"
                         onClick={() => {
                           setShowMore((v) => !v);
                           setShowClose(false);
@@ -637,7 +633,7 @@ export default function StaffInbox({
                       >
                         <MoreHorizontal className="size-3.5" />
                         More
-                      </button>
+                      </Button>
                     ) : null}
                   </div>
                 </div>
@@ -648,9 +644,9 @@ export default function StaffInbox({
                       {active.assigneeName ?? "Someone"} is helping. You can
                       take over if they’re stuck.
                     </p>
-                    <button
+                    <Button
                       type="button"
-                      className="rounded-lg bg-violet-800 px-3 py-1.5 text-[12px] font-semibold text-white"
+                      size="sm"
                       onClick={() => {
                         setShowForce(true);
                         setShowMore(false);
@@ -658,31 +654,33 @@ export default function StaffInbox({
                       }}
                     >
                       Take over
-                    </button>
+                    </Button>
                   </div>
                 ) : null}
 
                 {showMore ? (
                   <div className="flex flex-wrap gap-2 rounded-xl border border-black/8 bg-black/[0.02] px-3 py-2.5">
                     {isMine || isAdmin ? (
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         disabled={busy != null || active.assigneeId == null}
                         onClick={() =>
                           void run("release", () =>
                             releaseThread({ threadId: active._id }),
                           )
                         }
-                        className="inline-flex items-center gap-1 rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-black/70 disabled:opacity-40"
                       >
                         <Unlock className="size-3.5" />
                         Release to queue
-                      </button>
+                      </Button>
                     ) : null}
                     {active.status !== "closed" ? (
-                      <button
+                      <Button
                         type="button"
-                        className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-rose-800"
+                        variant="destructive"
+                        size="sm"
                         onClick={() => {
                           setShowClose(true);
                           setShowForce(false);
@@ -690,7 +688,7 @@ export default function StaffInbox({
                       >
                         <Ban className="size-3.5" />
                         Close as spam
-                      </button>
+                      </Button>
                     ) : null}
                     <p className="w-full text-[11px] text-black/40">
                       Release = back to Waiting. Close = merchant cannot reopen
@@ -712,8 +710,9 @@ export default function StaffInbox({
                       className="w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm"
                     />
                     <div className="flex gap-2">
-                      <button
+                      <Button
                         type="button"
+                        size="sm"
                         disabled={
                           busy != null || escalateReason.trim().length < 8
                         }
@@ -729,17 +728,17 @@ export default function StaffInbox({
                             setFilter(isAdmin ? "escalated" : "unclaimed");
                           })
                         }
-                        className="rounded-lg bg-violet-800 px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-45"
                       >
                         Send to Admins
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className="rounded-lg px-3 py-1.5 text-[12px] font-semibold text-black/50"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setShowEscalate(false)}
                       >
                         Cancel
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : null}
@@ -757,8 +756,9 @@ export default function StaffInbox({
                       className="w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm"
                     />
                     <div className="flex gap-2">
-                      <button
+                      <Button
                         type="button"
+                        size="sm"
                         disabled={busy != null || forceReason.trim().length < 8}
                         onClick={() =>
                           void run("force", async () => {
@@ -771,17 +771,17 @@ export default function StaffInbox({
                             setFilter("mine");
                           })
                         }
-                        className="rounded-lg bg-violet-800 px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-45"
                       >
                         Confirm take over
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className="rounded-lg px-3 py-1.5 text-[12px] font-semibold text-black/50"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setShowForce(false)}
                       >
                         Cancel
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : null}
@@ -800,8 +800,10 @@ export default function StaffInbox({
                       className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm"
                     />
                     <div className="flex gap-2">
-                      <button
+                      <Button
                         type="button"
+                        variant="destructive"
+                        size="sm"
                         disabled={busy != null || closeReason.trim().length < 8}
                         onClick={() =>
                           void run("close", async () => {
@@ -814,17 +816,17 @@ export default function StaffInbox({
                             setShowMore(false);
                           })
                         }
-                        className="rounded-lg bg-rose-700 px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-45"
                       >
                         Confirm close
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className="rounded-lg px-3 py-1.5 text-[12px] font-semibold text-black/50"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setShowClose(false)}
                       >
                         Cancel
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : null}
@@ -851,9 +853,9 @@ export default function StaffInbox({
                       · you’ll work on their dashboard as Admin (locks them out up to 60m)
                     </p>
                   </div>
-                  <button
+                  <Button
                     type="button"
-                    className="inline-flex items-center gap-1 rounded-lg bg-violet-900 px-2.5 py-1.5 text-[11px] font-semibold text-white"
+                    size="sm"
                     onClick={() => {
                       setTakeoverReason("");
                       setShowTakeoverStart(true);
@@ -861,7 +863,7 @@ export default function StaffInbox({
                   >
                     <ShieldAlert className="size-3" />
                     Take over account
-                  </button>
+                  </Button>
                 </div>
               ) : null}
 
@@ -888,10 +890,11 @@ export default function StaffInbox({
                   <div className="flex flex-wrap gap-1.5">
                     {!takeover.extended &&
                     takeover.adminUserId === viewerUserId ? (
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="xs"
                         disabled={busy != null}
-                        className="rounded-lg border border-rose-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-950 disabled:opacity-45"
                         onClick={() =>
                           void run("extend", () =>
                             extendTakeover({
@@ -902,12 +905,13 @@ export default function StaffInbox({
                         }
                       >
                         +30 min
-                      </button>
+                      </Button>
                     ) : null}
-                    <button
+                    <Button
                       type="button"
+                      variant="destructive"
+                      size="xs"
                       disabled={busy != null}
-                      className="rounded-lg bg-rose-900 px-2.5 py-1.5 text-[11px] font-semibold text-white disabled:opacity-45"
                       onClick={() =>
                         void run("endTakeover", () =>
                           endTakeover({
@@ -918,7 +922,7 @@ export default function StaffInbox({
                       }
                     >
                       End takeover
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : null}
@@ -943,30 +947,32 @@ export default function StaffInbox({
                   <div className="flex flex-wrap gap-1.5">
                     {(activeGrant.granteeUserId === viewerUserId ||
                       isAdmin) && (
-                      <button
+                      <Button
                         type="button"
-                        className="inline-flex items-center gap-1 rounded-lg bg-[#111] px-2.5 py-1.5 text-[11px] font-semibold text-white"
+                        size="xs"
                         onClick={() => setShowDashSim(true)}
                       >
                         <LayoutDashboard className="size-3" />
                         Look at Dashboard
-                      </button>
+                      </Button>
                     )}
                     {onOpenMerchant ? (
-                      <button
+                      <Button
                         type="button"
-                        className="rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-emerald-950"
+                        variant="outline"
+                        size="xs"
                         onClick={() => onOpenMerchant(active.userId)}
                       >
                         Account tools
-                      </button>
+                      </Button>
                     ) : null}
                     {(activeGrant.granteeUserId === viewerUserId ||
                       isAdmin) && (
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="xs"
                         disabled={busy != null}
-                        className="rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-emerald-950 disabled:opacity-45"
                         onClick={() =>
                           void run("revoke", () =>
                             revokeGrant({ grantId: activeGrant._id }),
@@ -974,7 +980,7 @@ export default function StaffInbox({
                         }
                       >
                         Revoke
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -1000,19 +1006,20 @@ export default function StaffInbox({
                     className="mt-2 w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-black/25"
                   />
                   <div className="mt-2 flex flex-wrap justify-end gap-2">
-                    <button
+                    <Button
                       type="button"
-                      className="rounded-lg border border-black/10 px-3 py-1.5 text-[12px] font-semibold text-black/60"
+                      variant="outline"
+                      size="sm"
                       onClick={() => setShowTakeoverStart(false)}
                     >
                       Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      size="sm"
                       disabled={
                         busy != null || takeoverReason.trim().length < 8
                       }
-                      className="rounded-lg bg-violet-900 px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-45"
                       onClick={() =>
                         void run("startTakeover", async () => {
                           await startTakeover({
@@ -1029,7 +1036,7 @@ export default function StaffInbox({
                       {busy === "startTakeover"
                         ? "Starting…"
                         : "Open their dashboard"}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : null}
@@ -1107,8 +1114,9 @@ export default function StaffInbox({
                         : "Claim as Admin to take over."
                       : "That puts you on the hook and keeps two people from typing at once."}
                   </p>
-                  <button
+                  <Button
                     type="button"
+                    className="mt-3"
                     disabled={busy != null}
                     onClick={() =>
                       void run("claim", async () => {
@@ -1116,7 +1124,6 @@ export default function StaffInbox({
                         setFilter("mine");
                       })
                     }
-                    className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-[#111] px-4 py-2.5 text-[13px] font-semibold text-white"
                   >
                     <UserPlus className="size-3.5" />
                     {busy === "claim"
@@ -1124,7 +1131,7 @@ export default function StaffInbox({
                       : isEscalated
                         ? "Claim as Admin"
                         : "Claim & help"}
-                  </button>
+                  </Button>
                 </div>
               ) : isEscalated && !isAdmin ? (
                 <div className="shrink-0 border-t border-violet-100 bg-violet-50/40 px-4 py-4 text-[13px] text-violet-950">
@@ -1146,48 +1153,44 @@ export default function StaffInbox({
                   }`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="inline-flex rounded-lg border border-black/10 bg-white p-0.5 text-[12px] font-semibold">
-                      <button
+                    <div className="inline-flex gap-0.5">
+                      <Button
                         type="button"
+                        size="xs"
+                        variant={!internalNote ? "default" : "ghost"}
                         onClick={() => setInternalNote(false)}
-                        className={`rounded-md px-2.5 py-1 transition ${
-                          !internalNote
-                            ? "bg-[#111] text-white"
-                            : "text-black/50 hover:text-black/70"
-                        }`}
                       >
                         Reply to customer
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        size="xs"
+                        variant={internalNote ? "secondary" : "ghost"}
                         onClick={() => setInternalNote(true)}
-                        className={`rounded-md px-2.5 py-1 transition ${
-                          internalNote
-                            ? "bg-amber-700 text-white"
-                            : "text-black/50 hover:text-black/70"
-                        }`}
                       >
                         Note for team
-                      </button>
+                      </Button>
                     </div>
                     {!internalNote ? (
                       <div className="flex flex-wrap items-center gap-1.5">
                         {REPLY_MACROS.map((macro) => (
-                          <button
+                          <Button
                             key={macro.id}
                             type="button"
+                            variant="outline"
+                            size="xs"
                             title={macro.body}
-                            className="rounded-lg border border-black/10 bg-black/[0.02] px-2 py-1 text-[11px] font-semibold text-black/60 hover:bg-black/[0.04]"
                             onClick={() =>
                               setReply((prev) => appendMacro(prev, macro.body))
                             }
                           >
                             {macro.label}
-                          </button>
+                          </Button>
                         ))}
-                        <button
+                        <Button
                           type="button"
-                          className="inline-flex items-center gap-1 rounded-lg border border-black/10 bg-black/[0.02] px-2 py-1 text-[11px] font-semibold text-black/65 hover:bg-black/[0.04]"
+                          variant="outline"
+                          size="xs"
                           onClick={() => {
                             setReply((prev) => {
                               if (prev.includes(GIVE_ACCESS_TOKEN)) return prev;
@@ -1200,11 +1203,12 @@ export default function StaffInbox({
                         >
                           <KeyRound className="size-3" />
                           Give Access
-                        </button>
+                        </Button>
                         {isAdmin ? (
-                          <button
+                          <Button
                             type="button"
-                            className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-900 hover:bg-violet-100"
+                            variant="outline"
+                            size="xs"
                             onClick={() => {
                               setReply((prev) => {
                                 if (prev.includes(TAKEOVER_CONSENT_TOKEN)) {
@@ -1219,7 +1223,7 @@ export default function StaffInbox({
                           >
                             <ShieldAlert className="size-3" />
                             Admin takeover
-                          </button>
+                          </Button>
                         ) : null}
                       </div>
                     ) : null}
@@ -1261,8 +1265,10 @@ export default function StaffInbox({
                         }
                       }}
                     />
-                    <button
+                    <Button
                       type="button"
+                      size="icon-lg"
+                      className="self-end"
                       disabled={busy != null || reply.trim().length < 1}
                       onClick={() =>
                         void run("send", async () => {
@@ -1274,13 +1280,10 @@ export default function StaffInbox({
                           setReply("");
                         })
                       }
-                      className={`inline-flex size-10 shrink-0 items-center justify-center self-end rounded-xl text-white disabled:opacity-45 ${
-                        internalNote ? "bg-amber-700" : "bg-[#111]"
-                      }`}
                       aria-label="Send"
                     >
                       <Send className="size-4" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (

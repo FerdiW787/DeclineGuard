@@ -1,5 +1,6 @@
 import { ArrowRight } from "lucide-react";
 import { SignedIn, SignedOut } from "@clerk/astro/react";
+import { Button } from "@/components/ui/button";
 import { PLANS } from "@/lib/pricing";
 import { HomePageTiers } from "./HomePageTiers";
 
@@ -64,19 +65,23 @@ export function HomePageContent() {
 
           <div className="mt-14 flex flex-wrap items-center gap-3">
             <SignedOut>
-              <a href="/a/sign-up" className="ln-btn ln-btn-primary">
-                Grab a founding spot
-                <ArrowRight className="size-4" />
-              </a>
-              <a href="/pricing" className="ln-btn ln-btn-ghost">
-                See pricing
-              </a>
+              <Button asChild size="lg">
+                <a href="/a/sign-up">
+                  Grab a founding spot
+                  <ArrowRight className="size-4" />
+                </a>
+              </Button>
+              <Button asChild variant="outline" size="lg">
+                <a href="/pricing">See pricing</a>
+              </Button>
             </SignedOut>
             <SignedIn>
-              <a href="/a/dashboard" className="ln-btn ln-btn-primary">
-                Open dashboard
-                <ArrowRight className="size-4" />
-              </a>
+              <Button asChild size="lg">
+                <a href="/a/dashboard">
+                  Open dashboard
+                  <ArrowRight className="size-4" />
+                </a>
+              </Button>
             </SignedIn>
           </div>
         </div>

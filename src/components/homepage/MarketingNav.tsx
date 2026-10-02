@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { SignedIn, SignedOut } from "@clerk/astro/react";
 import BrandLogo from "@/components/BrandLogo";
 import { useClerkClient } from "@/components/auth/useClerkClient";
+import { Button } from "@/components/ui/button";
 import { PrimaryCta } from "./CtaButton";
 
 type MarketingNavProps = {
@@ -61,12 +62,9 @@ export function MarketingNav({ homeAnchors = false }: MarketingNavProps) {
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <SignedOut>
-            <a
-              href="/a/sign-in"
-              className="hidden rounded-xl px-3 py-1.5 text-sm font-medium text-black/60 hover:bg-black/5 hover:text-black sm:inline"
-            >
-              Sign in
-            </a>
+            <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+              <a href="/a/sign-in">Sign in</a>
+            </Button>
             <PrimaryCta href="/a/sign-up" size="sm">
               Claim spot
             </PrimaryCta>
@@ -87,15 +85,16 @@ function MarketingLogOutButton() {
   const { clerk, isLoaded } = useClerkClient();
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="sm"
       disabled={!isLoaded || !clerk}
       onClick={() => {
         void clerk?.signOut({ redirectUrl: "/" });
       }}
-      className="rounded-xl px-3 py-1.5 text-sm font-medium text-black/60 transition hover:bg-black/5 hover:text-black disabled:opacity-40"
     >
       Log out
-    </button>
+    </Button>
   );
 }

@@ -2,6 +2,8 @@ import { ArrowRight, Check, Plus } from "lucide-react";
 import { SignedIn, SignedOut } from "@clerk/astro/react";
 import { ProCheckoutButton } from "@/components/billing/ProCheckoutButton";
 import { LinearCta } from "@/components/homepage-linear/LinearCta";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { withConvexClerkProvider } from "@/lib/withConvexClerkProvider";
 import { HomePageFooter } from "./HomePageBento";
 import { HomeNav } from "./HomeNav";
@@ -17,8 +19,10 @@ import {
 const free = PLANS.free;
 const pro = PLANS.pro;
 
-const darkCtaClass =
-  "ln-btn inline-flex w-full items-center justify-center rounded-full bg-[#f7f8f8] px-[1.15rem] py-[0.72rem] text-[14px] font-medium text-[#08090a] transition-colors hover:bg-white";
+const darkCtaClass = cn(
+  buttonVariants({ size: "lg" }),
+  "w-full bg-primary-foreground text-primary hover:bg-primary-foreground/90",
+);
 
 function FreePlanCtas() {
   return (

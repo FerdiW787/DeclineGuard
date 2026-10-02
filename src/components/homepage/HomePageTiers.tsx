@@ -1,5 +1,6 @@
 import { ArrowRight } from "lucide-react";
 import { SignedIn, SignedOut } from "@clerk/astro/react";
+import { Button } from "@/components/ui/button";
 import {
   formatDeclineAddon,
   formatDeclineQuota,
@@ -43,16 +44,20 @@ export function HomePageTiers() {
             </div>
             <div className="mt-6">
               <SignedOut>
-                <a href="/a/sign-up" className="ln-btn ln-btn-ghost">
-                  {free.cta}
-                  <ArrowRight className="size-4" />
-                </a>
+                <Button asChild variant="outline" size="lg">
+                  <a href="/a/sign-up">
+                    {free.cta}
+                    <ArrowRight className="size-4" />
+                  </a>
+                </Button>
               </SignedOut>
               <SignedIn>
-                <a href="/a/dashboard" className="ln-btn ln-btn-ghost">
-                  Open dashboard
-                  <ArrowRight className="size-4" />
-                </a>
+                <Button asChild variant="outline" size="lg">
+                  <a href="/a/dashboard">
+                    Open dashboard
+                    <ArrowRight className="size-4" />
+                  </a>
+                </Button>
               </SignedIn>
             </div>
           </article>
@@ -75,13 +80,16 @@ export function HomePageTiers() {
               </p>
             </div>
             <div className="mt-6">
-              <a
-                href="/pricing"
-                className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[#f7f8f8] px-[1.15rem] py-[0.72rem] text-[14px] font-medium text-[#08090a] transition-colors hover:bg-white"
+              <Button
+                asChild
+                size="lg"
+                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
               >
-                See Pro details
-                <ArrowRight className="size-4" />
-              </a>
+                <a href="/pricing">
+                  See Pro details
+                  <ArrowRight className="size-4" />
+                </a>
+              </Button>
             </div>
           </article>
         </div>

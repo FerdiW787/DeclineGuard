@@ -3,6 +3,7 @@ import {
   marketingProductTabs,
   type MarketingProductTab,
 } from "@/components/homepage/marketing/MarketingProductPreview";
+import { Button } from "@/components/ui/button";
 
 const featureCells = [
   {
@@ -42,18 +43,15 @@ export function LinearFeatures({ tab, onTabChange }: Props) {
         <div className="ln-reveal mx-auto mt-14 max-w-5xl">
           <div className="mb-4 flex flex-wrap items-center gap-1.5">
             {marketingProductTabs.map((t) => (
-              <button
+              <Button
                 key={t.id}
                 type="button"
+                size="sm"
+                variant={tab === t.id ? "default" : "ghost"}
                 onClick={() => onTabChange(t.id)}
-                className={`cursor-pointer rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
-                  tab === t.id
-                    ? "bg-white text-black"
-                    : "text-[#8a8a8e] hover:bg-white/5 hover:text-white"
-                }`}
               >
                 {t.label}
-              </button>
+              </Button>
             ))}
           </div>
           <div className="overflow-hidden rounded-xl border border-white/10">
