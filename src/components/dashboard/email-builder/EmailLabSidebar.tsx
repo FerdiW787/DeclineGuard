@@ -19,45 +19,45 @@ const KIT_LABEL: Record<
   LayoutPresetId,
   { title: string; source: string }
 > = {
-  sonos: {
-    title: "Sonos",
-    source: "Verify your email",
+  "poster-notice": {
+    title: "Poster notice",
+    source: "One announcement, then the button",
   },
-  avocode: {
-    title: "Avocode",
-    source: "Your trial ended",
+  "amount-due": {
+    title: "Amount due",
+    source: "Money first, then the problem",
   },
-  benchmark: {
-    title: "Benchmark",
-    source: "Don’t worry, your data is safe",
+  "plain-letter": {
+    title: "Plain letter",
+    source: "A short letter, then the ask",
   },
-  fontbase: {
-    title: "FontBase",
-    source: "Upcoming renewal",
+  "cta-lead": {
+    title: "CTA lead",
+    source: "Button first, explanation after",
   },
-  "nordvpn-structure": {
-    title: "NordVPN",
-    source: "Your account has expired",
+  "ruled-editorial": {
+    title: "Ruled editorial",
+    source: "Rules frame the notice",
   },
-  "invoice-stack": {
-    title: "Invoice stack",
-    source: "Receipt meta first",
+  "postscript-note": {
+    title: "Postscript",
+    source: "Ask, then a P.S. trust line",
   },
-  "checklist-card": {
-    title: "Checklist card",
-    source: "Rounded card + list",
+  "what-happened": {
+    title: "What happened",
+    source: "Two beats: happened, then do",
   },
-  "split-banner": {
-    title: "Split banner",
-    source: "Right-aligned headline",
+  "quiet-column": {
+    title: "Quiet column",
+    source: "Wide type, almost nothing else",
   },
-  "step-rail": {
-    title: "Step rail",
-    source: "Numbered path first",
+  "stub-header": {
+    title: "Stub header",
+    source: "Product and amount as a stub",
   },
-  "tight-notice": {
-    title: "Tight notice",
-    source: "Compact bands",
+  "end-action": {
+    title: "End action",
+    source: "Copy first, isolated CTA last",
   },
 };
 
@@ -89,9 +89,9 @@ export default function EmailLabSidebar({
           Lab
         </p>
         <p className="mt-1 text-[12px] leading-relaxed text-[#6b6f76]">
-          Ten starter kits. First five match the Really Good Emails refs; five
-          more change structure only. Same layout on Day 0, Day 2, and Day 5 —
-          only the copy changes.
+          Ten recovery layouts. Each kit is a different structure — alignment,
+          density, hero, and CTA placement. Same layout on Day 0, Day 2, and
+          Day 5 — only the copy changes.
         </p>
         <div
           className="mt-3 space-y-1"
@@ -250,89 +250,52 @@ function EmailLabKitPreview({
           showName={kitShowsStoreName(kitId)}
           className="mb-3"
         />
-        {kitId === "invoice-stack" ? (
+        {kitId === "amount-due" ? (
           <p
-            className="mb-1 text-[9px] font-semibold"
+            className="mb-1 text-[13px] font-semibold leading-none"
             style={{ color: theme.emailTextColor }}
           >
             €29
           </p>
         ) : null}
-        {kitId === "step-rail" ? (
+        {kitId === "stub-header" ? (
           <p
-            className="mb-1 text-[8px] font-semibold"
-            style={{ color: theme.brandColor }}
-          >
-            1 Open · 2 Update · 3 Keep
-          </p>
-        ) : null}
-        {kitId === "benchmark" ? (
-          <p
-            className="mb-1 text-[8px] font-semibold"
-            style={{ color: theme.brandColor }}
-          >
-            {copy.eyebrow}
-          </p>
-        ) : kitId === "split-banner" ? null : kitId === "checklist-card" ? null : (
-          <p
-            className="text-[8px] font-medium uppercase tracking-[0.14em]"
+            className="mb-1 text-[7px]"
             style={{ color: theme.mutedTextColor }}
           >
-            {copy.eyebrow}
+            Pro Monthly · €29
           </p>
-        )}
+        ) : null}
+        {kitId === "cta-lead" ? (
+          <span
+            className={cn(
+              "mb-2 inline-block px-2.5 py-1 text-[8px] font-semibold",
+              ctaClass,
+            )}
+            style={{
+              background: theme.ctaBackgroundColor,
+              color: theme.ctaTextColor,
+              borderRadius: theme.ctaBorderRadiusPx,
+            }}
+          >
+            {copy.cta}
+          </span>
+        ) : null}
+        {kitId === "ruled-editorial" ? (
+          <hr className="mb-1.5 border-0 border-t" style={{ borderColor: `${theme.emailTextColor}18` }} />
+        ) : null}
         <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-snug tracking-tight">
           {copy.headline}
         </p>
-        {kitId === "split-banner" ? (
+        {kitId === "ruled-editorial" ? (
+          <hr className="mt-1.5 border-0 border-t" style={{ borderColor: `${theme.emailTextColor}18` }} />
+        ) : null}
+        {kitId === "what-happened" ? (
           <p
-            className="mt-1 text-[8px] font-medium uppercase tracking-[0.14em]"
+            className="mt-1.5 text-[7px] uppercase tracking-[0.12em]"
             style={{ color: theme.mutedTextColor }}
           >
-            {copy.eyebrow}
-          </p>
-        ) : null}
-        {kitId === "avocode" ? (
-          <div
-            className="mt-1.5 rounded border px-1.5 py-1"
-            style={{ borderColor: `${theme.brandColor}33` }}
-          >
-            <p className="text-[7px]" style={{ color: theme.mutedTextColor }}>
-              What’s ending
-            </p>
-            <p className="text-[8px] font-semibold">Pro Monthly</p>
-          </div>
-        ) : null}
-        {kitId === "fontbase" ? (
-          <p
-            className="mt-1 text-[8px]"
-            style={{ color: theme.mutedTextColor }}
-          >
-            What’s included · plan · card
-          </p>
-        ) : null}
-        {kitId === "nordvpn-structure" ? (
-          <p
-            className="mt-1 text-[8px] font-semibold"
-            style={{ color: theme.brandColor }}
-          >
-            1 Update billing · 2 Keep access
-          </p>
-        ) : null}
-        {kitId === "benchmark" ? (
-          <p
-            className="mt-1 text-[8px]"
-            style={{ color: theme.mutedTextColor }}
-          >
-            Nothing here is gone
-          </p>
-        ) : null}
-        {kitId === "checklist-card" ? (
-          <p
-            className="mt-1 text-[8px]"
-            style={{ color: theme.mutedTextColor }}
-          >
-            Same workspace · Same billing
+            What happened · What to do
           </p>
         ) : null}
         <p
@@ -341,25 +304,35 @@ function EmailLabKitPreview({
         >
           {copy.body}
         </p>
-        <span
-          className={cn(
-            "mt-2 inline-block px-2.5 py-1 text-[8px] font-semibold",
-            ctaClass,
-          )}
-          style={{
-            background: theme.ctaBackgroundColor,
-            color: theme.ctaTextColor,
-            borderRadius: theme.ctaBorderRadiusPx,
-          }}
-        >
-          {copy.cta}
-        </span>
-        {kitId === "tight-notice" ? (
+        {kitId === "cta-lead" ? null : (
+          <span
+            className={cn(
+              "mt-2 inline-block px-2.5 py-1 text-[8px] font-semibold",
+              ctaClass,
+            )}
+            style={{
+              background: theme.ctaBackgroundColor,
+              color: theme.ctaTextColor,
+              borderRadius: theme.ctaBorderRadiusPx,
+            }}
+          >
+            {copy.cta}
+          </span>
+        )}
+        {kitId === "postscript-note" ? (
           <p
-            className="mt-1.5 text-[7px]"
+            className="mt-1.5 text-[7px] italic"
             style={{ color: theme.mutedTextColor }}
           >
-            Access stays on · Pro Monthly
+            P.S. Access stays on
+          </p>
+        ) : null}
+        {kitId === "end-action" ? (
+          <p
+            className="mt-1 text-[7px]"
+            style={{ color: theme.mutedTextColor }}
+          >
+            Your workspace stays put.
           </p>
         ) : null}
         </div>

@@ -1,7 +1,8 @@
 /**
  * Layout kits influence block document structure (align, shell, padding).
- * Canonical IDs: sonos | avocode | benchmark | fontbase | nordvpn-structure
- *   | invoice-stack | checklist-card | split-banner | step-rail | tight-notice.
+ * Canonical IDs: poster-notice | amount-due | plain-letter | cta-lead
+ *   | ruled-editorial | postscript-note | what-happened | quiet-column
+ *   | stub-header | end-action.
  *
  * Kit ids are FE-local until Riley’s BE catalog accepts the full 10.
  * Persist may fail on the five new ids — keep the local draft and surface

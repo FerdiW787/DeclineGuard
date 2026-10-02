@@ -15,31 +15,29 @@ export type StylingMode = (typeof STYLING_MODES)[number];
 
 export const QUIET_VERIFY_LAYOUT_ID = "quiet-verify";
 export const SONOS_LAYOUT_ID = "sonos";
+export const POSTER_NOTICE_LAYOUT_ID = "poster-notice";
 
 /**
- * Starter block kits — structure only.
- * First five match the RGE refs. Five more are FE structural variants.
- * Legacy quiet-verify → sonos. Default remains sonos.
+ * Recovery starter kits — structure only. Hard reset: these IDs replace
+ * the RGE / invoice-stack generation. Tokens are not a brand palette.
  *
- * FE catalog is 10. Riley BE `LAYOUT_PRESET_IDS` / recoveryBlockKits
- * currently accept the first five only. New ids stay on the local draft
- * until Convex validators catch up — do not remap on hydrate.
+ * FE catalog is 10. Riley BE still knows older IDs (sonos…). New ids
+ * stay on the local draft until Convex validators catch up.
  *
- * FE+BE parity target (comment only; do not invent a BE palette here):
- *   sonos | avocode | benchmark | fontbase | nordvpn-structure
- *   invoice-stack | checklist-card | split-banner | step-rail | tight-notice
+ *   poster-notice | amount-due | plain-letter | cta-lead | ruled-editorial
+ *   postscript-note | what-happened | quiet-column | stub-header | end-action
  */
 export const LAYOUT_PRESET_IDS = [
-  "sonos",
-  "avocode",
-  "benchmark",
-  "fontbase",
-  "nordvpn-structure",
-  "invoice-stack",
-  "checklist-card",
-  "split-banner",
-  "step-rail",
-  "tight-notice",
+  "poster-notice",
+  "amount-due",
+  "plain-letter",
+  "cta-lead",
+  "ruled-editorial",
+  "postscript-note",
+  "what-happened",
+  "quiet-column",
+  "stub-header",
+  "end-action",
 ] as const;
 
 /** IDs Riley BE is expected to accept today. New FE kits persist locally. */
@@ -53,7 +51,7 @@ export const BE_LAYOUT_PRESET_IDS = [
 
 export type LayoutPresetId = (typeof LAYOUT_PRESET_IDS)[number];
 
-export const DEFAULT_LAYOUT_PRESET_ID: LayoutPresetId = SONOS_LAYOUT_ID;
+export const DEFAULT_LAYOUT_PRESET_ID: LayoutPresetId = POSTER_NOTICE_LAYOUT_ID;
 export const DEFAULT_STYLING_MODE: StylingMode = "preset";
 
 /** MVP lifecycle emails — same layout via the single global layoutPresetId. */
@@ -109,18 +107,6 @@ export const SONOS_TOKENS: EmailThemeTokens = {
 /** @deprecated Use SONOS_TOKENS. Kept for Riley catalog mirrors. */
 export const QUIET_VERIFY_TOKENS: EmailThemeTokens = SONOS_TOKENS;
 
-function layoutTokens(
-  partial: Omit<EmailThemeTokens, "fontFamilyRaw" | "emailFont"> & {
-    emailFont?: EmailFontId;
-  },
-): EmailThemeTokens {
-  return {
-    ...partial,
-    emailFont: partial.emailFont ?? "system",
-    fontFamilyRaw: null,
-  };
-}
-
 export type LayoutPreset = {
   id: string;
   name: string;
@@ -129,122 +115,71 @@ export type LayoutPreset = {
 };
 
 export const LAYOUT_PRESET_CATALOG: Record<string, LayoutPreset> = {
-  sonos: {
-    id: "sonos",
-    name: "Sonos",
-    description: "Centered verify — logo, headline, pill CTA.",
+  "poster-notice": {
+    id: "poster-notice",
+    name: "Poster notice",
+    description: "One announcement, then the button.",
     tokens: SONOS_TOKENS,
   },
-  avocode: {
-    id: "avocode",
-    name: "Avocode",
-    description: "Left-aligned trial-ended stack.",
-    tokens: layoutTokens({
-      brandColor: "#2b6cff",
-      secondaryColor: "#6b7280",
-      mutedTextColor: "#6b7280",
-      linkColor: "#2b6cff",
-      pageBackgroundColor: "#ffffff",
-      pageTextColor: "#111827",
-      emailBackgroundColor: "#ffffff",
-      emailTextColor: "#111827",
-      ctaBackgroundColor: "#2b6cff",
-      ctaTextColor: "#ffffff",
-      ctaBorderRadiusPx: 6,
-    }),
-  },
-  benchmark: {
-    id: "benchmark",
-    name: "Benchmark",
-    description: "Reassuring pause — your data is safe.",
-    tokens: layoutTokens({
-      brandColor: "#1f7a4d",
-      secondaryColor: "#5c6b61",
-      mutedTextColor: "#5c6b61",
-      linkColor: "#1f7a4d",
-      pageBackgroundColor: "#f7faf7",
-      pageTextColor: "#173322",
-      emailBackgroundColor: "#f7faf7",
-      emailTextColor: "#173322",
-      ctaBackgroundColor: "#1f7a4d",
-      ctaTextColor: "#f7faf7",
-      ctaBorderRadiusPx: 8,
-    }),
-  },
-  fontbase: {
-    id: "fontbase",
-    name: "FontBase",
-    description: "Editorial upcoming renewal.",
-    tokens: layoutTokens({
-      brandColor: "#111111",
-      secondaryColor: "#6b6b6b",
-      mutedTextColor: "#6b6b6b",
-      linkColor: "#111111",
-      pageBackgroundColor: "#fafafa",
-      pageTextColor: "#111111",
-      emailBackgroundColor: "#fafafa",
-      emailTextColor: "#111111",
-      ctaBackgroundColor: "#111111",
-      ctaTextColor: "#fafafa",
-      ctaBorderRadiusPx: 4,
-    }),
-  },
-  "nordvpn-structure": {
-    id: "nordvpn-structure",
-    name: "NordVPN",
-    description: "Expired account — accent frame, next step.",
-    tokens: layoutTokens({
-      brandColor: "#4687ff",
-      secondaryColor: "#5b6475",
-      mutedTextColor: "#5b6475",
-      linkColor: "#4687ff",
-      pageBackgroundColor: "#ffffff",
-      pageTextColor: "#0e1a33",
-      emailBackgroundColor: "#ffffff",
-      emailTextColor: "#0e1a33",
-      ctaBackgroundColor: "#4687ff",
-      ctaTextColor: "#ffffff",
-      ctaBorderRadiusPx: 8,
-    }),
-  },
-  // Structure-only kits. Catalog tokens reuse Sonos so we never invent a
-  // parallel brand palette. Configured/scrape BrandKit tokens win via
-  // resolveTheme({ stylingMode: "configured" }).
-  "invoice-stack": {
-    id: "invoice-stack",
-    name: "Invoice stack",
-    description: "Receipt meta first — amount, then copy.",
+  "amount-due": {
+    id: "amount-due",
+    name: "Amount due",
+    description: "Money first, then the problem.",
     tokens: SONOS_TOKENS,
   },
-  "checklist-card": {
-    id: "checklist-card",
-    name: "Checklist card",
-    description: "Rounded card — greeting, then checklist.",
+  "plain-letter": {
+    id: "plain-letter",
+    name: "Plain letter",
+    description: "A short letter, then the ask.",
     tokens: SONOS_TOKENS,
   },
-  "split-banner": {
-    id: "split-banner",
-    name: "Split banner",
-    description: "Right-aligned — headline, then eyebrow.",
+  "cta-lead": {
+    id: "cta-lead",
+    name: "CTA lead",
+    description: "Button first, explanation after.",
     tokens: SONOS_TOKENS,
   },
-  "step-rail": {
-    id: "step-rail",
-    name: "Step rail",
-    description: "Numbered path first, then the ask.",
+  "ruled-editorial": {
+    id: "ruled-editorial",
+    name: "Ruled editorial",
+    description: "Rules frame the notice.",
     tokens: SONOS_TOKENS,
   },
-  "tight-notice": {
-    id: "tight-notice",
-    name: "Tight notice",
-    description: "Compact bands — CTA, then a reassurance row.",
+  "postscript-note": {
+    id: "postscript-note",
+    name: "Postscript",
+    description: "Ask, then a P.S. trust line.",
+    tokens: SONOS_TOKENS,
+  },
+  "what-happened": {
+    id: "what-happened",
+    name: "What happened",
+    description: "Two beats: happened, then do.",
+    tokens: SONOS_TOKENS,
+  },
+  "quiet-column": {
+    id: "quiet-column",
+    name: "Quiet column",
+    description: "Wide type, almost nothing else.",
+    tokens: SONOS_TOKENS,
+  },
+  "stub-header": {
+    id: "stub-header",
+    name: "Stub header",
+    description: "Product and amount as a stub.",
+    tokens: SONOS_TOKENS,
+  },
+  "end-action": {
+    id: "end-action",
+    name: "End action",
+    description: "Copy first, isolated CTA last.",
     tokens: SONOS_TOKENS,
   },
 };
 
 export const NEW_MERCHANT_THEME_DEFAULTS = {
   stylingMode: "preset" as const,
-  layoutPresetId: SONOS_LAYOUT_ID,
+  layoutPresetId: POSTER_NOTICE_LAYOUT_ID,
 };
 
 export type ResolveThemeInput = {
@@ -265,17 +200,27 @@ export type RecoverySettingsLayoutFields = {
 };
 
 const LEGACY_LAYOUT_PRESET_IDS: Record<string, LayoutPresetId> = {
-  "quiet-verify": "sonos",
-  quiet_verify: "sonos",
-  "soft-expire": "avocode",
-  soft_expire: "avocode",
-  "safe-pause": "benchmark",
-  safe_pause: "benchmark",
-  "soft-renew": "fontbase",
-  soft_renew: "fontbase",
-  "alert-expire": "nordvpn-structure",
-  alert_expire: "nordvpn-structure",
-  nordvpn: "nordvpn-structure",
+  "quiet-verify": "poster-notice",
+  quiet_verify: "poster-notice",
+  sonos: "poster-notice",
+  "soft-expire": "poster-notice",
+  soft_expire: "poster-notice",
+  avocode: "poster-notice",
+  "safe-pause": "poster-notice",
+  safe_pause: "poster-notice",
+  benchmark: "poster-notice",
+  "soft-renew": "poster-notice",
+  soft_renew: "poster-notice",
+  fontbase: "poster-notice",
+  "alert-expire": "poster-notice",
+  alert_expire: "poster-notice",
+  nordvpn: "poster-notice",
+  "nordvpn-structure": "poster-notice",
+  "invoice-stack": "amount-due",
+  "checklist-card": "what-happened",
+  "split-banner": "ruled-editorial",
+  "step-rail": "end-action",
+  "tight-notice": "stub-header",
 };
 
 export function isStylingMode(value: unknown): value is StylingMode {
@@ -308,7 +253,7 @@ export function normalizeLayoutPresetId(
   const raw = value?.trim() ?? "";
   const id = LEGACY_LAYOUT_PRESET_IDS[raw] ?? raw;
   if (id && LAYOUT_PRESET_CATALOG[id]) return id;
-  return SONOS_LAYOUT_ID;
+  return POSTER_NOTICE_LAYOUT_ID;
 }
 
 export function resolveLayoutPresetId(id: string): LayoutPresetId {
@@ -321,7 +266,7 @@ export function resolveLayoutPresetId(id: string): LayoutPresetId {
 export function getLayoutPreset(layoutPresetId: string): LayoutPreset {
   const id = normalizeLayoutPresetId(layoutPresetId);
   return (
-    LAYOUT_PRESET_CATALOG[id] ?? LAYOUT_PRESET_CATALOG[SONOS_LAYOUT_ID]!
+    LAYOUT_PRESET_CATALOG[id] ?? LAYOUT_PRESET_CATALOG[POSTER_NOTICE_LAYOUT_ID]!
   );
 }
 

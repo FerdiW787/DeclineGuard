@@ -25,8 +25,8 @@ export const QUIET_VERIFY_LAYOUT_ID = "quiet-verify";
 
 /**
  * FE catalog target (src/lib/emailTheme.ts LAYOUT_PRESET_IDS) — 10 kits:
- *   sonos | avocode | benchmark | fontbase | nordvpn-structure
- *   invoice-stack | checklist-card | split-banner | step-rail | tight-notice
+ *   poster-notice | amount-due | plain-letter | cta-lead | ruled-editorial
+ *   postscript-note | what-happened | quiet-column | stub-header | end-action
  *
  * This BE file still validates the legacy Quiet Verify id. Riley must
  * extend LAYOUT_PRESET_IDS / recoveryBlockKits before merchants can

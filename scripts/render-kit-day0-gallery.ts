@@ -167,7 +167,7 @@ async function scrapeConfigured(): Promise<ScrapeReport> {
     });
     const resolved = resolveTheme({
       stylingMode: "configured",
-      layoutPresetId: "sonos",
+      layoutPresetId: "poster-notice",
       configured: merged,
     });
     const remoteLogo = scraped.favicon ?? scraped.ogImage;

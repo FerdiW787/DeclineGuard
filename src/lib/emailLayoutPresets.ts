@@ -43,21 +43,21 @@ export const LAYOUT_PRESET_META: readonly LayoutPresetMeta[] =
     };
   });
 
-/** Product labels match the RGE refs — never Quiet Verify / Soft Expire. */
+/** Labels describe structure — not RGE refs or Quiet Verify. */
 export const LAYOUT_PRESET_STRUCTURE_META: Record<
   LayoutPresetId,
   { label: string; hint: string }
 > = {
-  sonos: { label: "Sonos", hint: "Verify your email" },
-  avocode: { label: "Avocode", hint: "Your trial ended" },
-  benchmark: { label: "Benchmark", hint: "Your data is safe" },
-  fontbase: { label: "FontBase", hint: "Upcoming renewal" },
-  "nordvpn-structure": { label: "NordVPN", hint: "Your account has expired" },
-  "invoice-stack": { label: "Invoice stack", hint: "Receipt meta first" },
-  "checklist-card": { label: "Checklist card", hint: "Rounded card + list" },
-  "split-banner": { label: "Split banner", hint: "Right-aligned headline" },
-  "step-rail": { label: "Step rail", hint: "Numbered path first" },
-  "tight-notice": { label: "Tight notice", hint: "Compact bands" },
+  "poster-notice": { label: "Poster notice", hint: "Centered announcement" },
+  "amount-due": { label: "Amount due", hint: "Money first" },
+  "plain-letter": { label: "Plain letter", hint: "Two paragraphs" },
+  "cta-lead": { label: "CTA lead", hint: "Button first" },
+  "ruled-editorial": { label: "Ruled editorial", hint: "Rules frame the notice" },
+  "postscript-note": { label: "Postscript", hint: "P.S. after the ask" },
+  "what-happened": { label: "What happened", hint: "Two labeled beats" },
+  "quiet-column": { label: "Quiet column", hint: "Wide type only" },
+  "stub-header": { label: "Stub header", hint: "Product · amount" },
+  "end-action": { label: "End action", hint: "Isolated CTA last" },
 };
 
 export const LIFECYCLE_EMAIL_META: Record<

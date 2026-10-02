@@ -15,9 +15,9 @@ const STORAGE_KEY = "dg.emailLayoutDraft.v1";
 
 /**
  * Riley-shaped FE draft. recoverySettings will store stylingMode +
- * layoutPresetId (default sonos; legacy quiet-verify maps here) when Convex tips; until then
- * this stays in localStorage. FE catalog is 10 kits; Riley BE currently
- * accepts the first five — persist errors should surface, not remap on hydrate.
+ * layoutPresetId (default poster-notice; legacy quiet-verify / sonos map here)
+ * when Convex tips; until then this stays in localStorage. FE catalog is 10
+ * kits; Riley BE still accepts older ids — persist errors should surface.
  */
 export type EmailLayoutDraft = {
   stylingMode: StylingMode;

@@ -1,6 +1,5 @@
 import type { CSSProperties, MouseEvent } from "react";
 import EmailStoreHeader from "../EmailStoreHeader";
-import { StoreAvatar } from "../dashboardUi";
 import {
   applyLayoutCopyVars,
   resolveLayoutCopy,
@@ -79,112 +78,37 @@ export default function EmailLayoutPreview({
     color: theme.emailTextColor,
   };
 
+  const shared = {
+    theme,
+    storeName,
+    storeLogoUrl,
+    emailFont,
+    copy,
+    vars,
+  };
+
   const inner = (() => {
     switch (layoutPresetId) {
-      case "sonos":
-        return (
-          <QuietVerify
-            theme={theme}
-            storeName={storeName}
-            storeLogoUrl={storeLogoUrl}
-            emailFont={emailFont}
-            copy={copy}
-          />
-        );
-      case "avocode":
-        return (
-          <SoftExpire
-            theme={theme}
-            storeName={storeName}
-            storeLogoUrl={storeLogoUrl}
-            emailFont={emailFont}
-            copy={copy}
-            vars={vars}
-          />
-        );
-      case "benchmark":
-        return (
-          <SafePause
-            theme={theme}
-            storeName={storeName}
-            storeLogoUrl={storeLogoUrl}
-            emailFont={emailFont}
-            copy={copy}
-          />
-        );
-      case "fontbase":
-        return (
-          <SoftRenew
-            theme={theme}
-            storeName={storeName}
-            storeLogoUrl={storeLogoUrl}
-            emailFont={emailFont}
-            copy={copy}
-            vars={vars}
-          />
-        );
-      case "nordvpn-structure":
-        return (
-          <AlertExpire
-            theme={theme}
-            storeName={storeName}
-            storeLogoUrl={storeLogoUrl}
-            emailFont={emailFont}
-            copy={copy}
-          />
-        );
-      case "invoice-stack":
-        return (
-          <InvoiceStack
-            theme={theme}
-            storeName={storeName}
-            storeLogoUrl={storeLogoUrl}
-            emailFont={emailFont}
-            copy={copy}
-            vars={vars}
-          />
-        );
-      case "checklist-card":
-        return (
-          <ChecklistCard
-            theme={theme}
-            storeName={storeName}
-            storeLogoUrl={storeLogoUrl}
-            emailFont={emailFont}
-            copy={copy}
-          />
-        );
-      case "split-banner":
-        return (
-          <SplitBanner
-            theme={theme}
-            storeName={storeName}
-            storeLogoUrl={storeLogoUrl}
-            emailFont={emailFont}
-            copy={copy}
-          />
-        );
-      case "step-rail":
-        return (
-          <StepRail
-            theme={theme}
-            storeName={storeName}
-            storeLogoUrl={storeLogoUrl}
-            emailFont={emailFont}
-            copy={copy}
-          />
-        );
-      case "tight-notice":
-        return (
-          <TightNotice
-            theme={theme}
-            storeName={storeName}
-            storeLogoUrl={storeLogoUrl}
-            emailFont={emailFont}
-            copy={copy}
-            vars={vars}
-          />
-        );
+      case "poster-notice":
+        return <PosterNotice {...shared} />;
+      case "amount-due":
+        return <AmountDue {...shared} />;
+      case "plain-letter":
+        return <PlainLetter {...shared} />;
+      case "cta-lead":
+        return <CtaLead {...shared} />;
+      case "ruled-editorial":
+        return <RuledEditorial {...shared} />;
+      case "postscript-note":
+        return <PostscriptNote {...shared} />;
+      case "what-happened":
+        return <WhatHappened {...shared} />;
+      case "quiet-column":
+        return <QuietColumn {...shared} />;
+      case "stub-header":
+        return <StubHeader {...shared} />;
+      case "end-action":
+        return <EndAction {...shared} />;
       default: {
         const _exhaustive: never = layoutPresetId;
         return _exhaustive;
@@ -235,6 +159,15 @@ type ChromeCopy = {
   status: string;
 };
 
+type LayoutProps = {
+  theme: EmailThemeTokens;
+  storeName: string;
+  storeLogoUrl: string | null;
+  emailFont: EmailFontId;
+  copy: ChromeCopy;
+  vars: PreviewVars & { storeName: string };
+};
+
 function Cta({
   theme,
   label,
@@ -258,46 +191,193 @@ function Cta({
   );
 }
 
-function QuietVerify({
+function BillingLink({
+  theme,
+  label,
+  align = "left",
+}: {
+  theme: EmailThemeTokens;
+  label: string;
+  align?: "left" | "center";
+}) {
+  return (
+    <p className={cn("text-[12px]", align === "center" && "text-center")}>
+      <a
+        href="#secondary"
+        onClick={preventNav}
+        className="underline"
+        style={{ color: theme.linkColor }}
+      >
+        {label}
+      </a>
+    </p>
+  );
+}
+
+function Header({
   theme,
   storeName,
   storeLogoUrl,
   emailFont,
-  copy,
+  showName = true,
 }: {
   theme: EmailThemeTokens;
   storeName: string;
   storeLogoUrl: string | null;
   emailFont: EmailFontId;
-  copy: ChromeCopy;
+  showName?: boolean;
 }) {
   return (
-    <div className="px-6 py-10 text-center sm:px-10">
-      <div className="flex justify-center">
-        <StoreAvatar
-          src={storeLogoUrl}
-          alt={storeName}
-          size="preview"
-          brandColor={theme.brandColor}
-        />
-      </div>
-      <p
-        className="mt-6 text-[11px] font-medium uppercase tracking-[0.16em]"
-        style={{ color: theme.mutedTextColor }}
-      >
-        {copy.eyebrow}
-      </p>
+    <EmailStoreHeader
+      storeName={storeName}
+      storeLogoUrl={storeLogoUrl}
+      primary={theme.brandColor}
+      emailFont={emailFont}
+      textColor={theme.emailTextColor}
+      showName={showName}
+      className="mb-6"
+    />
+  );
+}
+
+function PosterNotice({ theme, copy }: LayoutProps) {
+  return (
+    <div className="px-10 py-16 text-center">
       <h2
-        className="mt-3 text-[22px] font-semibold tracking-[-0.03em]"
-        style={{
-          color: theme.emailTextColor,
-          fontFamily: emailFontFamily(emailFont),
-        }}
+        className="text-[34px] font-semibold leading-tight tracking-[-0.03em]"
+        style={{ color: theme.emailTextColor }}
       >
         {copy.headline}
       </h2>
       <p
-        className="mx-auto mt-3 max-w-[20rem] text-[14px] leading-relaxed"
+        className="mx-auto mt-3.5 max-w-[22rem] text-[16px] leading-relaxed"
+        style={{ color: theme.mutedTextColor }}
+      >
+        {copy.body}
+      </p>
+      <div className="mt-9 flex justify-center">
+        <Cta theme={theme} label={copy.cta} />
+      </div>
+      <div className="mt-4">
+        <BillingLink theme={theme} label={copy.secondaryLink} align="center" />
+      </div>
+    </div>
+  );
+}
+
+function AmountDue({ theme, storeName, storeLogoUrl, emailFont, copy, vars }: LayoutProps) {
+  return (
+    <div className="px-8 py-10">
+      <Header
+        theme={theme}
+        storeName={storeName}
+        storeLogoUrl={storeLogoUrl}
+        emailFont={emailFont}
+      />
+      <p className="text-[11px]" style={{ color: theme.mutedTextColor }}>
+        Amount due
+      </p>
+      <p
+        className="mt-1.5 text-[42px] font-semibold leading-none tracking-tight"
+        style={{ color: theme.emailTextColor }}
+      >
+        {vars.amount}
+      </p>
+      <p className="mt-1 text-[14px]" style={{ color: theme.mutedTextColor }}>
+        {vars.product}
+      </p>
+      <h2
+        className="mt-7 text-[20px] font-semibold tracking-[-0.02em]"
+        style={{ color: theme.emailTextColor }}
+      >
+        {copy.headline}
+      </h2>
+      <p className="mt-2.5 text-[15px] leading-relaxed" style={{ color: theme.mutedTextColor }}>
+        {copy.body}
+      </p>
+      <div className="mt-6">
+        <Cta theme={theme} label={copy.cta} />
+      </div>
+      <div className="mt-3.5">
+        <BillingLink theme={theme} label={copy.secondaryLink} />
+      </div>
+    </div>
+  );
+}
+
+function PlainLetter({ theme, storeName, storeLogoUrl, emailFont, copy }: LayoutProps) {
+  return (
+    <div className="px-9 py-10">
+      <Header
+        theme={theme}
+        storeName={storeName}
+        storeLogoUrl={storeLogoUrl}
+        emailFont={emailFont}
+      />
+      <h2
+        className="text-[22px] font-semibold tracking-[-0.02em]"
+        style={{ color: theme.emailTextColor }}
+      >
+        {copy.headline}
+      </h2>
+      <p className="mt-4 text-[16px] leading-relaxed" style={{ color: theme.emailTextColor }}>
+        {copy.body}
+      </p>
+      <p className="mt-4 text-[16px] leading-relaxed" style={{ color: theme.mutedTextColor }}>
+        Updating the card keeps the same plan on. Nothing else changes.
+      </p>
+      <div className="mt-7">
+        <Cta theme={theme} label={copy.cta} />
+      </div>
+      <div className="mt-3.5">
+        <BillingLink theme={theme} label={copy.secondaryLink} />
+      </div>
+    </div>
+  );
+}
+
+function CtaLead({ theme, storeName, storeLogoUrl, emailFont, copy }: LayoutProps) {
+  return (
+    <div className="px-8 py-8">
+      <Header
+        theme={theme}
+        storeName={storeName}
+        storeLogoUrl={storeLogoUrl}
+        emailFont={emailFont}
+      />
+      <Cta theme={theme} label={copy.cta} />
+      <h2
+        className="mt-7 text-[20px] font-semibold tracking-[-0.02em]"
+        style={{ color: theme.emailTextColor }}
+      >
+        {copy.headline}
+      </h2>
+      <p className="mt-2.5 text-[15px] leading-relaxed" style={{ color: theme.mutedTextColor }}>
+        {copy.body}
+      </p>
+      <div className="mt-4">
+        <BillingLink theme={theme} label={copy.secondaryLink} />
+      </div>
+    </div>
+  );
+}
+
+function RuledEditorial({ theme, copy }: LayoutProps) {
+  const rule = isDarkHex(theme.emailBackgroundColor)
+    ? "rgba(255,255,255,0.16)"
+    : "rgba(0,0,0,0.12)";
+  return (
+    <div className="px-10 py-12 text-center">
+      <hr style={{ borderColor: rule }} />
+      <h2
+        className="py-5 text-[28px] font-semibold leading-tight tracking-[-0.03em]"
+        style={{ color: theme.emailTextColor }}
+      >
+        {copy.headline}
+      </h2>
+      <hr style={{ borderColor: rule }} />
+      <p
+        className="mx-auto mt-5 max-w-[22rem] text-[15px] leading-relaxed"
         style={{ color: theme.mutedTextColor }}
       >
         {copy.body}
@@ -305,574 +385,178 @@ function QuietVerify({
       <div className="mt-7 flex justify-center">
         <Cta theme={theme} label={copy.cta} />
       </div>
-      <p className="mt-5 text-[12px]">
-        <a
-          href="#secondary"
-          onClick={preventNav}
-          className="underline"
-          style={{ color: theme.linkColor }}
-        >
-          {copy.secondaryLink}
-        </a>
-      </p>
-    </div>
-  );
-}
-
-function SoftExpire({
-  theme,
-  storeName,
-  storeLogoUrl,
-  emailFont,
-  copy,
-  vars,
-}: {
-  theme: EmailThemeTokens;
-  storeName: string;
-  storeLogoUrl: string | null;
-  emailFont: EmailFontId;
-  copy: ChromeCopy;
-  vars: PreviewVars & { storeName: string };
-}) {
-  const cardBorder = isDarkHex(theme.emailBackgroundColor)
-    ? "rgba(255,255,255,0.12)"
-    : "rgba(0,0,0,0.08)";
-  return (
-    <div className="px-5 py-7 sm:px-7">
-      <EmailStoreHeader
-        storeName={storeName}
-        storeLogoUrl={storeLogoUrl}
-        primary={theme.brandColor}
-        emailFont={emailFont}
-        textColor={theme.emailTextColor}
-        className="mb-6"
-      />
-      <p
-        className="text-[11px] font-medium uppercase tracking-[0.14em]"
-        style={{ color: theme.mutedTextColor }}
-      >
-        {copy.eyebrow}
-      </p>
-      <h2
-        className="mt-2 text-[20px] font-semibold tracking-[-0.03em]"
-        style={{ color: theme.emailTextColor }}
-      >
-        {copy.headline}
-      </h2>
-      <div
-        className="mt-5 rounded-xl px-4 py-3"
-        style={{ border: `1px solid ${cardBorder}` }}
-      >
-        <p className="text-[12px] font-medium" style={{ color: theme.mutedTextColor }}>
-          What’s ending
-        </p>
-        <p className="mt-1 text-[14px] font-semibold" style={{ color: theme.emailTextColor }}>
-          {vars.product}
-        </p>
-        <p className="mt-0.5 text-[12px]" style={{ color: theme.mutedTextColor }}>
-          {vars.amount}
-        </p>
-      </div>
-      <p className="mt-5 text-[14px] leading-relaxed" style={{ color: theme.mutedTextColor }}>
-        {copy.body}
-      </p>
-      <div className="mt-6">
-        <Cta theme={theme} label={copy.cta} />
-      </div>
-      <p className="mt-4 text-[12px]">
-        <a
-          href="#secondary"
-          onClick={preventNav}
-          className="underline"
-          style={{ color: theme.linkColor }}
-        >
-          {copy.secondaryLink}
-        </a>
-      </p>
-    </div>
-  );
-}
-
-function SafePause({
-  theme,
-  storeName,
-  storeLogoUrl,
-  emailFont,
-  copy,
-}: {
-  theme: EmailThemeTokens;
-  storeName: string;
-  storeLogoUrl: string | null;
-  emailFont: EmailFontId;
-  copy: ChromeCopy;
-}) {
-  const chipBg = isDarkHex(theme.emailBackgroundColor)
-    ? "rgba(255,255,255,0.08)"
-    : "rgba(47,58,42,0.08)";
-  const noteBg = isDarkHex(theme.emailBackgroundColor)
-    ? "rgba(255,255,255,0.06)"
-    : "rgba(47,58,42,0.05)";
-  return (
-    <div className="px-5 py-7 sm:px-7">
-      <EmailStoreHeader
-        storeName={storeName}
-        storeLogoUrl={storeLogoUrl}
-        primary={theme.brandColor}
-        emailFont={emailFont}
-        textColor={theme.emailTextColor}
-        className="mb-6"
-      />
-      <span
-        className="inline-flex rounded-full px-3 py-1 text-[11px] font-semibold"
-        style={{ background: chipBg, color: theme.brandColor }}
-      >
-        {copy.status}
-      </span>
-      <h2
-        className="mt-4 text-[20px] font-semibold tracking-[-0.03em]"
-        style={{ color: theme.emailTextColor }}
-      >
-        {copy.headline}
-      </h2>
-      <p className="mt-3 text-[14px] leading-relaxed" style={{ color: theme.mutedTextColor }}>
-        {copy.body}
-      </p>
-      <div className="mt-5 rounded-xl px-4 py-3" style={{ background: noteBg }}>
-        <p className="text-[12px] font-medium" style={{ color: theme.emailTextColor }}>
-          Nothing here is gone
-        </p>
-        <ul className="mt-2 space-y-1 text-[12px]" style={{ color: theme.mutedTextColor }}>
-          {copy.support.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
-      </div>
-      <div className="mt-6">
-        <Cta theme={theme} label={copy.cta} />
-      </div>
-      <p className="mt-4 text-[12px]">
-        <a
-          href="#secondary"
-          onClick={preventNav}
-          className="underline"
-          style={{ color: theme.linkColor }}
-        >
-          {copy.secondaryLink}
-        </a>
-      </p>
-    </div>
-  );
-}
-
-function SoftRenew({
-  theme,
-  storeName,
-  storeLogoUrl,
-  emailFont,
-  copy,
-  vars,
-}: {
-  theme: EmailThemeTokens;
-  storeName: string;
-  storeLogoUrl: string | null;
-  emailFont: EmailFontId;
-  copy: ChromeCopy;
-  vars: PreviewVars & { storeName: string };
-}) {
-  const rowBorder = isDarkHex(theme.emailBackgroundColor)
-    ? "rgba(255,255,255,0.1)"
-    : "rgba(0,0,0,0.07)";
-  return (
-    <div className="px-5 py-7 sm:px-7">
-      <EmailStoreHeader
-        storeName={storeName}
-        storeLogoUrl={storeLogoUrl}
-        primary={theme.brandColor}
-        emailFont={emailFont}
-        textColor={theme.emailTextColor}
-        className="mb-6"
-      />
-      <p
-        className="text-[11px] font-medium uppercase tracking-[0.14em]"
-        style={{ color: theme.mutedTextColor }}
-      >
-        {copy.eyebrow}
-      </p>
-      <h2
-        className="mt-2 text-[20px] font-semibold tracking-[-0.03em]"
-        style={{ color: theme.emailTextColor }}
-      >
-        {copy.headline}
-      </h2>
-      <p className="mt-3 text-[14px] leading-relaxed" style={{ color: theme.mutedTextColor }}>
-        {copy.body}
-      </p>
-      <div className="mt-5 border-y py-3" style={{ borderColor: rowBorder }}>
-        <p className="text-[12px] font-medium" style={{ color: theme.mutedTextColor }}>
-          What’s included
-        </p>
-        <ul className="mt-2 space-y-1.5 text-[13px]" style={{ color: theme.emailTextColor }}>
-          {copy.support.map((line) => (
-            <li key={line} className="flex gap-2">
-              <span aria-hidden style={{ color: theme.mutedTextColor }}>
-                ·
-              </span>
-              {line}
-            </li>
-          ))}
-        </ul>
-      </div>
-      <div className="mt-4 flex items-baseline justify-between gap-3">
-        <p className="text-[12px]" style={{ color: theme.mutedTextColor }}>
-          {vars.product}
-        </p>
-        <p className="text-[15px] font-semibold" style={{ color: theme.emailTextColor }}>
-          {vars.amount}
-        </p>
-      </div>
-      <div className="mt-6">
-        <Cta theme={theme} label={copy.cta} />
-      </div>
-      <p className="mt-4 text-[12px]">
-        <a
-          href="#secondary"
-          onClick={preventNav}
-          className="underline"
-          style={{ color: theme.linkColor }}
-        >
-          {copy.secondaryLink}
-        </a>
-      </p>
-    </div>
-  );
-}
-
-function AlertExpire({
-  theme,
-  storeName,
-  storeLogoUrl,
-  emailFont,
-  copy,
-}: {
-  theme: EmailThemeTokens;
-  storeName: string;
-  storeLogoUrl: string | null;
-  emailFont: EmailFontId;
-  copy: ChromeCopy;
-}) {
-  return (
-    <div>
-      <div className="h-1.5 w-full" style={{ background: theme.brandColor }} />
-      <div className="px-5 py-7 sm:px-7">
-        <EmailStoreHeader
-          storeName={storeName}
-          storeLogoUrl={storeLogoUrl}
-          primary={theme.brandColor}
-          emailFont={emailFont}
-          textColor={theme.emailTextColor}
-          className="mb-6"
-        />
-        <p
-          className="text-[11px] font-medium uppercase tracking-[0.14em]"
-          style={{ color: theme.mutedTextColor }}
-        >
-          {copy.eyebrow}
-        </p>
-        <h2
-          className="mt-2 text-[20px] font-semibold tracking-[-0.03em]"
-          style={{ color: theme.emailTextColor }}
-        >
-          {copy.headline}
-        </h2>
-        <p className="mt-3 text-[14px] leading-relaxed" style={{ color: theme.mutedTextColor }}>
-          {copy.body}
-        </p>
-        <ol className="mt-5 space-y-2">
-          {copy.support.map((line, i) => (
-            <li key={line} className="flex gap-3 text-[13px]">
-              <span
-                className="flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
-                style={{
-                  background: theme.brandColor,
-                  color: theme.ctaTextColor,
-                }}
-              >
-                {i + 1}
-              </span>
-              <span style={{ color: theme.emailTextColor }}>{line}</span>
-            </li>
-          ))}
-        </ol>
-        <div className="mt-6">
-          <Cta theme={theme} label={copy.cta} />
-        </div>
-        <p className="mt-4 text-[12px]">
-          <a
-            href="#secondary"
-            onClick={preventNav}
-            className="underline"
-            style={{ color: theme.linkColor }}
-          >
-            {copy.secondaryLink}
-          </a>
-        </p>
+      <div className="mt-4">
+        <BillingLink theme={theme} label={copy.secondaryLink} align="center" />
       </div>
     </div>
   );
 }
 
-function InvoiceStack({
-  theme,
-  storeName,
-  storeLogoUrl,
-  emailFont,
-  copy,
-  vars,
-}: {
-  theme: EmailThemeTokens;
-  storeName: string;
-  storeLogoUrl: string | null;
-  emailFont: EmailFontId;
-  copy: ChromeCopy;
-  vars: PreviewVars & { storeName: string };
-}) {
+function PostscriptNote({ theme, storeName, storeLogoUrl, emailFont, copy }: LayoutProps) {
   const rule = isDarkHex(theme.emailBackgroundColor)
     ? "rgba(255,255,255,0.12)"
     : "rgba(0,0,0,0.08)";
   return (
-    <div className="px-4 py-5 sm:px-5">
-      <EmailStoreHeader
+    <div className="px-8 py-9">
+      <Header
+        theme={theme}
         storeName={storeName}
         storeLogoUrl={storeLogoUrl}
-        primary={theme.brandColor}
         emailFont={emailFont}
-        textColor={theme.emailTextColor}
-        align="right"
-        className="mb-5"
       />
-      <p className="text-[11px]" style={{ color: theme.mutedTextColor }}>
-        Receipt
-      </p>
-      <p className="mt-1 text-[14px] font-semibold" style={{ color: theme.emailTextColor }}>
-        {vars.product}
-      </p>
-      <p className="mt-1 text-[26px] font-semibold tracking-tight" style={{ color: theme.emailTextColor }}>
-        {vars.amount}
-      </p>
-      <hr className="my-4" style={{ borderColor: rule }} />
-      <p className="text-[11px] uppercase tracking-[0.14em]" style={{ color: theme.mutedTextColor }}>
-        {copy.eyebrow}
-      </p>
-      <h2 className="mt-2 text-[18px] font-semibold" style={{ color: theme.emailTextColor }}>
+      <h2
+        className="text-[22px] font-semibold tracking-[-0.02em]"
+        style={{ color: theme.emailTextColor }}
+      >
         {copy.headline}
       </h2>
-      <p className="mt-2 text-[13px] leading-relaxed" style={{ color: theme.mutedTextColor }}>
+      <p className="mt-3 text-[15px] leading-relaxed" style={{ color: theme.mutedTextColor }}>
         {copy.body}
       </p>
       <div className="mt-5">
         <Cta theme={theme} label={copy.cta} />
       </div>
-    </div>
-  );
-}
-
-function ChecklistCard({
-  theme,
-  storeName,
-  storeLogoUrl,
-  emailFont,
-  copy,
-}: {
-  theme: EmailThemeTokens;
-  storeName: string;
-  storeLogoUrl: string | null;
-  emailFont: EmailFontId;
-  copy: ChromeCopy;
-}) {
-  const rule = isDarkHex(theme.emailBackgroundColor)
-    ? "rgba(255,255,255,0.12)"
-    : "rgba(0,0,0,0.08)";
-  return (
-    <div className="px-8 py-9 text-center">
-      <EmailStoreHeader
-        storeName={storeName}
-        storeLogoUrl={storeLogoUrl}
-        primary={theme.brandColor}
-        emailFont={emailFont}
-        textColor={theme.emailTextColor}
-        align="center"
-        className="mb-6"
-      />
-      <h2 className="text-[22px] font-semibold tracking-tight" style={{ color: theme.emailTextColor }}>
-        {copy.headline}
-      </h2>
-      <p className="mx-auto mt-3 max-w-[20rem] text-[14px] leading-relaxed" style={{ color: theme.mutedTextColor }}>
-        {copy.body}
+      <hr className="mt-5" style={{ borderColor: rule }} />
+      <p className="mt-4 text-[13px] italic" style={{ color: theme.mutedTextColor }}>
+        P.S. Access stays on while you update.
       </p>
-      <hr className="mx-auto my-5 w-16" style={{ borderColor: rule }} />
-      <p className="text-[11px] uppercase tracking-[0.14em]" style={{ color: theme.mutedTextColor }}>
-        Before you continue
-      </p>
-      <ul className="mt-2 space-y-1 text-[13px]" style={{ color: theme.emailTextColor }}>
-        {copy.support.map((line) => (
-          <li key={line}>{line}</li>
-        ))}
-      </ul>
-      <div className="mt-6 flex justify-center">
-        <Cta theme={theme} label={copy.cta} />
+      <div className="mt-3">
+        <BillingLink theme={theme} label={copy.secondaryLink} />
       </div>
     </div>
   );
 }
 
-function SplitBanner({
-  theme,
-  storeName,
-  storeLogoUrl,
-  emailFont,
-  copy,
-}: {
-  theme: EmailThemeTokens;
-  storeName: string;
-  storeLogoUrl: string | null;
-  emailFont: EmailFontId;
-  copy: ChromeCopy;
-}) {
+function WhatHappened({ theme, storeName, storeLogoUrl, emailFont, copy }: LayoutProps) {
   return (
-    <div>
-      <div className="h-1.5 w-full" style={{ background: theme.brandColor }} />
-      <div className="px-6 py-10 text-right sm:px-10">
-        <EmailStoreHeader
-          storeName={storeName}
-          storeLogoUrl={storeLogoUrl}
-          primary={theme.brandColor}
-          emailFont={emailFont}
-          textColor={theme.emailTextColor}
-          align="right"
-          showName={false}
-          className="mb-6"
-        />
-        <h2 className="text-[26px] font-semibold tracking-tight" style={{ color: theme.emailTextColor }}>
-          {copy.headline}
-        </h2>
-        <p className="mt-2 text-[11px] uppercase tracking-[0.16em]" style={{ color: theme.mutedTextColor }}>
-          {copy.eyebrow}
-        </p>
-        <p className="ml-auto mt-4 max-w-[22rem] text-[14px] leading-relaxed" style={{ color: theme.mutedTextColor }}>
-          {copy.body}
-        </p>
-        <div className="mt-7 flex justify-end">
-          <Cta theme={theme} label={copy.cta} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StepRail({
-  theme,
-  storeName,
-  storeLogoUrl,
-  emailFont,
-  copy,
-}: {
-  theme: EmailThemeTokens;
-  storeName: string;
-  storeLogoUrl: string | null;
-  emailFont: EmailFontId;
-  copy: ChromeCopy;
-}) {
-  const rule = isDarkHex(theme.emailBackgroundColor)
-    ? "rgba(255,255,255,0.12)"
-    : "rgba(0,0,0,0.08)";
-  return (
-    <div className="px-5 py-7 sm:px-7">
-      <EmailStoreHeader
+    <div className="px-7 py-8">
+      <Header
+        theme={theme}
         storeName={storeName}
         storeLogoUrl={storeLogoUrl}
-        primary={theme.brandColor}
         emailFont={emailFont}
-        textColor={theme.emailTextColor}
-        className="mb-6"
       />
-      <p className="text-[11px] uppercase tracking-[0.14em]" style={{ color: theme.mutedTextColor }}>
-        How this works
-      </p>
-      <ol className="mt-3 space-y-2">
-        {copy.support.map((line, i) => (
-          <li key={line} className="text-[14px] font-semibold" style={{ color: theme.emailTextColor }}>
-            {i + 1} — {line}
-          </li>
-        ))}
-      </ol>
-      <hr className="my-5" style={{ borderColor: rule }} />
-      <p className="text-[11px]" style={{ color: theme.mutedTextColor }}>
-        {copy.eyebrow}
-      </p>
-      <h2 className="mt-2 text-[20px] font-semibold" style={{ color: theme.emailTextColor }}>
+      <h2
+        className="text-[22px] font-semibold tracking-[-0.02em]"
+        style={{ color: theme.emailTextColor }}
+      >
         {copy.headline}
       </h2>
-      <p className="mt-3 text-[14px] leading-relaxed" style={{ color: theme.mutedTextColor }}>
+      <p
+        className="mt-6 text-[11px] uppercase tracking-[0.12em]"
+        style={{ color: theme.mutedTextColor }}
+      >
+        What happened
+      </p>
+      <p className="mt-1.5 text-[15px] leading-relaxed" style={{ color: theme.emailTextColor }}>
         {copy.body}
+      </p>
+      <p
+        className="mt-5 text-[11px] uppercase tracking-[0.12em]"
+        style={{ color: theme.mutedTextColor }}
+      >
+        What to do
+      </p>
+      <p className="mt-1.5 text-[15px] leading-relaxed" style={{ color: theme.emailTextColor }}>
+        Update the card. Takes about a minute.
       </p>
       <div className="mt-6">
         <Cta theme={theme} label={copy.cta} />
       </div>
+      <div className="mt-3.5">
+        <BillingLink theme={theme} label={copy.secondaryLink} />
+      </div>
     </div>
   );
 }
 
-function TightNotice({
-  theme,
-  storeName,
-  storeLogoUrl,
-  emailFont,
-  copy,
-  vars,
-}: {
-  theme: EmailThemeTokens;
-  storeName: string;
-  storeLogoUrl: string | null;
-  emailFont: EmailFontId;
-  copy: ChromeCopy;
-  vars: PreviewVars & { storeName: string };
-}) {
+function QuietColumn({ theme, copy }: LayoutProps) {
+  return (
+    <div className="px-12 py-14">
+      <h2
+        className="text-[26px] font-semibold leading-snug tracking-[-0.03em]"
+        style={{ color: theme.emailTextColor }}
+      >
+        {copy.headline}
+      </h2>
+      <p className="mt-4 max-w-[24rem] text-[17px] leading-relaxed" style={{ color: theme.mutedTextColor }}>
+        {copy.body}
+      </p>
+      <div className="mt-8">
+        <Cta theme={theme} label={copy.cta} />
+      </div>
+      <div className="mt-4">
+        <BillingLink theme={theme} label={copy.secondaryLink} />
+      </div>
+    </div>
+  );
+}
+
+function StubHeader({ theme, storeName, storeLogoUrl, emailFont, copy, vars }: LayoutProps) {
+  const rule = isDarkHex(theme.emailBackgroundColor)
+    ? "rgba(255,255,255,0.12)"
+    : "rgba(0,0,0,0.1)";
+  return (
+    <div className="px-6 py-6">
+      <Header
+        theme={theme}
+        storeName={storeName}
+        storeLogoUrl={storeLogoUrl}
+        emailFont={emailFont}
+      />
+      <p className="text-[12px]" style={{ color: theme.mutedTextColor }}>
+        {vars.product}  ·  {vars.amount}
+      </p>
+      <hr className="mt-2.5" style={{ borderColor: rule }} />
+      <h2
+        className="mt-5 text-[20px] font-semibold tracking-[-0.02em]"
+        style={{ color: theme.emailTextColor }}
+      >
+        {copy.headline}
+      </h2>
+      <p className="mt-2.5 text-[14px] leading-relaxed" style={{ color: theme.mutedTextColor }}>
+        {copy.body}
+      </p>
+      <div className="mt-5">
+        <Cta theme={theme} label={copy.cta} />
+      </div>
+      <div className="mt-3.5">
+        <BillingLink theme={theme} label={copy.secondaryLink} />
+      </div>
+    </div>
+  );
+}
+
+function EndAction({ theme, storeName, storeLogoUrl, emailFont, copy }: LayoutProps) {
   const rule = isDarkHex(theme.emailBackgroundColor)
     ? "rgba(255,255,255,0.12)"
     : "rgba(0,0,0,0.08)";
   return (
-    <div>
-      <div className="h-1.5 w-full" style={{ background: theme.brandColor }} />
-      <div className="px-4 py-5 text-center">
-        <EmailStoreHeader
-          storeName={storeName}
-          storeLogoUrl={storeLogoUrl}
-          primary={theme.brandColor}
-          emailFont={emailFont}
-          textColor={theme.emailTextColor}
-          align="left"
-          className="mb-4"
-        />
-        <hr style={{ borderColor: rule }} />
-        <p className="mt-3 text-[10px] uppercase tracking-[0.16em]" style={{ color: theme.mutedTextColor }}>
-          {copy.eyebrow}
-        </p>
-        <h2 className="mt-2 text-[16px] font-semibold" style={{ color: theme.emailTextColor }}>
-          {copy.headline}
-        </h2>
-        <p className="mt-2 text-[13px] leading-relaxed" style={{ color: theme.mutedTextColor }}>
-          {copy.body}
-        </p>
-        <div className="mt-4 flex justify-center">
-          <Cta theme={theme} label={copy.cta} />
-        </div>
-        <hr className="mt-5" style={{ borderColor: rule }} />
-        <p className="mt-3 text-[12px]" style={{ color: theme.mutedTextColor }}>
-          Access stays on while you update.
-        </p>
-        <p className="mt-1 text-[12px]" style={{ color: theme.mutedTextColor }}>
-          {vars.product} · {vars.amount}
-        </p>
+    <div className="px-8 py-9">
+      <Header
+        theme={theme}
+        storeName={storeName}
+        storeLogoUrl={storeLogoUrl}
+        emailFont={emailFont}
+      />
+      <h2
+        className="text-[22px] font-semibold tracking-[-0.02em]"
+        style={{ color: theme.emailTextColor }}
+      >
+        {copy.headline}
+      </h2>
+      <p className="mt-3 text-[15px] leading-relaxed" style={{ color: theme.mutedTextColor }}>
+        {copy.body}
+      </p>
+      <p className="mt-3 text-[14px]" style={{ color: theme.mutedTextColor }}>
+        Your workspace stays put.
+      </p>
+      <hr className="mt-2" style={{ borderColor: rule }} />
+      <div className="mt-8 flex justify-center">
+        <Cta theme={theme} label={copy.cta} />
+      </div>
+      <div className="mt-3.5">
+        <BillingLink theme={theme} label={copy.secondaryLink} align="center" />
       </div>
     </div>
   );

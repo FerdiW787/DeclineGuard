@@ -62,166 +62,153 @@ export default function LayoutPresetPicker({
 function LayoutThumb({ id }: { id: LayoutPresetId }) {
   const theme = PRESET_THEMES[id] ?? QUIET_VERIFY_TOKENS;
   switch (id) {
-    case "sonos":
+    case "poster-notice":
       return (
         <div
-          className="flex h-16 flex-col items-center justify-center gap-1.5 rounded-lg"
+          className="flex h-16 flex-col items-center justify-center gap-1.5 rounded-lg px-3"
           style={{ background: theme.emailBackgroundColor }}
         >
+          <span className="h-1.5 w-12 bg-black/20" />
+          <span className="h-1 w-8 rounded-full bg-black/10" />
           <span
-            className="size-2 rounded-full"
-            style={{ background: theme.brandColor }}
-          />
-          <span className="h-1 w-10 rounded-full bg-black/15" />
-          <span className="h-1 w-7 rounded-full bg-black/10" />
-          <span
-            className="mt-0.5 h-2 w-8 rounded-full"
+            className="mt-1 h-2 w-7 rounded-sm"
             style={{ background: theme.ctaBackgroundColor }}
           />
         </div>
       );
-    case "avocode":
+    case "amount-due":
       return (
         <div
           className="flex h-16 flex-col justify-center gap-1 rounded-lg px-2.5"
           style={{ background: theme.emailBackgroundColor }}
         >
-          <span className="h-1 w-8 rounded-full bg-black/20" />
+          <span className="h-1 w-6 rounded-full bg-black/10" />
+          <span className="h-4 w-10 bg-black/20" />
+          <span className="h-1 w-8 rounded-full bg-black/10" />
           <span
-            className="h-6 rounded-md border"
-            style={{ borderColor: `${theme.brandColor}22` }}
-          />
-          <span
-            className="h-2 w-9 rounded-md"
+            className="mt-0.5 h-2 w-7 rounded-sm"
             style={{ background: theme.ctaBackgroundColor }}
           />
         </div>
       );
-    case "benchmark":
+    case "plain-letter":
       return (
         <div
           className="flex h-16 flex-col justify-center gap-1 rounded-lg px-2.5"
           style={{ background: theme.emailBackgroundColor }}
         >
-          <span
-            className="h-1.5 w-10 rounded-full"
-            style={{ background: `${theme.brandColor}22` }}
-          />
-          <span className="h-1 w-12 rounded-full bg-black/15" />
-          <span className="h-4 rounded-md bg-black/6" />
-        </div>
-      );
-    case "fontbase":
-      return (
-        <div
-          className="flex h-16 flex-col justify-center gap-1 rounded-lg px-2.5"
-          style={{ background: theme.emailBackgroundColor }}
-        >
-          <span className="h-1 w-11 rounded-full bg-black/18" />
+          <span className="h-1 w-10 bg-black/18" />
           <span className="h-1 w-full rounded-full bg-black/8" />
-          <span className="h-1 w-full rounded-full bg-black/8" />
+          <span className="h-1 w-11/12 rounded-full bg-black/8" />
           <span
-            className="mt-0.5 h-2 w-8 rounded-md"
+            className="mt-1 h-2 w-7 rounded-sm"
             style={{ background: theme.ctaBackgroundColor }}
           />
         </div>
       );
-    case "nordvpn-structure":
+    case "cta-lead":
       return (
         <div
-          className="flex h-16 flex-col overflow-hidden rounded-lg"
+          className="flex h-16 flex-col justify-center gap-1 rounded-lg px-2.5"
           style={{ background: theme.emailBackgroundColor }}
         >
-          <span className="h-1 w-full" style={{ background: theme.brandColor }} />
-          <div className="flex flex-1 flex-col justify-center gap-1 px-2.5">
-            <span className="h-1 w-10 rounded-full bg-black/20" />
-            <span className="h-1 w-7 rounded-full bg-black/10" />
-            <span
-              className="mt-0.5 h-2 w-8 rounded-md"
-              style={{ background: theme.ctaBackgroundColor }}
-            />
-          </div>
+          <span
+            className="h-2.5 w-9 rounded-sm"
+            style={{ background: theme.ctaBackgroundColor }}
+          />
+          <span className="mt-1 h-1 w-10 bg-black/18" />
+          <span className="h-1 w-8 rounded-full bg-black/10" />
         </div>
       );
-    case "invoice-stack":
+    case "ruled-editorial":
       return (
         <div
-          className="flex h-16 flex-col justify-center gap-1 rounded-sm px-2.5"
+          className="flex h-16 flex-col items-center justify-center gap-1.5 rounded-lg px-3"
           style={{ background: theme.emailBackgroundColor }}
         >
-          <span className="ml-auto h-1 w-5 rounded-full bg-black/20" />
-          <span className="h-3 w-8 bg-black/15" />
-          <span className="h-px w-full bg-black/10" />
+          <span className="h-px w-full bg-black/16" />
+          <span className="h-1.5 w-10 bg-black/20" />
+          <span className="h-px w-full bg-black/16" />
+          <span
+            className="h-2 w-6 rounded-sm"
+            style={{ background: theme.ctaBackgroundColor }}
+          />
+        </div>
+      );
+    case "postscript-note":
+      return (
+        <div
+          className="flex h-16 flex-col justify-center gap-1 rounded-lg px-2.5"
+          style={{ background: theme.emailBackgroundColor }}
+        >
+          <span className="h-1 w-10 bg-black/18" />
+          <span className="h-1 w-8 rounded-full bg-black/10" />
           <span
             className="h-2 w-7 rounded-sm"
             style={{ background: theme.ctaBackgroundColor }}
           />
+          <span className="h-px w-full bg-black/10" />
+          <span className="h-1 w-9 rounded-full bg-black/8" />
         </div>
       );
-    case "checklist-card":
+    case "what-happened":
       return (
         <div
-          className="flex h-16 flex-col items-center justify-center gap-1 rounded-2xl px-2.5"
+          className="flex h-16 flex-col justify-center gap-1 rounded-lg px-2.5"
           style={{ background: theme.emailBackgroundColor }}
         >
-          <span className="h-1 w-10 rounded-full bg-black/18" />
-          <span className="h-1 w-7 rounded-full bg-black/10" />
-          <span className="h-1 w-8 rounded-full bg-black/10" />
+          <span className="h-1 w-9 bg-black/18" />
+          <span className="h-1 w-5 rounded-full bg-black/8" />
+          <span className="h-1 w-11 rounded-full bg-black/12" />
+          <span className="h-1 w-5 rounded-full bg-black/8" />
           <span
-            className="mt-0.5 h-2 w-6 rounded-full"
+            className="mt-0.5 h-2 w-7 rounded-sm"
             style={{ background: theme.ctaBackgroundColor }}
           />
         </div>
       );
-    case "split-banner":
+    case "quiet-column":
       return (
         <div
-          className="flex h-16 flex-col overflow-hidden"
+          className="flex h-16 flex-col justify-end gap-1.5 rounded-lg px-2.5 pb-2"
           style={{ background: theme.emailBackgroundColor }}
         >
-          <span className="h-1 w-full" style={{ background: theme.brandColor }} />
-          <div className="flex flex-1 flex-col items-end justify-center gap-1 px-2.5">
-            <span className="h-1.5 w-11 bg-black/20" />
-            <span className="h-1 w-6 rounded-full bg-black/10" />
-            <span
-              className="mt-0.5 h-2 w-7"
-              style={{ background: theme.ctaBackgroundColor }}
-            />
-          </div>
+          <span className="h-2 w-12 bg-black/18" />
+          <span className="h-1 w-10 rounded-full bg-black/8" />
+          <span
+            className="h-2 w-6 rounded-sm"
+            style={{ background: theme.ctaBackgroundColor }}
+          />
         </div>
       );
-    case "step-rail":
+    case "stub-header":
       return (
         <div
-          className="flex h-16 flex-col justify-center gap-1 rounded-md px-2.5"
+          className="flex h-16 flex-col justify-center gap-1 rounded-sm border border-black/10 px-2"
           style={{ background: theme.emailBackgroundColor }}
         >
-          <span className="h-1 w-6 rounded-full bg-black/12" />
-          <span className="h-1 w-9 rounded-full bg-black/20" />
-          <span className="h-1 w-8 rounded-full bg-black/20" />
+          <span className="h-1 w-8 rounded-full bg-black/12" />
+          <span className="h-px w-full bg-black/14" />
+          <span className="h-1 w-10 bg-black/18" />
+          <span
+            className="h-2 w-6 rounded-sm"
+            style={{ background: theme.ctaBackgroundColor }}
+          />
+        </div>
+      );
+    case "end-action":
+      return (
+        <div
+          className="flex h-16 flex-col justify-between rounded-lg px-2.5 py-2"
+          style={{ background: theme.emailBackgroundColor }}
+        >
+          <span className="h-1 w-10 bg-black/18" />
+          <span className="h-1 w-8 rounded-full bg-black/8" />
           <span className="h-px w-full bg-black/10" />
           <span
-            className="h-2 w-7 rounded-md"
+            className="mx-auto h-2 w-7 rounded-sm"
             style={{ background: theme.ctaBackgroundColor }}
           />
-        </div>
-      );
-    case "tight-notice":
-      return (
-        <div
-          className="flex h-16 flex-col overflow-hidden"
-          style={{ background: theme.emailBackgroundColor }}
-        >
-          <span className="h-1 w-full" style={{ background: theme.brandColor }} />
-          <div className="flex flex-1 flex-col items-center justify-center gap-1 px-2">
-            <span className="h-px w-full bg-black/10" />
-            <span className="h-1 w-8 rounded-full bg-black/18" />
-            <span
-              className="h-2 w-6"
-              style={{ background: theme.ctaBackgroundColor }}
-            />
-            <span className="h-px w-full bg-black/10" />
-          </div>
         </div>
       );
     default: {
