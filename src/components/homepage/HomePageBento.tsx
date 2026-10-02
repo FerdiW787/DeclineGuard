@@ -119,6 +119,9 @@ export function HomePageFooter() {
           <a href="/pricing" className="transition-colors hover:text-[#08090a]">
             Pricing
           </a>
+          <a href="/#faq" className="transition-colors hover:text-[#08090a]">
+            FAQ
+          </a>
           <a href="/features" className="transition-colors hover:text-[#08090a]">
             Feature requests
           </a>
@@ -146,9 +149,7 @@ export function HomePageFooter() {
           <a href="/legal/dpa" className="transition-colors hover:text-[#08090a]">
             DPA
           </a>
-          <span className="text-[#6b7078]">
-            © {new Date().getFullYear()} DeclineGuard
-          </span>
+          <span>© {new Date().getFullYear()} DeclineGuard</span>
         </div>
       </div>
     </footer>

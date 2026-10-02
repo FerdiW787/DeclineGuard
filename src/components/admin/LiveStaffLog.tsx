@@ -168,11 +168,11 @@ export default function LiveStaffLog({
           }`}
         >
           {entries === undefined ? (
-            <li className="px-5 py-8 text-center text-sm text-black/40">
+            <li className="px-5 py-8 text-center text-sm text-[#8a8f98]">
               Loading activity…
             </li>
           ) : entries.length === 0 ? (
-            <li className="px-5 py-8 text-center text-sm text-black/40">
+            <li className="px-5 py-8 text-center text-sm text-[#8a8f98]">
               No staff actions yet
             </li>
           ) : (
@@ -208,12 +208,12 @@ export default function LiveStaffLog({
                           </span>
                         ) : null}
                         {row.revokedAt ? (
-                          <span className="rounded-full border border-black/10 bg-black/[0.04] px-1.5 py-0.5 text-[10px] font-semibold text-black/50">
+                          <span className="rounded-full border border-black/10 bg-black/[0.04] px-1.5 py-0.5 text-[10px] font-semibold text-[#6b6f76]">
                             Revoked
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-0.5 text-sm text-black/75">
+                      <p className="mt-0.5 text-sm text-[#6b6f76]">
                         {humanAction(row.action)}
                         {row.target ? (
                           <>
@@ -222,14 +222,14 @@ export default function LiveStaffLog({
                           </>
                         ) : null}
                       </p>
-                      <p className="mt-1 line-clamp-2 text-[12px] text-black/45">
+                      <p className="mt-1 line-clamp-2 text-[12px] text-[#8a8f98]">
                         {row.reason ?? "No comment on file"}
                       </p>
-                      <p className="mt-1 text-[11px] text-black/35">
+                      <p className="mt-1 text-[11px] text-[#8a8f98]">
                         {formatWhen(row.createdAt)}
                       </p>
                     </div>
-                    <ChevronRight className="mt-1 size-4 shrink-0 text-black/25" />
+                    <ChevronRight className="mt-1 size-4 shrink-0 text-[#8a8f98]" />
                   </button>
                 </li>
               );
@@ -243,7 +243,7 @@ export default function LiveStaffLog({
           }`}
         >
           {!selected ? (
-            <div className="flex h-full min-h-48 items-center justify-center px-5 py-8 text-center text-sm text-black/40">
+            <div className="flex h-full min-h-48 items-center justify-center px-5 py-8 text-center text-sm text-[#8a8f98]">
               Select an action to inspect
             </div>
           ) : (
@@ -254,7 +254,7 @@ export default function LiveStaffLog({
                 </h3>
                 <button
                   type="button"
-                  className="rounded-lg p-1 text-black/40 hover:bg-black/5 hover:text-black"
+                  className="rounded-lg p-1 text-[#8a8f98] hover:bg-black/5 hover:text-black"
                   onClick={() => setSelectedId(null)}
                   aria-label="Close detail"
                 >
@@ -264,25 +264,25 @@ export default function LiveStaffLog({
 
               <dl className="space-y-3 text-sm">
                 <div>
-                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-black/40">
+                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#8a8f98]">
                     Who
                   </dt>
                   <dd className="mt-0.5">
                     {selected.actor?.userName ?? "—"}{" "}
-                    <span className="text-black/45">
+                    <span className="text-[#8a8f98]">
                       ({selected.actor?.role ?? "?"})
                     </span>
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-black/40">
+                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#8a8f98]">
                     Target
                   </dt>
                   <dd className="mt-0.5">
                     {selected.target ? (
                       <>
                         {selected.target.userName}{" "}
-                        <span className="text-black/45">
+                        <span className="text-[#8a8f98]">
                           ({selected.target.role} · {selected.target.accountStatus})
                         </span>
                       </>
@@ -292,29 +292,29 @@ export default function LiveStaffLog({
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-black/40">
+                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#8a8f98]">
                     Their comment
                   </dt>
-                  <dd className="mt-0.5 whitespace-pre-wrap text-black/75">
+                  <dd className="mt-0.5 whitespace-pre-wrap text-[#6b6f76]">
                     {selected.reason ?? "—"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-black/40">
+                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#8a8f98]">
                     When
                   </dt>
                   <dd className="mt-0.5">{formatWhen(selected.createdAt)}</dd>
                 </div>
                 {selected.revokedAt ? (
                   <div>
-                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-black/40">
+                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#8a8f98]">
                       Revoked
                     </dt>
                     <dd className="mt-0.5">
                       {formatWhen(selected.revokedAt)} by{" "}
                       {selected.revokedBy?.userName ?? "Admin"}
                       {selected.revokeNote ? (
-                        <span className="mt-1 block text-black/55">
+                        <span className="mt-1 block text-[#6b6f76]">
                           {selected.revokeNote}
                         </span>
                       ) : null}
@@ -325,7 +325,7 @@ export default function LiveStaffLog({
 
               {selected.reversible ? (
                 <div className="space-y-2 border-t border-black/8 pt-4">
-                  <p className="text-[13px] text-black/55">
+                  <p className="text-[13px] text-[#6b6f76]">
                     Undo this action (unfreeze / unban the target). Leave a
                     note for the audit trail.
                   </p>
@@ -347,7 +347,7 @@ export default function LiveStaffLog({
                   </button>
                 </div>
               ) : selected.revokedAt ? null : (
-                <p className="border-t border-black/8 pt-4 text-[13px] text-black/45">
+                <p className="border-t border-black/8 pt-4 text-[13px] text-[#8a8f98]">
                   This action can’t be auto-revoked (restore, reclaim, kick
                   sessions, unlock). Fix manually if needed.
                 </p>

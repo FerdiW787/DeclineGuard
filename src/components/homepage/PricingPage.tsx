@@ -40,7 +40,7 @@ function FreePlanCtas() {
 function PricingPage() {
   return (
     <div className="ln-surface min-h-screen bg-white text-[#08090a]">
-      <HomeNav homeAnchors={false} />
+      <HomeNav homeAnchors={false} current="pricing" />
 
       <main className="mx-auto max-w-[1440px] px-6 pb-24 pt-28 md:pb-32 md:pt-36 lg:px-10">
         <div className="mx-auto max-w-xl text-center">

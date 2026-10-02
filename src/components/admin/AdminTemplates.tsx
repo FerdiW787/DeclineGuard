@@ -44,6 +44,9 @@ export default function AdminTemplates() {
   const recoveriesPair = detail
     ? selectPeriodPair(detail.recoveries, period)
     : null;
+  const recoveredPair = detail
+    ? selectPeriodPair(detail.recoveredCents, period)
+    : null;
   const recoveriesDelta = recoveriesPair
     ? periodDelta(
         recoveriesPair.current.total,
@@ -162,9 +165,11 @@ export default function AdminTemplates() {
               <p className="mt-1 text-[13px] text-[#8a8f98]">
                 Recoveries
                 {recoveriesDelta ? ` · ${recoveriesDelta.label}` : ""}
-                {listRow
-                  ? ` · ${formatAdminMetricValue(listRow.recoveredCents, "cents")} last 5y`
-                  : ""}
+                {recoveredPair
+                  ? ` · ${formatAdminMetricValue(recoveredPair.current.total, "cents")}`
+                  : listRow
+                    ? ` · ${formatAdminMetricValue(listRow.recoveredCents, "cents")} last 5y`
+                    : ""}
               </p>
               {detail && detail.unattributed > 0 ? (
                 <p className="mt-1 text-[12px] text-[#8a8f98]">
