@@ -3,14 +3,18 @@ import { SignedIn, SignedOut } from "@clerk/astro/react";
 import BrandLogo from "@/components/BrandLogo";
 import { useClerkClient } from "@/components/auth/useClerkClient";
 
-const navLinks = [
-  { label: "Product", href: "#product" },
-  { label: "How it works", href: "#how" },
-  { label: "Pricing", href: "#plans" },
-  { label: "Requests", href: "/features" },
-];
+type HomeNavProps = {
+  /** When false, hashes point at `/#…` and Pricing goes to `/pricing`. */
+  homeAnchors?: boolean;
+};
 
-export function HomeNav() {
+export function HomeNav({ homeAnchors = true }: HomeNavProps) {
+  const navLinks = [
+    { label: "Product", href: homeAnchors ? "#product" : "/#product" },
+    { label: "How it works", href: homeAnchors ? "#how" : "/#how" },
+    { label: "Pricing", href: homeAnchors ? "#plans" : "/pricing" },
+    { label: "Requests", href: "/features" },
+  ];
   const [solid, setSolid] = useState(false);
 
   useEffect(() => {

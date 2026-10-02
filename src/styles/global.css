@@ -1096,6 +1096,25 @@ html:not(.dark) .ln-btn-nav:hover {
   overscroll-behavior-x: none;
 }
 
+.ln-container {
+  width: 100%;
+  max-width: 90rem;
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .ln-container {
+    padding-inline: 2.5rem;
+  }
+}
+
+.ln-eyebrow {
+  font-size: 13px;
+  font-weight: 500;
+  color: #8a8f98;
+}
+
 .ln-product-stage {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.9fr);

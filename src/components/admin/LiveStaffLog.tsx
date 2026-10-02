@@ -126,24 +126,36 @@ export default function LiveStaffLog({
         fillHeight ? "h-full min-h-0" : ""
       }`}
     >
-      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-black/8 px-5 py-4">
-        <div>
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Activity className="size-4 text-black/50" />
-            Live staff log
-            <span className="rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-900">
-              Admin
-            </span>
+      {fillHeight ? (
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-black/8 px-5 py-3">
+          <div className="flex items-center gap-2 text-[12px] font-semibold text-[#6b6f76]">
+            <Activity className="size-3.5" />
+            Latest actions
           </div>
-          <p className="mt-1 text-[13px] text-black/50">
-            Latest Staff and Admin actions with required comments — open one to
-            review or revoke.
-          </p>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+            Live
+          </span>
         </div>
-        <span className="text-[11px] font-medium uppercase tracking-wide text-emerald-700">
-          Live
-        </span>
-      </div>
+      ) : (
+        <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-black/8 px-5 py-4">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Activity className="size-4 text-[#8a8f98]" />
+              Live staff log
+              <span className="rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-900">
+                Admin
+              </span>
+            </div>
+            <p className="mt-1 text-[13px] leading-relaxed text-[#6b6f76]">
+              Latest Staff and Admin actions with required comments — open one
+              to review or revoke.
+            </p>
+          </div>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+            Live
+          </span>
+        </div>
+      )}
 
       <div
         className={`grid min-h-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] ${

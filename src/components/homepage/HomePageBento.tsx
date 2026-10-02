@@ -29,7 +29,10 @@ export const homeFaqs = [
 
 export function HomePageFaq() {
   return (
-    <section className="ln-surface border-t border-black/[0.06] bg-white text-[#08090a]">
+    <section
+      id="faq"
+      className="ln-surface scroll-mt-24 border-t border-black/[0.06] bg-white text-[#08090a]"
+    >
       <div className="mx-auto max-w-[1440px] px-6 py-24 md:py-32 lg:px-10">
         <div className="dg-section-head grid gap-12 lg:grid-cols-[minmax(0,18rem)_1fr] lg:gap-24">
           <div>
@@ -110,7 +113,7 @@ export function HomePageFinalCta() {
 export function HomePageFooter() {
   return (
     <footer className="ln-surface border-t border-black/[0.08] bg-white text-[#8a8f98]">
-      <div className="mx-auto flex max-w-[1440px] flex-col items-center justify-between gap-6 px-6 py-10 text-center sm:flex-row sm:text-left lg:px-10">
+      <div className="mx-auto flex max-w-[1440px] flex-col items-center justify-between gap-6 px-6 py-12 text-center sm:flex-row sm:text-left lg:px-10">
         <BrandLogo size="sm" href="/" />
         <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[13px]">
           <a href="/pricing" className="transition-colors hover:text-[#08090a]">

@@ -90,9 +90,9 @@ export function HomePageContent() {
             {trust.map((item, i) => (
               <div
                 key={item.title}
-                className={`px-1 py-12 md:px-8 md:py-16 ${
+                className={`px-1 py-14 md:px-8 md:py-20 ${
                   i > 0
-                    ? "border-t border-black/[0.06] md:border-t-0 md:border-l"
+                    ? "border-t border-black/[0.06] md:border-t-0 md:border-l md:border-black/[0.06]"
                     : ""
                 }`}
               >

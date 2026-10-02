@@ -15,7 +15,7 @@ export function LinearCta({
 }: Props) {
   const base = variant === "primary" ? "ln-btn-primary" : "ln-btn-ghost";
   return (
-    <a href={href} className={`${base} ${className}`}>
+    <a href={href} className={`ln-btn ${base} ${className}`.trim()}>
       {children}
     </a>
   );

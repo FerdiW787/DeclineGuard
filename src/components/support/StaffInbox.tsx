@@ -306,16 +306,22 @@ export default function StaffInbox({
         fillHeight ? "h-full min-h-0" : ""
       }`}
     >
-      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-black/8 px-5 py-4">
-        <div>
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Headphones className="size-4 text-black/50" />
-            Support inbox
+      <div
+        className={`flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-black/8 px-5 ${
+          fillHeight ? "py-3" : "items-start py-4"
+        }`}
+      >
+        {fillHeight ? (
+          <div className="flex flex-wrap items-center gap-2">
             {typeof unclaimedCount === "number" && unclaimedCount > 0 ? (
               <span className="rounded-full bg-[#111] px-2 py-0.5 text-[10px] font-bold text-white">
                 {unclaimedCount} waiting
               </span>
-            ) : null}
+            ) : (
+              <span className="text-[12px] font-semibold text-[#6b6f76]">
+                Inbox
+              </span>
+            )}
             {isAdmin &&
             typeof escalatedCount === "number" &&
             escalatedCount > 0 ? (
@@ -324,16 +330,35 @@ export default function StaffInbox({
               </span>
             ) : null}
           </div>
-          <p className="mt-1 max-w-xl text-[13px] text-black/50">
-            Claim → reply → mark done. One person per chat.{" "}
-            <a
-              href="/a/admin/docs/support"
-              className="font-medium text-blue-700 underline-offset-2 hover:underline"
-            >
-              Guide
-            </a>
-          </p>
-        </div>
+        ) : (
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Headphones className="size-4 text-[#8a8f98]" />
+              Support inbox
+              {typeof unclaimedCount === "number" && unclaimedCount > 0 ? (
+                <span className="rounded-full bg-[#111] px-2 py-0.5 text-[10px] font-bold text-white">
+                  {unclaimedCount} waiting
+                </span>
+              ) : null}
+              {isAdmin &&
+              typeof escalatedCount === "number" &&
+              escalatedCount > 0 ? (
+                <span className="rounded-full bg-violet-700 px-2 py-0.5 text-[10px] font-bold text-white">
+                  {escalatedCount} for Admin
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-1 max-w-xl text-[13px] leading-relaxed text-[#6b6f76]">
+              Claim → reply → mark done. One person per chat.{" "}
+              <a
+                href="/a/admin/docs/support"
+                className="font-medium text-blue-700 underline-offset-2 hover:underline"
+              >
+                Guide
+              </a>
+            </p>
+          </div>
+        )}
         <div className="flex flex-wrap gap-1" role="tablist" aria-label="Inbox views">
           {filters
             .filter((f) => !f.adminOnly || isAdmin)

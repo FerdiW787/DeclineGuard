@@ -11,6 +11,7 @@
 import type * as clerk from "../clerk.js";
 import type * as crons from "../crons.js";
 import type * as functions_admin from "../functions/admin.js";
+import type * as functions_adminAnalytics from "../functions/adminAnalytics.js";
 import type * as functions_billing from "../functions/billing.js";
 import type * as functions_adminActions from "../functions/adminActions.js";
 import type * as functions_adminTakeover from "../functions/adminTakeover.js";
@@ -65,6 +66,7 @@ declare const fullApi: ApiFromModules<{
   clerk: typeof clerk;
   crons: typeof crons;
   "functions/admin": typeof functions_admin;
+  "functions/adminAnalytics": typeof functions_adminAnalytics;
   "functions/billing": typeof functions_billing;
   "functions/adminActions": typeof functions_adminActions;
   "functions/adminTakeover": typeof functions_adminTakeover;

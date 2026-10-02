@@ -5,6 +5,9 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { withConvexClerkProvider } from "@/lib/withConvexClerkProvider";
 import BrandLogo from "@/components/BrandLogo";
+import AdminOverview from "@/components/admin/AdminOverview";
+import AdminTemplates from "@/components/admin/AdminTemplates";
+import { AdminPageHeader } from "@/components/admin/adminUi";
 import LiveStaffLog from "@/components/admin/LiveStaffLog";
 import PageEnter, {
   type PageEnterHandle,
@@ -13,11 +16,13 @@ import StaffInbox from "@/components/support/StaffInbox";
 import {
   ArchiveRestore,
   Ban,
+  BarChart3,
   BookOpen,
   CheckCircle2,
   ChevronDown,
   Headphones,
   KeyRound,
+  Layers,
   LayoutDashboard,
   Lock,
   Radio,
@@ -31,14 +36,16 @@ import {
 const ADMIN_DOCS = "/a/admin/docs";
 
 const STAFF_NAV: {
-  id: "support" | "merchants" | "live" | "docs";
+  id: "overview" | "templates" | "support" | "merchants" | "live" | "docs";
   label: string;
   icon: typeof Headphones;
   adminOnly?: boolean;
 }[] = [
+  { id: "overview", label: "Overview", icon: BarChart3, adminOnly: true },
+  { id: "templates", label: "Templates", icon: Layers, adminOnly: true },
   { id: "support", label: "Support", icon: Headphones },
   { id: "merchants", label: "Merchants", icon: Users },
-  { id: "live", label: "Live log", icon: Radio, adminOnly: true },
+  { id: "live", label: "Live", icon: Radio, adminOnly: true },
   { id: "docs", label: "Guides", icon: BookOpen },
 ];
 
@@ -381,8 +388,8 @@ function AdminConsoleInner() {
     return (
       <div className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center gap-4 bg-[#f7f8f8] px-6 text-center text-[#08090a]">
         <BrandLogo />
-        <h1 className="ln-h1 text-2xl">Staff only</h1>
-        <p className="text-sm text-[#6b6f76]">
+        <h1 className="font-display text-3xl tracking-tight">Staff only</h1>
+        <p className="text-sm leading-relaxed text-[#6b6f76]">
           This page is for DeclineGuard Staff and Admins. Ask an owner to set
           your Clerk{" "}
           <code className="rounded bg-black/5 px-1.5 py-0.5 text-[12px]">
@@ -573,17 +580,21 @@ function AdminConsoleInner() {
 
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <PageEnter ref={pageEnterRef} pageKey={nav}>
+            {nav === "overview" && iAmAdmin ? (
+              <AdminOverview />
+            ) : null}
+
+            {nav === "templates" && iAmAdmin ? (
+              <AdminTemplates />
+            ) : null}
+
             {nav === "support" ? (
-              <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-1 flex-col px-5 py-5 md:px-8">
-                <div className="mb-4 shrink-0" data-enter>
-                  <h1 className="font-display text-2xl tracking-tight">
-                    Support
-                  </h1>
-                  <p className="mt-1 text-sm text-black/55">
-                    Claim a chat, help the merchant, mark done — or ask an
-                    Admin when you’re stuck.
-                  </p>
-                </div>
+              <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-1 flex-col px-5 py-6 md:px-8 md:py-8">
+                <AdminPageHeader
+                  eyebrow="Inbox"
+                  title="Support"
+                  description="Claim a chat, help the merchant, mark done — or ask an Admin when you’re stuck."
+                />
                 <div className="min-h-0 flex-1" data-enter>
                   <StaffInbox
                     isAdmin={iAmAdmin}
@@ -603,18 +614,14 @@ function AdminConsoleInner() {
 
             {nav === "live" && iAmAdmin ? (
               <div
-                className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-1 flex-col px-5 py-5 md:px-8"
+                className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-1 flex-col px-5 py-6 md:px-8 md:py-8"
                 data-enter
               >
-                <div className="mb-4 shrink-0">
-                  <h1 className="font-display text-2xl tracking-tight">
-                    Live staff log
-                  </h1>
-                  <p className="mt-1 text-sm text-black/55">
-                    Watch privileged actions in real time. Revoke freeze or ban
-                    if something looks wrong.
-                  </p>
-                </div>
+                <AdminPageHeader
+                  eyebrow="Audit"
+                  title="Live"
+                  description="Watch privileged actions in real time. Revoke freeze or ban if something looks wrong."
+                />
                 <div className="min-h-0 flex-1">
                   <LiveStaffLog fillHeight />
                 </div>
@@ -623,25 +630,26 @@ function AdminConsoleInner() {
 
             {nav === "docs" ? (
               <div
-                className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-1 flex-col overflow-y-auto px-5 py-5 md:px-8"
+                className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-1 flex-col overflow-y-auto px-5 py-6 md:px-8 md:py-8"
                 data-enter
               >
-                <h1 className="font-display text-2xl tracking-tight">
-                  Staff guides
-                </h1>
-                <p className="mt-1 text-sm text-black/55">
-                  How recovery tools and support chat work — open in a new tab
-                  when you need the full write-up.
-                </p>
-                <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <AdminPageHeader
+                  eyebrow="Docs"
+                  title="Guides"
+                  description="How recovery tools and support chat work — open in a new tab when you need the full write-up."
+                />
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <a
                     href={`${ADMIN_DOCS}#overview`}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-2xl border border-black/8 bg-white px-5 py-4 transition hover:border-black/15 hover:bg-black/[0.02]"
+                    className="rounded-2xl border border-black/8 bg-white px-5 py-5 transition hover:border-black/15 hover:bg-black/[0.02]"
                   >
-                    <p className="text-sm font-semibold">Recovery console</p>
-                    <p className="mt-1 text-[13px] text-black/50">
+                    <ShieldAlert className="size-4 text-[#8a8f98]" />
+                    <p className="mt-3 text-sm font-semibold text-[#08090a]">
+                      Recovery console
+                    </p>
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-[#6b6f76]">
                       Freeze, kick sessions, restore, reclaim store, unlock, ban
                     </p>
                   </a>
@@ -649,10 +657,13 @@ function AdminConsoleInner() {
                     href="/a/admin/docs/support"
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-2xl border border-black/8 bg-white px-5 py-4 transition hover:border-black/15 hover:bg-black/[0.02]"
+                    className="rounded-2xl border border-black/8 bg-white px-5 py-5 transition hover:border-black/15 hover:bg-black/[0.02]"
                   >
-                    <p className="text-sm font-semibold">Support chat</p>
-                    <p className="mt-1 text-[13px] text-black/50">
+                    <Headphones className="size-4 text-[#8a8f98]" />
+                    <p className="mt-3 text-sm font-semibold text-[#08090a]">
+                      Support chat
+                    </p>
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-[#6b6f76]">
                       Claim, reply, mark done, escalate to Admin, close as spam
                     </p>
                   </a>
@@ -660,10 +671,13 @@ function AdminConsoleInner() {
                     href={`${ADMIN_DOCS}#roles`}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-2xl border border-black/8 bg-white px-5 py-4 transition hover:border-black/15 hover:bg-black/[0.02]"
+                    className="rounded-2xl border border-black/8 bg-white px-5 py-5 transition hover:border-black/15 hover:bg-black/[0.02]"
                   >
-                    <p className="text-sm font-semibold">Roles</p>
-                    <p className="mt-1 text-[13px] text-black/50">
+                    <Users className="size-4 text-[#8a8f98]" />
+                    <p className="mt-3 text-sm font-semibold text-[#08090a]">
+                      Roles
+                    </p>
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-[#6b6f76]">
                       What Staff vs Admin can do
                     </p>
                   </a>
@@ -672,24 +686,22 @@ function AdminConsoleInner() {
             ) : null}
 
             {nav === "merchants" ? (
-              <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-1 flex-col overflow-y-auto px-5 py-5 md:px-8">
-                <div className="mb-6 shrink-0" data-enter>
-                  <h1 className="font-display text-2xl tracking-tight md:text-[1.75rem]">
-                    Merchants
-                  </h1>
-                  <p className="mt-1.5 text-sm leading-relaxed text-black/55">
-                    Find the account, stop the damage, put their data back, then
-                    unlock them.
-                  </p>
-                </div>
+              <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-1 flex-col overflow-y-auto px-5 py-6 md:px-8 md:py-8">
+                <AdminPageHeader
+                  eyebrow="Accounts"
+                  title="Merchants"
+                  description="Find the account, stop the damage, put their data back, then unlock them."
+                />
 
                 <section
                   className="mb-6 shrink-0 rounded-2xl border border-black/8 bg-white"
                   data-enter
                 >
                   <div className="px-5 py-4">
-                    <p className="text-sm font-semibold">Resend quota</p>
-                    <p className="mt-0.5 text-[13px] text-black/50">
+                    <p className="text-sm font-semibold text-[#08090a]">
+                      Resend quota
+                    </p>
+                    <p className="mt-1 text-[13px] leading-relaxed text-[#6b6f76]">
                       Provider 429 / quota blocks — sequences skip that send,
                       they are not merchant plan overage.
                     </p>
@@ -819,11 +831,11 @@ function AdminConsoleInner() {
         <div className="min-w-0 space-y-4">
           {!selectedId ? (
             <div className="rounded-2xl border border-dashed border-black/15 bg-black/[0.015] px-6 py-14 text-center">
-              <ShieldAlert className="mx-auto size-8 text-black/25" />
-              <h2 className="font-display mt-4 text-xl tracking-tight">
+              <ShieldAlert className="mx-auto size-8 text-[#8a8f98]" />
+              <h2 className="font-display mt-4 text-xl tracking-tight text-[#08090a]">
                 Pick a merchant on the left
               </h2>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-black/50">
+              <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-[#6b6f76]">
                 You’ll get a clear checklist: freeze if needed, restore wiped
                 data, reclaim a stolen store, then unlock them again.
               </p>
