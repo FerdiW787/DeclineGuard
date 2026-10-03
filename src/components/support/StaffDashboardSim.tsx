@@ -671,6 +671,7 @@ export default function StaffDashboardSim({
                 recoveryRateLabel={viewingDummy ? "—" : recoveryRateLabel}
                 feesOwedLabel="$0"
                 youKeepLabel={viewingDummy ? "$0" : recoveredLabel}
+                recoveryFeePercent={10}
                 openFailures={viewingDummy ? [] : data.openFailures}
                 recentActivity={viewingDummy ? [] : data.recentActivity}
                 brandColor={brandColor}
