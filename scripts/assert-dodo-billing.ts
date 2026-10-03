@@ -28,8 +28,10 @@ import {
   dodoIngestPeriodKey,
   dodoUsageAfterAcceptPersistDecision,
   dodoUsageCatchAction,
+  dodoUsagePendingAcceptSettleSnapshot,
   dodoUsagePeriodKey,
   dodoUsageReuseAcceptedEventId,
+  monthlyOwedFeeAddsMerchant,
   dodoUsageReclaimDeltaCents,
   dodoUsageReclaimFailureSnapshot,
   existingClaimBlocksNewCharge,
@@ -1041,6 +1043,48 @@ assert(
     usageIngestSettlesFeePeriod() === false,
   "failed persist after accept is not created; same period can finish without a second meter event",
 );
+const pendingAfterAccept = dodoUsagePendingAcceptSettleSnapshot({
+  acceptedCents: 14000,
+  scheduledMonthClose: true,
+  submittedAt: day1FebIngestAt,
+});
+assert(
+  !monthlyOwedFeeAddsMerchant({
+    testMode: false,
+    billingInvoiceId: "inv_jan",
+    feeCents: 14000,
+  }) &&
+    monthlyOwedFeeAddsMerchant({
+      testMode: false,
+      billingInvoiceId: null,
+      feeCents: 14000,
+    }) &&
+    !monthlyOwedFeeAddsMerchant({
+      testMode: true,
+      billingInvoiceId: null,
+      feeCents: 14000,
+    }) &&
+    pendingAfterAccept.outcome === "failed" &&
+    pendingAfterAccept.status === "created" &&
+    pendingAfterAccept.monthClosed === true &&
+    pendingAfterAccept.submittedAt === day1FebIngestAt &&
+    pendingAfterAccept.ingestedCents === 14000 &&
+    pendingAfterAccept.settleable === true &&
+    pendingAfterAccept.emitAgain === false &&
+    invoiceMatchesUsageCharge({
+      status: pendingAfterAccept.status,
+      periodKey: "2026-01",
+      coveredPeriodKey: "2026-01",
+      dodoUsageSubmittedAt: pendingAfterAccept.submittedAt,
+      monthClosed: pendingAfterAccept.monthClosed,
+    }) &&
+    dodoUsageReclaimDeltaCents(pendingAfterAccept.ingestedCents, 14000) === 0 &&
+    dodoIngestPeriodKey({
+      nowMs: day1MarIngestAt,
+      scheduledMonthClose: true,
+    }) === "2026-02",
+  "owed-fee cron skips linked invoices; pending marker commits monthClosed so 20 Feb can settle accepted cents",
+);
 assert(
   upsertDodoUsageCredit(
     [{ periodKey: "2026-01", paidAt: day1FebChargeAt, paymentId: "pay_feb1" }],
@@ -1643,6 +1687,24 @@ assert(
     !settleFn.includes(".first()"),
   "settle matches the covered period instead of scanning oldest 24",
 );
+const pendingFn = feeBillingSrc.slice(
+  feeBillingSrc.indexOf("export const markDodoUsageAcceptedPending"),
+  feeBillingSrc.indexOf("export const settleDodoUsageFeeInvoices"),
+);
+const owedFeePageFn = feeBillingSrc.slice(
+  feeBillingSrc.indexOf("export const listOwedFeePage"),
+  feeBillingSrc.indexOf("export const getUserBillingTarget"),
+);
+assert(
+  pendingFn.includes("writeDodoUsageAcceptedSnapshot") &&
+    pendingFn.includes("monthClosed: args.monthClosed") &&
+    pendingFn.includes("nowMs: args.nowMs") &&
+    pendingFn.includes("ingestedCents: args.ingestedCents") &&
+    owedFeePageFn.includes("billingInvoiceId: row.billingInvoiceId") &&
+    feeActionsSrc.includes("monthlyOwedFeeAddsMerchant({") &&
+    feeActionsSrc.includes("billingInvoiceId: fee.billingInvoiceId"),
+  "pending accept marker commits settle fields; owed-fee cron still skips linked invoices",
+);
 const viaDodoSrc = feeActionsSrc.slice(
   feeActionsSrc.indexOf("async function invoiceMerchantViaDodo"),
   feeActionsSrc.indexOf("export const runMonthlyFeeInvoices"),
@@ -1663,6 +1725,9 @@ assert(
     viaDodoSrc.includes("dodoUsageAfterAcceptPersistDecision") &&
     viaDodoSrc.includes("persist_after_accept") &&
     viaDodoSrc.includes("markDodoUsageAcceptedPending") &&
+    viaDodoSrc.includes("monthClosed: scheduledMonthClose") &&
+    feeActionsSrc.includes("monthlyOwedFeeAddsMerchant") &&
+    feeActionsSrc.includes("listOwedFeePage") &&
     viaDodoSrc.indexOf("ingestDodoUsageEvents") <
       viaDodoSrc.indexOf("dodoAccepted = true") &&
     viaDodoSrc.indexOf("dodoAccepted = true") <

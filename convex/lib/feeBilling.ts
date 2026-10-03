@@ -189,6 +189,49 @@ export function dodoUsageReuseAcceptedEventId(
   return existing || nextEventId;
 }
 
+/** Monthly owed-fee scan: linked fees never re-enter invoiceMerchant. */
+export function monthlyOwedFeeAddsMerchant(args: {
+  testMode: boolean;
+  billingInvoiceId?: string | null;
+  feeCents: number;
+}): boolean {
+  if (args.testMode) return false;
+  if (args.billingInvoiceId != null) return false;
+  if (args.feeCents <= 0) return false;
+  return true;
+}
+
+/**
+ * Last-ditch write after persist throws. Commits the settle fields for
+ * cents Dodo already accepted so a later Pro charge can pay them. The
+ * monthly owed-fee cron will not revisit those linked fees.
+ */
+export function dodoUsagePendingAcceptSettleSnapshot(args: {
+  acceptedCents: number;
+  scheduledMonthClose: boolean;
+  submittedAt: number;
+}): {
+  outcome: "failed";
+  status: "created";
+  ingestedCents: number;
+  monthClosed: boolean;
+  submittedAt: number;
+  settleable: boolean;
+  emitAgain: boolean;
+} {
+  const ingestedCents = Math.max(0, Math.round(args.acceptedCents));
+  const monthClosed = args.scheduledMonthClose && ingestedCents > 0;
+  return {
+    outcome: "failed",
+    status: "created",
+    ingestedCents,
+    monthClosed,
+    submittedAt: args.submittedAt,
+    settleable: monthClosed,
+    emitAgain: false,
+  };
+}
+
 /** Idempotency key: one LS charge per merchant per UTC month. */
 export function feeInvoiceClaimKey(
   userId: Id<"users">,

@@ -596,6 +596,7 @@ async function writeDodoUsageAcceptedSnapshot(
     nowMs: number;
     monthClosed?: boolean;
     ingestedCents?: number;
+    lastError?: string;
   },
 ): Promise<void> {
   const monthClosed =
@@ -612,7 +613,7 @@ async function writeDodoUsageAcceptedSnapshot(
     dodoUsageIngestedCents: ingested,
     dodoUsageMeteredFeeIds: args.invoice.feeIds,
     dodoUsageMonthClosed: monthClosed ? true : args.invoice.dodoUsageMonthClosed,
-    lastError: undefined,
+    lastError: args.lastError?.slice(0, 500),
   });
 }
 
@@ -720,6 +721,8 @@ export const markDodoUsageAcceptedPending = internalMutation({
     invoiceId: v.id("billingInvoices"),
     dodoUsageEventId: v.string(),
     ingestedCents: v.number(),
+    nowMs: v.number(),
+    monthClosed: v.optional(v.boolean()),
     error: v.string(),
   },
   returns: v.boolean(),
@@ -727,10 +730,13 @@ export const markDodoUsageAcceptedPending = internalMutation({
     const invoice = await ctx.db.get(args.invoiceId);
     if (!invoice) return false;
     if (invoice.status === "paid") return false;
-    await ctx.db.patch(args.invoiceId, {
+    await writeDodoUsageAcceptedSnapshot(ctx, {
+      invoice,
       dodoUsageEventId: args.dodoUsageEventId,
-      dodoUsageIngestedCents: Math.max(0, Math.round(args.ingestedCents)),
-      lastError: args.error.slice(0, 500),
+      nowMs: args.nowMs,
+      monthClosed: args.monthClosed,
+      ingestedCents: args.ingestedCents,
+      lastError: args.error,
     });
     return true;
   },

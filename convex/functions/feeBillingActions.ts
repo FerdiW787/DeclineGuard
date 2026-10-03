@@ -13,7 +13,7 @@ import {
   dodoUsageCatchAction,
   dodoUsagePeriodKey,
   dodoUsageReclaimDeltaCents,
-  dodoUsageReuseAcceptedEventId,
+  monthlyOwedFeeAddsMerchant,
   shouldUnlinkFeesAfterDodoUsageFailure,
   utcPeriodKey,
 } from "../lib/feeBilling";
@@ -738,17 +738,14 @@ async function invoiceMerchantViaDodo(
     if (!meterReady.ingest) {
       throw new Error(meterReady.reason);
     }
-    const eventId = dodoUsageReuseAcceptedEventId(
-      undefined,
-      dodoUsageEventId({
-        invoiceId,
-        claimKey,
-        amountCents:
-          claim.reclaimed && claim.priorIngestedCents > 0
-            ? claim.totalCents
-            : undefined,
-      }),
-    );
+    const eventId = dodoUsageEventId({
+      invoiceId,
+      claimKey,
+      amountCents:
+        claim.reclaimed && claim.priorIngestedCents > 0
+          ? claim.totalCents
+          : undefined,
+    });
     await ingestDodoUsageEvents(config, [
       buildRecoveryFeeUsageEvent({
         eventId,
@@ -903,6 +900,8 @@ async function invoiceMerchantViaDodo(
             invoiceId,
             dodoUsageEventId: acceptedEventId,
             ingestedCents: persistDecision.ingestedCents,
+            nowMs,
+            monthClosed: scheduledMonthClose,
             error: "persist_after_accept",
           },
         );
@@ -975,9 +974,15 @@ export const runMonthlyFeeInvoices = internalAction({
         },
       );
       for (const fee of page.page) {
-        if (fee.testMode) continue;
-        if (fee.billingInvoiceId != null) continue;
-        if (fee.feeCents <= 0) continue;
+        if (
+          !monthlyOwedFeeAddsMerchant({
+            testMode: fee.testMode,
+            billingInvoiceId: fee.billingInvoiceId,
+            feeCents: fee.feeCents,
+          })
+        ) {
+          continue;
+        }
         userIds.add(fee.userId);
       }
       if (page.isDone) break;
