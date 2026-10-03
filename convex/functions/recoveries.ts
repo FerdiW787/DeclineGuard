@@ -22,7 +22,7 @@ import {
   recoveryFeeRate,
   recoveryFeePercent,
   isWithinAttributionWindow,
-  ATTRIBUTION_WINDOW_DAYS,
+  recoveryActivityDetail,
   includedRecoveryEmails,
   emailOveragePacks,
   EMAIL_OVERAGE_PACK_PRICE_USD,
@@ -36,7 +36,7 @@ import {
 import {
   quotaHeldAfterLazyRelease,
   utcMonthStartMs,
-  utcNextMonthStartMs,
+  emailMeterMonthBounds,
 } from "../lib/declineCapacity";
 import {
   releaseHeldAndSchedule,
@@ -1000,12 +1000,11 @@ export const markPaymentRecovered = internalMutation({
       open.day0SentAt,
       args.recoveredAt,
     );
-    const recoveryDetail =
-      open.day0SentAt == null
-        ? `${amountLabel} · Lemon Squeezy recovered before our sequence`
-        : attributed
-          ? `${amountLabel} · Recovered after our sequence started`
-          : `${amountLabel} · Recovered after the ${ATTRIBUTION_WINDOW_DAYS}-day attribution window`;
+    const recoveryDetail = recoveryActivityDetail(
+      amountLabel,
+      open.day0SentAt,
+      args.recoveredAt,
+    );
 
     await ctx.db.insert("activityEvents", {
       userId: args.userId,
@@ -1432,7 +1431,7 @@ export const getRecoverySummary = query({
 
 /** Monthly recovery-email quota (soft overage — never blocks a sequence). */
 export const getEmailQuotaStatus = query({
-  args: { monthStartMs: v.number() },
+  args: { nowMs: v.number() },
   returns: v.object({
     plan: planValidator,
     sent: v.number(),
@@ -1461,9 +1460,9 @@ export const getEmailQuotaStatus = query({
 
     const plan = resolvePlan(user);
     const included = includedRecoveryEmails(plan);
-    const monthEndMs = utcNextMonthStartMs(args.monthStartMs);
-    // Month-bounded index range. Do not take a newest-N slice then drop
-    // deletes — deleted rows would hide live sends in the same month.
+    const { startMs, endMs } = emailMeterMonthBounds(args.nowMs);
+    // UTC month from nowMs. Do not take a newest-N slice then drop deletes,
+    // and do not treat a client local midnight as a UTC month start.
     // eslint-disable-next-line @convex-dev/no-query-collect
     const rows = await ctx.db
       .query("activityEvents")
@@ -1471,15 +1470,11 @@ export const getEmailQuotaStatus = query({
         q
           .eq("userId", user._id)
           .eq("type", "email_sent")
-          .gte("occurredAt", args.monthStartMs)
-          .lt("occurredAt", monthEndMs),
+          .gte("occurredAt", startMs)
+          .lt("occurredAt", endMs),
       )
       .collect();
-    const sent = countLiveEmailSendsInMonth(
-      rows,
-      args.monthStartMs,
-      monthEndMs,
-    );
+    const sent = countLiveEmailSendsInMonth(rows, startMs, endMs);
 
     const remaining = Math.max(0, included - sent);
     const overageEmails = Math.max(0, sent - included);

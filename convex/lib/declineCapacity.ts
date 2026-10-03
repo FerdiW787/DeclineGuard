@@ -68,6 +68,19 @@ export function utcNextMonthStartMs(monthStartMs: number): number {
 }
 
 /**
+ * UTC month bounds for the email meter. Both ends are derived from `nowMs`
+ * on the server — never treat a client local-midnight timestamp as a UTC
+ * month start.
+ */
+export function emailMeterMonthBounds(nowMs: number): {
+  startMs: number;
+  endMs: number;
+} {
+  const startMs = utcMonthStartMs(nowMs);
+  return { startMs, endMs: utcNextMonthStartMs(startMs) };
+}
+
+/**
  * Prefer Dodo `product_cart` quantity over checkout metadata.
  * Metadata is attacker-controlled; cart qty is what was charged.
  */

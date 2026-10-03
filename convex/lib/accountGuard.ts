@@ -307,6 +307,21 @@ export function isWithinAttributionWindow(
   return gap >= 0 && gap <= ATTRIBUTION_WINDOW_MS;
 }
 
+/** Activity copy for a recovery. Pre-Day-0 is not "past the window". */
+export function recoveryActivityDetail(
+  amountLabel: string,
+  day0SentAt: number | null | undefined,
+  recoveredAt: number,
+): string {
+  if (day0SentAt == null || recoveredAt < day0SentAt) {
+    return `${amountLabel} · Lemon Squeezy recovered before our sequence`;
+  }
+  if (isWithinAttributionWindow(day0SentAt, recoveredAt)) {
+    return `${amountLabel} · Recovered after our sequence started`;
+  }
+  return `${amountLabel} · Recovered after the ${ATTRIBUTION_WINDOW_DAYS}-day attribution window`;
+}
+
 export type EmailSentMeterRow = {
   occurredAt: number;
   deletedAt?: number | null;
