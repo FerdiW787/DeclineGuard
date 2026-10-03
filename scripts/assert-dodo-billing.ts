@@ -25,8 +25,10 @@ import {
   usageIngestSettlesFeePeriod,
 } from "../convex/lib/billingProvider";
 import {
+  dodoUsagePeriodKey,
   existingClaimBlocksNewCharge,
   previousUtcPeriodKey,
+  utcPeriodKey,
 } from "../convex/lib/feeBilling";
 import {
   availableDeclineCapacity,
@@ -54,9 +56,12 @@ import {
   dodoFeePathDecision,
   dodoMeterAggregationKeyFromResponse,
   dodoPaymentAmountCents,
+  dodoUsageChargeKind,
   dodoUsageEventId,
+  dodoUsageMerchantMatch,
   dodoUsageMeterDecision,
   dodoUsageSettleDecision,
+  dodoUsageSettlePayloadDecision,
   extractDodoUserRefs,
   feeCentsToUsageUsd,
   invoiceMatchesUsageCharge,
@@ -826,10 +831,16 @@ assert(
 const janUsageSubmittedAt = Date.UTC(2026, 0, 15);
 const decUsageSubmittedAt = Date.UTC(2025, 11, 15);
 const subscriptionSignupAt = Date.UTC(2025, 5, 1);
-const februaryRenewalAt = Date.UTC(2026, 1, 1, 12, 0, 0);
+const day1FebIngestAt = Date.UTC(2026, 1, 1, 6, 0, 0);
+const februaryRenewalAt = Date.UTC(2026, 1, 20, 15, 0, 0);
 assert(
-  previousUtcPeriodKey(februaryRenewalAt) === "2026-01",
-  "February charge covers January usage",
+  utcPeriodKey(day1FebIngestAt) === "2026-02" &&
+    dodoUsagePeriodKey(day1FebIngestAt) === "2026-01" &&
+    previousUtcPeriodKey(februaryRenewalAt) === "2026-01" &&
+    dodoUsagePeriodKey(februaryRenewalAt) === "2026-01" &&
+    dodoUsagePeriodKey(day1FebIngestAt) ===
+      dodoUsagePeriodKey(februaryRenewalAt),
+  "day-1 ingest period equals the period a later Pro charge in that cycle settles",
 );
 assert(
   parseIsoMsStrict(null) === null &&
@@ -838,37 +849,38 @@ assert(
   "usage paidAt parser never falls back to Date.now() or non-ISO values",
 );
 assert(
-  parseIsoMsStrict("2026-02-01T12:00:00.000Z") === februaryRenewalAt,
+  parseIsoMsStrict("2026-02-20T15:00:00.000Z") === februaryRenewalAt,
   "payment created_at is the usage paidAt",
 );
 
-const renewalNoProduct = dodoUsageSettleDecision({
+const proRenewal = dodoUsageSettleDecision({
   eventType: "payment.succeeded",
   hasFeeClaimKey: false,
-  hasSubscriptionId: true,
-  matchesProProduct: false,
+  subscriptionId: "sub_pro",
+  productId: null,
+  expectedProProductId: "prod_pro",
+  merchantProSubscriptionId: "sub_pro",
+  chargeKind: "recurring",
   isUpdatePaymentMethod: false,
   amountCents: 3499,
   paymentCreatedAtMs: februaryRenewalAt,
 });
 assert(
-  renewalNoProduct.settle === true &&
-    renewalNoProduct.coveredPeriodKey === "2026-01" &&
-    renewalNoProduct.paidAt === februaryRenewalAt &&
-    renewalNoProduct.paidAt !== subscriptionSignupAt,
-  "renewal payment.succeeded with subscription_id and no product_id settles January",
+  proRenewal.settle === true &&
+    proRenewal.coveredPeriodKey === dodoUsagePeriodKey(day1FebIngestAt) &&
+    proRenewal.paidAt === februaryRenewalAt &&
+    proRenewal.paidAt !== subscriptionSignupAt,
+  "this merchant's Pro renewal settles the day-1 ingested usage month",
 );
 assert(
   invoiceMatchesUsageCharge({
     status: "created",
     periodKey: "2026-01",
-    coveredPeriodKey: renewalNoProduct.settle
-      ? renewalNoProduct.coveredPeriodKey
-      : "",
+    coveredPeriodKey: proRenewal.settle ? proRenewal.coveredPeriodKey : "",
     dodoUsageSubmittedAt: janUsageSubmittedAt,
-    paidAt: renewalNoProduct.settle ? renewalNoProduct.paidAt : 0,
+    paidAt: proRenewal.settle ? proRenewal.paidAt : 0,
   }),
-  "January usage ingested after signup is on the February charge",
+  "January usage ingested after signup is on the February Pro charge",
 );
 
 for (const eventType of [
@@ -879,8 +891,11 @@ for (const eventType of [
   const activation = dodoUsageSettleDecision({
     eventType,
     hasFeeClaimKey: false,
-    hasSubscriptionId: true,
-    matchesProProduct: true,
+    subscriptionId: "sub_pro",
+    productId: "prod_pro",
+    expectedProProductId: "prod_pro",
+    merchantProSubscriptionId: "sub_pro",
+    chargeKind: "recurring",
     isUpdatePaymentMethod: false,
     amountCents: 2999,
     paymentCreatedAtMs: subscriptionSignupAt,
@@ -907,7 +922,7 @@ assert(
     status: "created",
     periodKey: "2026-01",
     coveredPeriodKey: "2026-01",
-    dodoUsageSubmittedAt: Date.UTC(2026, 1, 2),
+    dodoUsageSubmittedAt: Date.UTC(2026, 1, 21),
     paidAt: februaryRenewalAt,
   }) === false,
   "usage submitted after the charge is not on that invoice",
@@ -916,8 +931,11 @@ assert(
 const updatePm = dodoUsageSettleDecision({
   eventType: "payment.succeeded",
   hasFeeClaimKey: false,
-  hasSubscriptionId: true,
-  matchesProProduct: true,
+  subscriptionId: "sub_pro",
+  productId: "prod_pro",
+  expectedProProductId: "prod_pro",
+  merchantProSubscriptionId: "sub_pro",
+  chargeKind: "recurring",
   isUpdatePaymentMethod: true,
   amountCents: 0,
   paymentCreatedAtMs: februaryRenewalAt,
@@ -933,8 +951,11 @@ assert(
   dodoUsageSettleDecision({
     eventType: "payment.succeeded",
     hasFeeClaimKey: false,
-    hasSubscriptionId: true,
-    matchesProProduct: false,
+    subscriptionId: "sub_pro",
+    productId: "prod_pro",
+    expectedProProductId: "prod_pro",
+    merchantProSubscriptionId: "sub_pro",
+    chargeKind: "recurring",
     isUpdatePaymentMethod: false,
     amountCents: 2999,
     paymentCreatedAtMs: null,
@@ -945,13 +966,98 @@ assert(
   dodoUsageSettleDecision({
     eventType: "payment.succeeded",
     hasFeeClaimKey: true,
-    hasSubscriptionId: false,
-    matchesProProduct: false,
+    subscriptionId: null,
+    productId: null,
+    expectedProProductId: "prod_pro",
+    merchantProSubscriptionId: null,
+    chargeKind: "recurring",
     isUpdatePaymentMethod: false,
     amountCents: 199,
     paymentCreatedAtMs: februaryRenewalAt,
   }).reason === "fee_claim_key",
   "fee claim_key must not settle usage",
+);
+
+const nonProProduct = dodoUsageSettleDecision({
+  eventType: "payment.succeeded",
+  hasFeeClaimKey: false,
+  subscriptionId: "sub_pro",
+  productId: "prod_addon",
+  expectedProProductId: "prod_pro",
+  merchantProSubscriptionId: "sub_pro",
+  chargeKind: "recurring",
+  isUpdatePaymentMethod: false,
+  amountCents: 500,
+  paymentCreatedAtMs: februaryRenewalAt,
+});
+assert(
+  nonProProduct.settle === false && nonProProduct.reason === "non_pro_product",
+  "a non-Pro product_id does not settle",
+);
+
+const subWithoutPro = dodoUsageSettleDecision({
+  eventType: "payment.succeeded",
+  hasFeeClaimKey: false,
+  subscriptionId: "sub_other",
+  productId: null,
+  expectedProProductId: "prod_pro",
+  merchantProSubscriptionId: null,
+  chargeKind: "recurring",
+  isUpdatePaymentMethod: false,
+  amountCents: 2999,
+  paymentCreatedAtMs: februaryRenewalAt,
+});
+assert(
+  subWithoutPro.settle === false &&
+    subWithoutPro.reason === "subscription_not_merchant_pro",
+  "subscription_id without Pro does not settle",
+);
+assert(
+  dodoUsageSettlePayloadDecision({
+    eventType: "payment.succeeded",
+    hasFeeClaimKey: false,
+    subscriptionId: "sub_other",
+    productId: null,
+    expectedProProductId: "prod_pro",
+    chargeKind: "recurring",
+    isUpdatePaymentMethod: false,
+    amountCents: 2999,
+    paymentCreatedAtMs: februaryRenewalAt,
+  }).settle === true &&
+    dodoUsageMerchantMatch({
+      paymentSubscriptionId: "sub_other",
+      merchantProSubscriptionId: "sub_pro",
+    }).ok === false,
+  "payload may look like a subscription charge; merchant Pro-sub match still rejects",
+);
+assert(
+  dodoUsageChargeKind({ on_demand: true }) === "on_demand" &&
+    dodoUsageChargeKind({ is_proration: true }) === "proration" &&
+    dodoUsageChargeKind({ addon: true }) === "addon" &&
+    dodoUsageSettleDecision({
+      eventType: "payment.succeeded",
+      hasFeeClaimKey: false,
+      subscriptionId: "sub_pro",
+      productId: "prod_pro",
+      expectedProProductId: "prod_pro",
+      merchantProSubscriptionId: "sub_pro",
+      chargeKind: "on_demand",
+      isUpdatePaymentMethod: false,
+      amountCents: 2999,
+      paymentCreatedAtMs: februaryRenewalAt,
+    }).reason === "not_pro_recurring_charge",
+  "on-demand / proration / addon charges do not settle",
+);
+assert(
+  pickUniqueDodoCustomerUser({
+    users: [{ dodoSubscriptionId: "sub_other" }],
+    dodoSubscriptionId: "sub_pro",
+  }) === null &&
+    dodoUsageMerchantMatch({
+      paymentSubscriptionId: "sub_pro",
+      merchantProSubscriptionId: "sub_other",
+    }).ok === false,
+  "one customer row with a different subscription id does not settle",
 );
 
 const missingMeter = dodoUsageMeterDecision({
@@ -1037,8 +1143,11 @@ assert(
 assert(
   dodoWebhookSrc.includes("parseIsoMsStrict(data.created_at)") &&
     dodoWebhookSrc.includes("coveredPeriodKey: decision.coveredPeriodKey") &&
-    dodoWebhookSrc.includes("hasSubscriptionId: subscriptionId != null"),
-  "usage settle uses payment created_at + subscription_id, not signup/now",
+    dodoWebhookSrc.includes("dodoUsageSettlePayloadDecision") &&
+    dodoWebhookSrc.includes("dodoUsageChargeKind(data)") &&
+    !dodoWebhookSrc.includes("hasSubscriptionId") &&
+    !dodoWebhookSrc.includes("matchesProProduct"),
+  "usage settle uses payment created_at + Pro payload gate, not signup/now",
 );
 const settleFn = feeBillingSrc.slice(
   feeBillingSrc.indexOf("export const settleDodoUsageFeeInvoices"),
@@ -1047,10 +1156,16 @@ const settleFn = feeBillingSrc.slice(
 assert(
   settleFn.includes("coveredPeriodKey") &&
     settleFn.includes("invoiceMatchesUsageCharge") &&
+    settleFn.includes("dodoUsageMerchantMatch") &&
     settleFn.includes('.eq("periodKey", coveredPeriodKey)') &&
     !settleFn.includes(".take(24)") &&
     !settleFn.includes(".first()"),
   "settle matches the covered period instead of scanning oldest 24",
+);
+assert(
+  feeActionsSrc.includes("dodoUsagePeriodKey(nowMs)") &&
+    feeActionsSrc.includes("invoiceMerchantViaDodo"),
+  "Dodo ingest uses dodoUsagePeriodKey, not the new calendar month",
 );
 assert(
   feeActionsSrc.includes("requireDodoUsageMeterId") &&

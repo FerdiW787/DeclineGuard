@@ -4,14 +4,14 @@ import { internal } from "./_generated/api";
 import {
   collectDodoWebhookSecrets,
   dodoPaymentAmountCents,
-  dodoUsageSettleDecision,
+  dodoUsageChargeKind,
+  dodoUsageSettlePayloadDecision,
   extractDodoMetadata,
   extractDodoUserRefs,
   getDodoPaymentsConfig,
   isDodoPaymentEvent,
   isDodoSubscriptionEvent,
   isDodoUpdatePaymentMethod,
-  matchesDodoProProduct,
   parseDodoEnvironment,
   parseIsoMsStrict,
   statusFromDodoEvent,
@@ -214,18 +214,14 @@ async function handlePaymentEvent(
   const claimKey = refs.claimKey;
   if (!claimKey || !isFeeInvoiceClaimKey(claimKey)) {
     const subscriptionId = stringifyDodoId(data.subscription_id);
-    const proProductId = getDodoPaymentsConfig()?.proProductId;
-    const decision = dodoUsageSettleDecision({
+    const proProductId = getDodoPaymentsConfig()?.proProductId ?? null;
+    const decision = dodoUsageSettlePayloadDecision({
       eventType,
       hasFeeClaimKey: false,
-      hasSubscriptionId: subscriptionId != null,
-      matchesProProduct: Boolean(
-        proProductId &&
-          matchesDodoProProduct({
-            productId,
-            expectedProductId: proProductId,
-          }),
-      ),
+      subscriptionId,
+      productId,
+      expectedProProductId: proProductId,
+      chargeKind: dodoUsageChargeKind(data),
       isUpdatePaymentMethod: isDodoUpdatePaymentMethod(data),
       amountCents: dodoPaymentAmountCents(data),
       paymentCreatedAtMs: parseIsoMsStrict(data.created_at),

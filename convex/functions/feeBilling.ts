@@ -23,6 +23,7 @@ import {
 import { allowHttpsUrl } from "../lib/safeUrl";
 import { resolveProductUserOrNull } from "../lib/accountGuard";
 import {
+  dodoUsageMerchantMatch,
   invoiceMatchesUsageCharge,
   pickUniqueDodoCustomerUser,
   shouldIgnoreDodoTestEvent,
@@ -540,6 +541,18 @@ export const settleDodoUsageFeeInvoices = internalMutation({
     }
     if (!userId) {
       return { settled: 0, reason: "user_not_found" };
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      return { settled: 0, reason: "user_not_found" };
+    }
+    const merchant = dodoUsageMerchantMatch({
+      paymentSubscriptionId: args.dodoSubscriptionId ?? null,
+      merchantProSubscriptionId: user.dodoSubscriptionId ?? null,
+    });
+    if (!merchant.ok) {
+      return { settled: 0, reason: merchant.reason };
     }
 
     const rows = await ctx.db

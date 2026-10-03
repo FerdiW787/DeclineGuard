@@ -17,6 +17,15 @@ export function previousUtcPeriodKey(paidAtMs: number): string {
   return utcPeriodKey(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1));
 }
 
+/**
+ * Shared Dodo ingest + settle period.
+ * The day-1 06:00 UTC job runs in the new calendar month; a later Pro charge
+ * in that cycle covers the month that just closed. Do not use utcPeriodKey.
+ */
+export function dodoUsagePeriodKey(atMs: number): string {
+  return previousUtcPeriodKey(atMs);
+}
+
 /** Idempotency key: one LS charge per merchant per UTC month. */
 export function feeInvoiceClaimKey(
   userId: Id<"users">,

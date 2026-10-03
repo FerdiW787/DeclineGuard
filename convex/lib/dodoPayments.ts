@@ -1,6 +1,6 @@
 import type { Plan } from "./accountGuard";
 import type { BillingProviderId } from "./billingProvider";
-import { previousUtcPeriodKey } from "./feeBilling";
+import { dodoUsagePeriodKey } from "./feeBilling";
 
 /**
  * Dodo Payments env (Convex dashboard — do not invent secrets in code):
@@ -247,6 +247,13 @@ export function isDodoUpdatePaymentMethod(
   return data.is_update_payment_method === true;
 }
 
+export type DodoUsageChargeKind =
+  | "recurring"
+  | "addon"
+  | "proration"
+  | "on_demand"
+  | "one_time";
+
 export type DodoUsageSettleDecision =
   | {
       settle: true;
@@ -256,15 +263,95 @@ export type DodoUsageSettleDecision =
     }
   | { settle: false; reason: string };
 
+export function dodoUsageChargeKind(
+  data: Record<string, unknown>,
+): DodoUsageChargeKind {
+  if (data.on_demand === true) return "on_demand";
+  if (data.proration === true || data.is_proration === true) return "proration";
+  if (data.addon === true || data.is_addon === true) return "addon";
+  const paymentType =
+    typeof data.payment_type === "string"
+      ? data.payment_type.trim().toLowerCase()
+      : "";
+  switch (paymentType) {
+    case "on_demand":
+    case "ondemand":
+      return "on_demand";
+    case "proration":
+    case "prorated":
+      return "proration";
+    case "addon":
+    case "add_on":
+    case "add-on":
+      return "addon";
+    case "one_time":
+    case "onetime":
+    case "one-time":
+      return "one_time";
+    default:
+      break;
+  }
+  if (Array.isArray(data.addons) && data.addons.length > 0) {
+    return "addon";
+  }
+  return "recurring";
+}
+
+export function dodoUsageMerchantMatch(args: {
+  paymentSubscriptionId: string | null;
+  merchantProSubscriptionId: string | null;
+}): { ok: true } | { ok: false; reason: string } {
+  const paymentSub = args.paymentSubscriptionId?.trim() ?? "";
+  if (!paymentSub) {
+    return { ok: false, reason: "missing_subscription_id" };
+  }
+  const merchantSub = args.merchantProSubscriptionId?.trim() ?? "";
+  if (!merchantSub) {
+    return { ok: false, reason: "subscription_not_merchant_pro" };
+  }
+  if (paymentSub !== merchantSub) {
+    return { ok: false, reason: "subscription_mismatch" };
+  }
+  return { ok: true };
+}
+
 /**
- * Usage is paid only by a real Pro invoice/subscription charge that covers
- * that period. Activation, $0 update-PM, and missing payment time do not settle.
+ * Usage is paid only by this merchant's Pro recurring invoice for the
+ * covered period. subscription_id alone, a non-Pro product, addon /
+ * proration / on-demand, activation, and $0 update-PM do not settle.
  */
 export function dodoUsageSettleDecision(args: {
   eventType: string;
   hasFeeClaimKey: boolean;
-  hasSubscriptionId: boolean;
-  matchesProProduct: boolean;
+  subscriptionId: string | null;
+  productId: string | null;
+  expectedProProductId: string | null;
+  merchantProSubscriptionId: string | null;
+  chargeKind: DodoUsageChargeKind;
+  isUpdatePaymentMethod: boolean;
+  amountCents: number;
+  paymentCreatedAtMs: number | null;
+}): DodoUsageSettleDecision {
+  const payload = dodoUsageSettlePayloadDecision(args);
+  if (!payload.settle) return payload;
+  const merchant = dodoUsageMerchantMatch({
+    paymentSubscriptionId: args.subscriptionId,
+    merchantProSubscriptionId: args.merchantProSubscriptionId,
+  });
+  if (!merchant.ok) {
+    return { settle: false, reason: merchant.reason };
+  }
+  return payload;
+}
+
+/** Payload gate for the webhook. Merchant Pro-sub match happens at settle. */
+export function dodoUsageSettlePayloadDecision(args: {
+  eventType: string;
+  hasFeeClaimKey: boolean;
+  subscriptionId: string | null;
+  productId: string | null;
+  expectedProProductId: string | null;
+  chargeKind: DodoUsageChargeKind;
   isUpdatePaymentMethod: boolean;
   amountCents: number;
   paymentCreatedAtMs: number | null;
@@ -281,8 +368,20 @@ export function dodoUsageSettleDecision(args: {
   if (args.amountCents <= 0) {
     return { settle: false, reason: "zero_amount" };
   }
-  if (!args.hasSubscriptionId && !args.matchesProProduct) {
-    return { settle: false, reason: "not_pro_subscription_payment" };
+  if (args.chargeKind !== "recurring") {
+    return { settle: false, reason: "not_pro_recurring_charge" };
+  }
+  const expectedPro = args.expectedProProductId?.trim() ?? "";
+  if (!expectedPro) {
+    return { settle: false, reason: "pro_product_unconfigured" };
+  }
+  const subscriptionId = args.subscriptionId?.trim() ?? "";
+  if (!subscriptionId) {
+    return { settle: false, reason: "missing_subscription_id" };
+  }
+  const productId = args.productId?.trim() ?? "";
+  if (productId && productId !== expectedPro) {
+    return { settle: false, reason: "non_pro_product" };
   }
   if (args.paymentCreatedAtMs == null) {
     return { settle: false, reason: "missing_payment_created_at" };
@@ -290,7 +389,7 @@ export function dodoUsageSettleDecision(args: {
   return {
     settle: true,
     paidAt: args.paymentCreatedAtMs,
-    coveredPeriodKey: previousUtcPeriodKey(args.paymentCreatedAtMs),
+    coveredPeriodKey: dodoUsagePeriodKey(args.paymentCreatedAtMs),
     reason: "ok",
   };
 }
@@ -315,13 +414,15 @@ export function pickUniqueDodoCustomerUser<
   dodoSubscriptionId?: string | null;
 }): T | null {
   if (args.users.length === 0) return null;
+  const sub = args.dodoSubscriptionId?.trim() || null;
+  if (sub) {
+    const matches = args.users.filter((user) => user.dodoSubscriptionId === sub);
+    return matches.length === 1 ? (matches[0] ?? null) : null;
+  }
   if (args.users.length === 1) {
     return args.users[0] ?? null;
   }
-  const sub = args.dodoSubscriptionId?.trim();
-  if (!sub) return null;
-  const matches = args.users.filter((user) => user.dodoSubscriptionId === sub);
-  return matches.length === 1 ? (matches[0] ?? null) : null;
+  return null;
 }
 
 export function requireDodoUsageMeterId(

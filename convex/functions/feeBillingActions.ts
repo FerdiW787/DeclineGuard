@@ -8,6 +8,7 @@ import type { Id } from "../_generated/dataModel";
 import {
   FEE_INVOICE_CHECKOUT_TTL_MS,
   feeInvoiceClaimKey,
+  dodoUsagePeriodKey,
   utcPeriodKey,
 } from "../lib/feeBilling";
 import {
@@ -301,7 +302,7 @@ async function invoiceMerchant(
     return await invoiceMerchantViaDodo(
       ctx,
       userId,
-      periodKey,
+      dodoUsagePeriodKey(nowMs),
       nowMs,
       actorUserId,
       {
