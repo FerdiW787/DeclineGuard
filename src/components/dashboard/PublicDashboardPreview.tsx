@@ -219,6 +219,7 @@ export default function PublicDashboardPreview() {
                 recoveryRateLabel="81%"
                 feesOwedLabel="€389"
                 youKeepLabel="€3,502"
+                recoveryFeePercent={10}
                 openFailures={previewOpenFailures}
                 recentActivity={marketingActivity}
                 brandColor="#0c0c0c"

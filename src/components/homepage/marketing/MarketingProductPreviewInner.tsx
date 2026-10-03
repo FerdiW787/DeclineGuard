@@ -93,6 +93,7 @@ export function MarketingProductPreviewInner({
             recoveryRateLabel={marketingOverviewLabels.recoveryRateLabel}
             feesOwedLabel={marketingOverviewLabels.feesOwedLabel}
             youKeepLabel={live.youKeepLabel}
+            recoveryFeePercent={10}
             openFailures={marketingOpenFailures}
             recentActivity={marketingActivity}
             brandColor={marketingStore.brandColor}

@@ -106,7 +106,7 @@ export default function OverviewHub({
   recoveryRateLabel,
   feesOwedLabel,
   youKeepLabel,
-  recoveryFeePercent = 10,
+  recoveryFeePercent,
   openFailures,
   emailIsProduction,
   chartRows,
@@ -358,8 +358,12 @@ export default function OverviewHub({
               }
               hint={
                 recoveredThisMonthCents > 0
-                  ? `${recoveryFeePercent}% fee · ${feesOwedLabel}`
-                  : `${recoveryFeePercent}% fee after we recover`
+                  ? recoveryFeePercent != null
+                    ? `${recoveryFeePercent}% fee · ${feesOwedLabel}`
+                    : feesOwedLabel
+                  : recoveryFeePercent != null
+                    ? `${recoveryFeePercent}% fee after we recover`
+                    : "Fee after we recover"
               }
             />
             <ScoreStat

@@ -224,13 +224,10 @@ function Dashboard() {
   );
   const ensureCurrentUser = useMutation(api.functions.user.ensureCurrentUser);
   const currentUser = useQuery(api.functions.user.getCurrentUser);
-  // Product plan / fee % come from getFeesSummary (takeover target).
-  // getCurrentUser is the signed-in viewer — Pro staff would otherwise show 4%.
+  // Fee % on Overview / Billing is only getFeesSummary (merchant, incl. takeover).
+  // Never getCurrentUser / PLANS — those are the signed-in viewer or a second rate.
   const plan = feesSummary?.plan ?? currentUser?.plan ?? "free";
-  const recoveryFeePercent =
-    feesSummary?.recoveryFeePercent ??
-    currentUser?.recoveryFeePercent ??
-    PLANS[plan].recoveryFeePercent;
+  const recoveryFeePercent = feesSummary?.recoveryFeePercent;
   const planTier = PLANS[plan].name;
   const unreadHelpCount = useQuery(
     api.functions.support.countUnreadThreads,
@@ -1492,7 +1489,6 @@ function Dashboard() {
           planTier={planTier}
           planId={plan}
           lsSubscriptionStatus={currentUser?.lsSubscriptionStatus ?? null}
-          recoveryFeePercent={recoveryFeePercent}
           webhookSetup={webhookSetup}
           webhookStatus={webhookStatus}
           feesSummary={feesSummary}

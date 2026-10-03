@@ -47,7 +47,6 @@ export default function SettingsModule({
   planTier = "Free",
   planId = "free",
   lsSubscriptionStatus = null,
-  recoveryFeePercent = 10,
   webhookSetup,
   webhookStatus,
   feesSummary,
@@ -289,7 +288,6 @@ export default function SettingsModule({
                 planTier={planTier}
                 planId={planId}
                 lsSubscriptionStatus={lsSubscriptionStatus}
-                recoveryFeePercent={recoveryFeePercent}
                 readOnly={readOnly}
               />
             ) : null}

@@ -28,7 +28,6 @@ export function BillingTab({
   feesSummary,
   emailQuota,
   planTier = "Free",
-  recoveryFeePercent = 10,
   planId = "free",
   lsSubscriptionStatus = null,
   readOnly = false,
@@ -36,7 +35,6 @@ export function BillingTab({
   feesSummary: SettingsFeesSummary | undefined;
   emailQuota?: SettingsEmailQuota | undefined;
   planTier?: string;
-  recoveryFeePercent?: number;
   planId?: "free" | "pro";
   lsSubscriptionStatus?: string | null;
   readOnly?: boolean;
@@ -48,7 +46,6 @@ export function BillingTab({
         feesSummary={feesSummary}
         emailQuota={emailQuota}
         planTier={planTier}
-        recoveryFeePercent={recoveryFeePercent}
         planId={planId}
         lsSubscriptionStatus={lsSubscriptionStatus}
       />
@@ -60,7 +57,6 @@ export function BillingTab({
       feesSummary={feesSummary}
       emailQuota={emailQuota}
       planTier={planTier}
-      recoveryFeePercent={recoveryFeePercent}
       planId={planId}
       lsSubscriptionStatus={lsSubscriptionStatus}
       billing={null}
@@ -73,14 +69,12 @@ function BillingTabConnected({
   feesSummary,
   emailQuota,
   planTier,
-  recoveryFeePercent,
   planId,
   lsSubscriptionStatus,
 }: {
   feesSummary: SettingsFeesSummary | undefined;
   emailQuota?: SettingsEmailQuota | undefined;
   planTier: string;
-  recoveryFeePercent: number;
   planId: "free" | "pro";
   lsSubscriptionStatus: string | null;
 }) {
@@ -90,7 +84,6 @@ function BillingTabConnected({
       feesSummary={feesSummary}
       emailQuota={emailQuota}
       planTier={planTier}
-      recoveryFeePercent={recoveryFeePercent}
       planId={billing?.plan ?? planId}
       lsSubscriptionStatus={
         billing?.lsSubscriptionStatus ?? lsSubscriptionStatus
@@ -105,7 +98,6 @@ function BillingTabView({
   feesSummary,
   emailQuota,
   planTier,
-  recoveryFeePercent,
   planId,
   lsSubscriptionStatus,
   billing,
@@ -114,23 +106,22 @@ function BillingTabView({
   feesSummary: SettingsFeesSummary | undefined;
   emailQuota?: SettingsEmailQuota | undefined;
   planTier: string;
-  recoveryFeePercent: number;
   planId: "free" | "pro";
   lsSubscriptionStatus: string | null;
   billing: BillingSnapshot | null;
   showActions: boolean;
 }) {
-  // Display plan / fee % from the merchant ledger (takeover-safe).
-  // Checkout actions stay on the signed-in viewer via getMyBilling.
+  // Merchant fee % is only getFeesSummary — never viewer plan or PLANS lookup.
+  const merchantFeePercent = feesSummary?.recoveryFeePercent;
   const displayPlan = feesSummary?.plan ?? billing?.plan ?? planId;
   const displayPlanTier = feesSummary
     ? PLANS[feesSummary.plan].name
     : planTier;
-  const feePercent = feesSummary?.recoveryFeePercent ?? recoveryFeePercent;
   const isPro = displayPlan === "pro";
   const viewerIsPro = (billing?.plan ?? planId) === "pro";
   const pro = PLANS.pro;
-  const feeLabel = `${feePercent}%`;
+  const feeLabel =
+    merchantFeePercent != null ? `${merchantFeePercent}%` : null;
   const provider = billing?.billingProvider;
   const subscriptionStatus = subscriptionStatusFor(billing, lsSubscriptionStatus);
   // portalAvailable is true if a Dodo customer or an LS subscription exists.
@@ -140,11 +131,12 @@ function BillingTabView({
   return (
     <SettingsSection
       title="Billing"
-      description={
-        isPro
-          ? `${displayPlanTier} plan: ${feeLabel} of recovered revenue if payment returns within ${ATTRIBUTION_WINDOW_DAYS} days of our first recovery email. Pro is $29.99/mo.`
-          : `${displayPlanTier} plan: ${feeLabel} of recovered revenue if payment returns within ${ATTRIBUTION_WINDOW_DAYS} days of our first recovery email. Upgrade to Pro for ${pro.recoveryFeePercent}% fees.`
-      }
+      description={billingRateDescription({
+        isPro,
+        planTier: displayPlanTier,
+        feeLabel,
+        proFeePercent: pro.recoveryFeePercent,
+      })}
     >
       <SettingsCard>
         <SettingsRow
@@ -200,7 +192,7 @@ function BillingTabView({
               description={
                 feesSummary.currencyMixed
                   ? "Mixed currencies across recoveries."
-                  : `${feeLabel} of attributed recovered revenue this calendar month.`
+                  : `${feesSummary.recoveryFeePercent}% of attributed recovered revenue this calendar month.`
               }
             >
               <p className="text-[15px] font-semibold tabular-nums text-[#08090a]">
@@ -312,6 +304,27 @@ function subscriptionStatusFor(
       return _never;
     }
   }
+}
+
+function billingRateDescription({
+  isPro,
+  planTier,
+  feeLabel,
+  proFeePercent,
+}: {
+  isPro: boolean;
+  planTier: string;
+  feeLabel: string | null;
+  proFeePercent: number;
+}): string {
+  const ratePhrase = feeLabel
+    ? `${feeLabel} of recovered revenue`
+    : "a recovery fee of recovered revenue";
+  const window = `if payment returns within ${ATTRIBUTION_WINDOW_DAYS} days of our first recovery email`;
+  if (isPro) {
+    return `${planTier} plan: ${ratePhrase} ${window}. Pro is $29.99/mo.`;
+  }
+  return `${planTier} plan: ${ratePhrase} ${window}. Upgrade to Pro for ${proFeePercent}% fees.`;
 }
 
 function currentPlanDescription({
