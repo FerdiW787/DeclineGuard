@@ -26,8 +26,10 @@ import {
 } from "../convex/lib/billingProvider";
 import {
   dodoIngestPeriodKey,
+  dodoUsageAfterAcceptPersistDecision,
   dodoUsageCatchAction,
   dodoUsagePeriodKey,
+  dodoUsageReuseAcceptedEventId,
   dodoUsageReclaimDeltaCents,
   dodoUsageReclaimFailureSnapshot,
   existingClaimBlocksNewCharge,
@@ -965,6 +967,80 @@ assert(
     }) === "unlink",
   "after Dodo accepts cents, do not roll back or unlink; before accept, reclaim rolls back and first ingest unlinks",
 );
+const failedPersistAfterAccept = dodoUsageAfterAcceptPersistDecision({
+  persistCommitted: false,
+  scheduledMonthClose: true,
+  acceptedCents: 10000,
+  firstIngest: true,
+});
+const committedPersistAfterAccept = dodoUsageAfterAcceptPersistDecision({
+  persistCommitted: true,
+  scheduledMonthClose: true,
+  acceptedCents: 10000,
+  firstIngest: true,
+});
+const acceptedEventId = "fee-usage:fee-invoice:user:2026-01:inv_jan";
+const retriedEventId = dodoUsageReuseAcceptedEventId(
+  acceptedEventId,
+  dodoUsageEventId({
+    invoiceId: "inv_jan",
+    claimKey: "fee-invoice:user:2026-01",
+    amountCents: 10000,
+  }),
+);
+assert(
+  failedPersistAfterAccept.outcome === "failed" &&
+    failedPersistAfterAccept.status === "claiming" &&
+    failedPersistAfterAccept.monthClosed === false &&
+    failedPersistAfterAccept.settleable === false &&
+    failedPersistAfterAccept.emitAgain === false &&
+    failedPersistAfterAccept.mayFinishSamePeriod === true &&
+    failedPersistAfterAccept.blocksFirstIngestRerun === false &&
+    !invoiceMatchesUsageCharge({
+      status: "claiming",
+      periodKey: "2026-01",
+      coveredPeriodKey: "2026-01",
+      dodoUsageSubmittedAt: null,
+      monthClosed: failedPersistAfterAccept.monthClosed,
+    }) &&
+    existingClaimBlocksNewCharge("claiming", 3, false) === true &&
+    unpaidDodoUsageClaimMayReclaim({
+      scheduledMonthClose: true,
+      status: "claiming",
+      billingProvider: null,
+      dodoUsageSubmittedAt: null,
+      dodoUsageEventId: acceptedEventId,
+      dodoUsageIngestedCents: failedPersistAfterAccept.ingestedCents,
+      paidAt: null,
+      lsCheckoutId: null,
+    }) &&
+    !unpaidDodoUsageClaimMayReclaim({
+      scheduledMonthClose: true,
+      status: "claiming",
+      billingProvider: null,
+      dodoUsageSubmittedAt: null,
+      paidAt: null,
+      lsCheckoutId: null,
+    }) &&
+    dodoUsageReclaimDeltaCents(failedPersistAfterAccept.ingestedCents, 10000) ===
+      0 &&
+    retriedEventId === acceptedEventId &&
+    committedPersistAfterAccept.outcome === "created" &&
+    committedPersistAfterAccept.status === "created" &&
+    committedPersistAfterAccept.monthClosed === true &&
+    committedPersistAfterAccept.settleable === true &&
+    committedPersistAfterAccept.emitAgain === false &&
+    committedPersistAfterAccept.blocksFirstIngestRerun === false &&
+    invoiceMatchesUsageCharge({
+      status: committedPersistAfterAccept.status,
+      periodKey: "2026-01",
+      coveredPeriodKey: "2026-01",
+      dodoUsageSubmittedAt: day1FebIngestAt,
+      monthClosed: committedPersistAfterAccept.monthClosed,
+    }) &&
+    usageIngestSettlesFeePeriod() === false,
+  "failed persist after accept is not created; same period can finish without a second meter event",
+);
 assert(
   upsertDodoUsageCredit(
     [{ periodKey: "2026-01", paidAt: day1FebChargeAt, paymentId: "pay_feb1" }],
@@ -1558,6 +1634,8 @@ assert(
     feeBillingSrc.includes("rollbackDodoUsageReclaim") &&
     feeBillingSrc.includes("dodoUsageMonthClosed") &&
     feeBillingSrc.includes("markDodoUsageAcceptedCentsSettleable") &&
+    feeBillingSrc.includes("persistDodoUsageAccepted") &&
+    feeBillingSrc.includes("markDodoUsageAcceptedPending") &&
     feeBillingSrc.includes("dodoUsageReclaimFailureSnapshot") &&
     feeBillingSrc.includes("merchantProductId: user.dodoProductId") &&
     settleFn.includes("upsertDodoUsageCredit") &&
@@ -1580,10 +1658,17 @@ assert(
     viaDodoSrc.includes("dodoUsageCatchAction") &&
     viaDodoSrc.includes("markDodoUsageAcceptedCentsSettleable") &&
     viaDodoSrc.includes('case "keep_accepted"') &&
+    viaDodoSrc.includes("persistDodoUsageAccepted") &&
+    viaDodoSrc.includes("persistCommitted") &&
+    viaDodoSrc.includes("dodoUsageAfterAcceptPersistDecision") &&
+    viaDodoSrc.includes("persist_after_accept") &&
+    viaDodoSrc.includes("markDodoUsageAcceptedPending") &&
     viaDodoSrc.indexOf("ingestDodoUsageEvents") <
       viaDodoSrc.indexOf("dodoAccepted = true") &&
     viaDodoSrc.indexOf("dodoAccepted = true") <
-      viaDodoSrc.indexOf("const persistAccepted") &&
+      viaDodoSrc.indexOf("const persistSnapshot") &&
+    viaDodoSrc.includes('persistDecision.outcome !== "created"') &&
+    viaDodoSrc.includes('error: "persist_after_accept"') &&
     !feeActionsSrc.includes("dodoUsagePeriodKey(nowMs),"),
   "scheduled Dodo ingest uses the closed month and may reclaim a force-run row",
 );

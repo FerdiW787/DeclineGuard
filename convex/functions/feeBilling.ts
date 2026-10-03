@@ -248,12 +248,15 @@ export const claimBillingPeriod = internalMutation({
         status: existingWinner.status,
         billingProvider: existingWinner.billingProvider,
         dodoUsageSubmittedAt: existingWinner.dodoUsageSubmittedAt,
+        dodoUsageEventId: existingWinner.dodoUsageEventId,
+        dodoUsageIngestedCents: existingWinner.dodoUsageIngestedCents,
         paidAt: existingWinner.paidAt,
         lsCheckoutId: existingWinner.lsCheckoutId,
       });
     const priorIngestedCents = mayReclaim && existingWinner
       ? (existingWinner.dodoUsageIngestedCents ??
-        (existingWinner.dodoUsageSubmittedAt != null
+        (existingWinner.dodoUsageSubmittedAt != null ||
+        Boolean(existingWinner.dodoUsageEventId?.trim())
           ? existingWinner.totalCents
           : 0))
       : 0;
@@ -585,6 +588,34 @@ async function markUsageInvoicePaid(
   });
 }
 
+async function writeDodoUsageAcceptedSnapshot(
+  ctx: MutationCtx,
+  args: {
+    invoice: Doc<"billingInvoices">;
+    dodoUsageEventId?: string;
+    nowMs: number;
+    monthClosed?: boolean;
+    ingestedCents?: number;
+  },
+): Promise<void> {
+  const monthClosed =
+    args.monthClosed === true || args.invoice.dodoUsageMonthClosed === true;
+  const ingested =
+    args.ingestedCents != null
+      ? Math.max(0, Math.round(args.ingestedCents))
+      : args.invoice.totalCents;
+  await ctx.db.patch(args.invoice._id, {
+    status: "created",
+    billingProvider: "dodo",
+    dodoUsageEventId: args.dodoUsageEventId ?? args.invoice.dodoUsageEventId,
+    dodoUsageSubmittedAt: args.nowMs,
+    dodoUsageIngestedCents: ingested,
+    dodoUsageMeteredFeeIds: args.invoice.feeIds,
+    dodoUsageMonthClosed: monthClosed ? true : args.invoice.dodoUsageMonthClosed,
+    lastError: undefined,
+  });
+}
+
 async function applyMatchingUsageCredit(
   ctx: MutationCtx,
   invoiceId: Id<"billingInvoices">,
@@ -640,17 +671,11 @@ export const attachDodoUsageSubmitted = internalMutation({
     if (!invoice) return false;
     if (invoice.status === "paid") return false;
 
-    const monthClosed =
-      args.monthClosed === true || invoice.dodoUsageMonthClosed === true;
-    await ctx.db.patch(args.invoiceId, {
-      status: "created",
-      billingProvider: "dodo",
-      dodoUsageEventId: args.dodoUsageEventId ?? invoice.dodoUsageEventId,
-      dodoUsageSubmittedAt: args.nowMs,
-      dodoUsageIngestedCents: invoice.totalCents,
-      dodoUsageMeteredFeeIds: invoice.feeIds,
-      dodoUsageMonthClosed: monthClosed ? true : invoice.dodoUsageMonthClosed,
-      lastError: undefined,
+    await writeDodoUsageAcceptedSnapshot(ctx, {
+      invoice,
+      dodoUsageEventId: args.dodoUsageEventId,
+      nowMs: args.nowMs,
+      monthClosed: args.monthClosed,
     });
 
     try {
@@ -662,6 +687,51 @@ export const attachDodoUsageSubmitted = internalMutation({
         message,
       );
     }
+    return true;
+  },
+});
+
+export const persistDodoUsageAccepted = internalMutation({
+  args: {
+    invoiceId: v.id("billingInvoices"),
+    dodoUsageEventId: v.optional(v.string()),
+    nowMs: v.number(),
+    monthClosed: v.optional(v.boolean()),
+    ingestedCents: v.optional(v.number()),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.invoiceId);
+    if (!invoice) return false;
+    if (invoice.status === "paid") return false;
+    await writeDodoUsageAcceptedSnapshot(ctx, {
+      invoice,
+      dodoUsageEventId: args.dodoUsageEventId,
+      nowMs: args.nowMs,
+      monthClosed: args.monthClosed,
+      ingestedCents: args.ingestedCents,
+    });
+    return true;
+  },
+});
+
+export const markDodoUsageAcceptedPending = internalMutation({
+  args: {
+    invoiceId: v.id("billingInvoices"),
+    dodoUsageEventId: v.string(),
+    ingestedCents: v.number(),
+    error: v.string(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.invoiceId);
+    if (!invoice) return false;
+    if (invoice.status === "paid") return false;
+    await ctx.db.patch(args.invoiceId, {
+      dodoUsageEventId: args.dodoUsageEventId,
+      dodoUsageIngestedCents: Math.max(0, Math.round(args.ingestedCents)),
+      lastError: args.error.slice(0, 500),
+    });
     return true;
   },
 });

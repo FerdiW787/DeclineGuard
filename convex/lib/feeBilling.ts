@@ -51,6 +51,8 @@ export function unpaidDodoUsageClaimMayReclaim(args: {
   status: BillingInvoiceStatus;
   billingProvider?: "lemon" | "dodo" | null;
   dodoUsageSubmittedAt?: number | null;
+  dodoUsageEventId?: string | null;
+  dodoUsageIngestedCents?: number | null;
   paidAt?: number | null;
   lsCheckoutId?: string | null;
 }): boolean {
@@ -60,7 +62,10 @@ export function unpaidDodoUsageClaimMayReclaim(args: {
   if (args.billingProvider === "lemon") return false;
   if (args.status !== "created" && args.status !== "claiming") return false;
   return (
-    args.billingProvider === "dodo" || args.dodoUsageSubmittedAt != null
+    args.billingProvider === "dodo" ||
+    args.dodoUsageSubmittedAt != null ||
+    Boolean(args.dodoUsageEventId?.trim()) ||
+    (args.dodoUsageIngestedCents != null && args.dodoUsageIngestedCents > 0)
   );
 }
 
@@ -127,6 +132,61 @@ export function dodoUsageCatchAction(args: {
     return "rollback";
   }
   return "unlink";
+}
+
+export type DodoUsageAfterAcceptPersistDecision = {
+  outcome: "created" | "failed";
+  status: BillingInvoiceStatus;
+  ingestedCents: number;
+  monthClosed: boolean;
+  settleable: boolean;
+  emitAgain: boolean;
+  mayFinishSamePeriod: boolean;
+  blocksFirstIngestRerun: boolean;
+};
+
+/**
+ * After Dodo accepts a meter event, local persist either commits
+ * accepted cents + monthClosed or leaves the same period finishable
+ * without a second POST. Never report created when persist did not commit.
+ */
+export function dodoUsageAfterAcceptPersistDecision(args: {
+  persistCommitted: boolean;
+  scheduledMonthClose: boolean;
+  acceptedCents: number;
+  firstIngest: boolean;
+}): DodoUsageAfterAcceptPersistDecision {
+  const ingestedCents = Math.max(0, Math.round(args.acceptedCents));
+  if (args.persistCommitted) {
+    return {
+      outcome: "created",
+      status: "created",
+      ingestedCents,
+      monthClosed: args.scheduledMonthClose,
+      settleable: args.scheduledMonthClose && ingestedCents > 0,
+      emitAgain: false,
+      mayFinishSamePeriod: false,
+      blocksFirstIngestRerun: false,
+    };
+  }
+  return {
+    outcome: "failed",
+    status: args.firstIngest ? "claiming" : "created",
+    ingestedCents,
+    monthClosed: false,
+    settleable: false,
+    emitAgain: false,
+    mayFinishSamePeriod: true,
+    blocksFirstIngestRerun: false,
+  };
+}
+
+export function dodoUsageReuseAcceptedEventId(
+  existingEventId: string | null | undefined,
+  nextEventId: string,
+): string {
+  const existing = existingEventId?.trim() ?? "";
+  return existing || nextEventId;
 }
 
 /** Idempotency key: one LS charge per merchant per UTC month. */
