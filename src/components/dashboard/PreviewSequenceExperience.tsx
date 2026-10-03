@@ -28,6 +28,8 @@ type Props = {
   onClose: () => void;
   /** After preview slides away — open support with a report draft. */
   onContactSupport?: () => void;
+  /** Set A kit id (LAYOUT_PRESET_IDS). Required to render the three steps. */
+  layoutKit: string;
 };
 
 const INBOX_TOAST_MS = 5_000;
@@ -519,6 +521,7 @@ export default function PreviewSequenceExperience({
   open,
   onClose,
   onContactSupport,
+  layoutKit,
 }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -651,7 +654,7 @@ export default function PreviewSequenceExperience({
 
     void (async () => {
       try {
-        const id = await startPreview({});
+        const id = await startPreview({ layoutKit });
         setPreviewId(id);
         // Stay on setup until Email 1 sends (or fails), min ~3s.
       } catch (err) {
@@ -661,7 +664,7 @@ export default function PreviewSequenceExperience({
         );
       }
     })();
-  }, [open, startPreview]);
+  }, [open, startPreview, layoutKit]);
 
   // During setup: wait for first email, or surface send failure (after min 3s).
   useEffect(() => {

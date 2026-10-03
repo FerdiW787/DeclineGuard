@@ -53,6 +53,10 @@ type Props = {
     amount: string;
     firstName?: string;
   };
+  /** Kit chrome — defaults keep the classic Sequences / onboarding preview. */
+  logoAlign?: "left" | "center" | "right";
+  showStoreName?: boolean;
+  showGreeting?: boolean;
   className?: string;
 };
 
@@ -88,6 +92,9 @@ export default function EmailPreviewBody({
   showSocialPlaceholder = false,
   customerFirstName = "Maya",
   previewVars,
+  logoAlign = "left",
+  showStoreName = true,
+  showGreeting = true,
   className,
 }: Props) {
   useEmailFontLoader(emailFont);
@@ -134,14 +141,18 @@ export default function EmailPreviewBody({
         primary={primary}
         emailFont={emailFont}
         textColor={shellText}
+        align={logoAlign}
+        showName={showStoreName}
       />
 
-      <p
-        className="text-[17px] font-semibold tracking-tight"
-        style={{ color: shellText }}
-      >
-        Hi {customerFirstName},
-      </p>
+      {showGreeting ? (
+        <p
+          className="text-[17px] font-semibold tracking-tight"
+          style={{ color: shellText }}
+        >
+          Hi {customerFirstName},
+        </p>
+      ) : null}
 
       {useBlocks ? (
         <div className="mt-4">
