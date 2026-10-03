@@ -77,6 +77,14 @@ export default defineSchema({
     /** Dodo Payments subscription id for DeclineGuard Pro. */
     dodoSubscriptionId: v.optional(v.string()),
     dodoSubscriptionStatus: v.optional(v.string()),
+    /** Last product_id from a Dodo subscription webhook (has product_id). */
+    dodoProductId: v.optional(v.string()),
+    /** Subscription.on_demand from Dodo. Payments do not carry this field. */
+    dodoOnDemand: v.optional(v.boolean()),
+    /** Pro charge that should close this period if ingest races after paidAt. */
+    dodoUsageCreditPeriodKey: v.optional(v.string()),
+    dodoUsageCreditPaidAt: v.optional(v.number()),
+    dodoUsageCreditPaymentId: v.optional(v.string()),
     dodoCheckoutNonce: v.optional(v.string()),
     dodoCheckoutNonceExpiresAt: v.optional(v.number()),
     /** Extra monthly declines from paid $0.99 +10 packs (sum of credited units). */

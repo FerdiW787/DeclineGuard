@@ -8,6 +8,7 @@ import type { Id } from "../_generated/dataModel";
 import {
   FEE_INVOICE_CHECKOUT_TTL_MS,
   feeInvoiceClaimKey,
+  dodoIngestPeriodKey,
   dodoUsagePeriodKey,
   utcPeriodKey,
 } from "../lib/feeBilling";
@@ -293,6 +294,7 @@ async function invoiceMerchant(
   periodKey: string,
   nowMs: number,
   actorUserId: Id<"users"> | null,
+  scheduledMonthClose: boolean,
 ): Promise<InvoiceMerchantResult> {
   const targetProvider = await ctx.runQuery(
     internal.functions.dodoBilling.getUserBillingProvider,
@@ -302,7 +304,7 @@ async function invoiceMerchant(
     return await invoiceMerchantViaDodo(
       ctx,
       userId,
-      dodoUsagePeriodKey(nowMs),
+      dodoIngestPeriodKey({ nowMs, scheduledMonthClose }),
       nowMs,
       actorUserId,
       {
@@ -817,6 +819,7 @@ export const runMonthlyFeeInvoices = internalAction({
         periodKey,
         nowMs,
         null,
+        true,
       );
       switch (result.outcome) {
         case "created":
@@ -851,8 +854,9 @@ export const runMonthlyFeeInvoices = internalAction({
       }
     }
 
+    const dodoClosedPeriodKey = dodoUsagePeriodKey(nowMs);
     console.log(
-      `Monthly fee invoices ${periodKey}: merchants=${userIds.size} created=${created} claimed=${skippedClaimed} zero=${skippedZero} currency=${skippedCurrency} failed=${failed}`,
+      `Monthly fee invoices lemon=${periodKey} dodo=${dodoClosedPeriodKey}: merchants=${userIds.size} created=${created} claimed=${skippedClaimed} zero=${skippedZero} currency=${skippedCurrency} failed=${failed}`,
     );
 
     return {
@@ -886,6 +890,7 @@ export const adminForceRunFeeInvoice = action({
       utcPeriodKey(nowMs),
       nowMs,
       actorUserId,
+      false,
     );
   },
 });

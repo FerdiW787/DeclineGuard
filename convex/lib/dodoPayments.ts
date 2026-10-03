@@ -263,44 +263,72 @@ export type DodoUsageSettleDecision =
     }
   | { settle: false; reason: string };
 
-export function dodoUsageChargeKind(
-  data: Record<string, unknown>,
-): DodoUsageChargeKind {
-  if (data.on_demand === true) return "on_demand";
-  if (data.proration === true || data.is_proration === true) return "proration";
-  if (data.addon === true || data.is_addon === true) return "addon";
-  const paymentType =
-    typeof data.payment_type === "string"
-      ? data.payment_type.trim().toLowerCase()
-      : "";
-  switch (paymentType) {
-    case "on_demand":
-    case "ondemand":
-      return "on_demand";
-    case "proration":
-    case "prorated":
-      return "proration";
-    case "addon":
-    case "add_on":
-    case "add-on":
-      return "addon";
-    case "one_time":
-    case "onetime":
-    case "one-time":
-      return "one_time";
-    default:
-      break;
+/** product_id on the payment, nested product, or product_cart lines. */
+export function dodoPaymentProductIds(data: Record<string, unknown>): string[] {
+  const ids: string[] = [];
+  const push = (value: unknown) => {
+    const id = stringifyDodoId(value);
+    if (id && !ids.includes(id)) ids.push(id);
+  };
+  push(data.product_id);
+  const product = data.product;
+  if (product && typeof product === "object") {
+    const rec = product as Record<string, unknown>;
+    push(rec.product_id);
+    push(rec.id);
   }
-  if (Array.isArray(data.addons) && data.addons.length > 0) {
-    return "addon";
+  const cart = data.product_cart;
+  if (Array.isArray(cart)) {
+    for (const item of cart) {
+      if (!item || typeof item !== "object") continue;
+      const rec = item as Record<string, unknown>;
+      push(rec.product_id);
+    }
   }
+  return ids;
+}
+
+export function paymentCartHasAddon(data: Record<string, unknown>): boolean {
+  const cart = data.product_cart;
+  if (!Array.isArray(cart)) return false;
+  for (const item of cart) {
+    if (!item || typeof item !== "object") continue;
+    const rec = item as Record<string, unknown>;
+    if (stringifyDodoId(rec.addon_id)) return true;
+    if (Array.isArray(rec.addons) && rec.addons.length > 0) return true;
+  }
+  return false;
+}
+
+/**
+ * Classify from fields Dodo actually sends.
+ * Payment.succeeded has product_cart / subscription_id / created_at.
+ * on_demand lives on the subscription object, not the payment.
+ */
+export function dodoUsageChargeKind(args: {
+  payment: Record<string, unknown>;
+  subscriptionOnDemand?: boolean;
+}): DodoUsageChargeKind {
+  if (args.subscriptionOnDemand === true) return "on_demand";
+  if (paymentCartHasAddon(args.payment)) return "addon";
+  const cart = args.payment.product_cart;
+  const hasCart = Array.isArray(cart) && cart.length > 0;
+  const hasSub = stringifyDodoId(args.payment.subscription_id) != null;
+  if (hasCart && !hasSub) return "one_time";
+  if (hasCart && hasSub) return "proration";
   return "recurring";
 }
 
 export function dodoUsageMerchantMatch(args: {
   paymentSubscriptionId: string | null;
   merchantProSubscriptionId: string | null;
+  merchantProductId?: string | null;
+  expectedProProductId?: string | null;
+  merchantOnDemand?: boolean;
 }): { ok: true } | { ok: false; reason: string } {
+  if (args.merchantOnDemand === true) {
+    return { ok: false, reason: "on_demand_subscription" };
+  }
   const paymentSub = args.paymentSubscriptionId?.trim() ?? "";
   if (!paymentSub) {
     return { ok: false, reason: "missing_subscription_id" };
@@ -311,6 +339,11 @@ export function dodoUsageMerchantMatch(args: {
   }
   if (paymentSub !== merchantSub) {
     return { ok: false, reason: "subscription_mismatch" };
+  }
+  const storedProduct = args.merchantProductId?.trim() ?? "";
+  const expectedPro = args.expectedProProductId?.trim() ?? "";
+  if (storedProduct && expectedPro && storedProduct !== expectedPro) {
+    return { ok: false, reason: "subscription_not_merchant_pro" };
   }
   return { ok: true };
 }
@@ -324,9 +357,11 @@ export function dodoUsageSettleDecision(args: {
   eventType: string;
   hasFeeClaimKey: boolean;
   subscriptionId: string | null;
-  productId: string | null;
+  productIds: string[];
   expectedProProductId: string | null;
   merchantProSubscriptionId: string | null;
+  merchantProductId?: string | null;
+  merchantOnDemand?: boolean;
   chargeKind: DodoUsageChargeKind;
   isUpdatePaymentMethod: boolean;
   amountCents: number;
@@ -337,6 +372,9 @@ export function dodoUsageSettleDecision(args: {
   const merchant = dodoUsageMerchantMatch({
     paymentSubscriptionId: args.subscriptionId,
     merchantProSubscriptionId: args.merchantProSubscriptionId,
+    merchantProductId: args.merchantProductId,
+    expectedProProductId: args.expectedProProductId,
+    merchantOnDemand: args.merchantOnDemand,
   });
   if (!merchant.ok) {
     return { settle: false, reason: merchant.reason };
@@ -349,7 +387,7 @@ export function dodoUsageSettlePayloadDecision(args: {
   eventType: string;
   hasFeeClaimKey: boolean;
   subscriptionId: string | null;
-  productId: string | null;
+  productIds: string[];
   expectedProProductId: string | null;
   chargeKind: DodoUsageChargeKind;
   isUpdatePaymentMethod: boolean;
@@ -379,8 +417,7 @@ export function dodoUsageSettlePayloadDecision(args: {
   if (!subscriptionId) {
     return { settle: false, reason: "missing_subscription_id" };
   }
-  const productId = args.productId?.trim() ?? "";
-  if (productId && productId !== expectedPro) {
+  if (args.productIds.some((id) => id.trim() && id.trim() !== expectedPro)) {
     return { settle: false, reason: "non_pro_product" };
   }
   if (args.paymentCreatedAtMs == null) {
@@ -394,17 +431,57 @@ export function dodoUsageSettlePayloadDecision(args: {
   };
 }
 
+export function dodoUsageSettleFromPayment(args: {
+  eventType: string;
+  payment: Record<string, unknown>;
+  hasFeeClaimKey: boolean;
+  expectedProProductId: string | null;
+  merchantProSubscriptionId: string | null;
+  merchantProductId?: string | null;
+  merchantOnDemand?: boolean;
+}): DodoUsageSettleDecision {
+  return dodoUsageSettleDecision({
+    eventType: args.eventType,
+    hasFeeClaimKey: args.hasFeeClaimKey,
+    subscriptionId: stringifyDodoId(args.payment.subscription_id),
+    productIds: dodoPaymentProductIds(args.payment),
+    expectedProProductId: args.expectedProProductId,
+    merchantProSubscriptionId: args.merchantProSubscriptionId,
+    merchantProductId: args.merchantProductId,
+    merchantOnDemand: args.merchantOnDemand,
+    chargeKind: dodoUsageChargeKind({
+      payment: args.payment,
+      subscriptionOnDemand: args.merchantOnDemand === true,
+    }),
+    isUpdatePaymentMethod: isDodoUpdatePaymentMethod(args.payment),
+    amountCents: dodoPaymentAmountCents(args.payment),
+    paymentCreatedAtMs: parseIsoMsStrict(args.payment.created_at),
+  });
+}
+
 export function invoiceMatchesUsageCharge(args: {
   status: string;
   periodKey: string;
   coveredPeriodKey: string;
   dodoUsageSubmittedAt: number | null | undefined;
-  paidAt: number;
 }): boolean {
   if (args.status !== "created") return false;
   if (args.dodoUsageSubmittedAt == null) return false;
-  if (args.periodKey !== args.coveredPeriodKey) return false;
-  return args.dodoUsageSubmittedAt <= args.paidAt;
+  return args.periodKey === args.coveredPeriodKey;
+}
+
+/** Charge-first credit applies when ingest later stamps the same period. */
+export function usageCreditAppliesToInvoice(args: {
+  invoicePeriodKey: string;
+  invoiceStatus: string;
+  creditPeriodKey: string | null | undefined;
+  creditPaidAt: number | null | undefined;
+}): boolean {
+  if (args.invoiceStatus === "paid") return false;
+  if (args.creditPaidAt == null || !Number.isFinite(args.creditPaidAt)) {
+    return false;
+  }
+  return (args.creditPeriodKey?.trim() ?? "") === args.invoicePeriodKey;
 }
 
 export function pickUniqueDodoCustomerUser<

@@ -18,12 +18,26 @@ export function previousUtcPeriodKey(paidAtMs: number): string {
 }
 
 /**
- * Shared Dodo ingest + settle period.
- * The day-1 06:00 UTC job runs in the new calendar month; a later Pro charge
- * in that cycle covers the month that just closed. Do not use utcPeriodKey.
+ * Period a Pro charge at `atMs` covers (the UTC month that just closed).
+ * Used by settle. The scheduled month-close job stamps this same key.
  */
 export function dodoUsagePeriodKey(atMs: number): string {
   return previousUtcPeriodKey(atMs);
+}
+
+/**
+ * Only the scheduled close of a finished usage month stamps the previous
+ * period. A mid-month force-run stamps the current usage month so a charge
+ * in this month cannot mark it paid and the next cycle can still find it.
+ */
+export function dodoIngestPeriodKey(args: {
+  nowMs: number;
+  scheduledMonthClose: boolean;
+}): string {
+  if (args.scheduledMonthClose) {
+    return dodoUsagePeriodKey(args.nowMs);
+  }
+  return utcPeriodKey(args.nowMs);
 }
 
 /** Idempotency key: one LS charge per merchant per UTC month. */

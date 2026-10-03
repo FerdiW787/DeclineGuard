@@ -225,6 +225,7 @@ export const applyDodoSubscription = internalMutation({
     dodoCustomerId: v.optional(v.string()),
     status: v.string(),
     productId: v.optional(v.string()),
+    onDemand: v.optional(v.boolean()),
     convexUserId: v.optional(v.string()),
     clerkUserId: v.optional(v.string()),
     checkoutNonce: v.optional(v.string()),
@@ -294,6 +295,18 @@ export const applyDodoSubscription = internalMutation({
 
     if (nextPlan === "pro") {
       if (args.productId && args.productId !== config.proProductId) {
+        if (knownSub) {
+          await ctx.db.patch(user._id, {
+            dodoProductId: args.productId,
+            dodoSubscriptionStatus: args.status,
+            ...(typeof args.onDemand === "boolean"
+              ? { dodoOnDemand: args.onDemand }
+              : {}),
+            ...(args.dodoCustomerId
+              ? { dodoCustomerId: args.dodoCustomerId }
+              : {}),
+          });
+        }
         return { applied: false, reason: "product_mismatch" };
       }
       if (!catalogOk && !knownSub && !checkoutNonceOk) {
@@ -314,6 +327,10 @@ export const applyDodoSubscription = internalMutation({
       billingProvider: nextPlan === "pro" ? "dodo" : user.billingProvider,
       dodoSubscriptionId: args.dodoSubscriptionId,
       dodoSubscriptionStatus: args.status,
+      ...(args.productId ? { dodoProductId: args.productId } : {}),
+      ...(typeof args.onDemand === "boolean"
+        ? { dodoOnDemand: args.onDemand }
+        : {}),
       ...(args.dodoCustomerId ? { dodoCustomerId: args.dodoCustomerId } : {}),
       dodoCheckoutNonce: "",
       dodoCheckoutNonceExpiresAt: 0,

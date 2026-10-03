@@ -24,9 +24,11 @@ import { allowHttpsUrl } from "../lib/safeUrl";
 import { resolveProductUserOrNull } from "../lib/accountGuard";
 import {
   dodoUsageMerchantMatch,
+  getDodoPaymentsConfig,
   invoiceMatchesUsageCharge,
   pickUniqueDodoCustomerUser,
   shouldIgnoreDodoTestEvent,
+  usageCreditAppliesToInvoice,
 } from "../lib/dodoPayments";
 
 /**
@@ -470,6 +472,42 @@ export const attachDodoCheckout = internalMutation({
   },
 });
 
+async function markUsageInvoicePaid(
+  ctx: MutationCtx,
+  args: {
+    invoice: Doc<"billingInvoices">;
+    paidAt: number;
+    dodoPaymentId?: string;
+    coveredPeriodKey: string;
+  },
+): Promise<void> {
+  for (const feeId of args.invoice.feeIds) {
+    const fee = await ctx.db.get(feeId);
+    if (!fee) continue;
+    if (fee.status !== "owed") continue;
+    await ctx.db.patch(feeId, { status: "invoiced" });
+  }
+  await ctx.db.patch(args.invoice._id, {
+    status: "paid",
+    dodoPaymentId: args.dodoPaymentId ?? args.invoice.dodoPaymentId,
+    paidAt: args.paidAt,
+    lastError: undefined,
+  });
+  await writeAuditLog(ctx, {
+    actorUserId: null,
+    targetUserId: args.invoice.userId,
+    action: "fee_invoice:paid",
+    metadata: {
+      invoiceId: args.invoice._id,
+      claimKey: args.invoice.claimKey,
+      path: "dodo_usage_subscription",
+      dodoPaymentId: args.dodoPaymentId ?? null,
+      coveredPeriodKey: args.coveredPeriodKey,
+      totalCents: args.invoice.totalCents,
+    },
+  });
+}
+
 export const attachDodoUsageSubmitted = internalMutation({
   args: {
     invoiceId: v.id("billingInvoices"),
@@ -489,6 +527,31 @@ export const attachDodoUsageSubmitted = internalMutation({
       dodoUsageSubmittedAt: args.nowMs,
       lastError: undefined,
     });
+
+    const submitted = await ctx.db.get(args.invoiceId);
+    if (!submitted) return true;
+    const user = await ctx.db.get(submitted.userId);
+    if (
+      user &&
+      usageCreditAppliesToInvoice({
+        invoicePeriodKey: submitted.periodKey,
+        invoiceStatus: submitted.status,
+        creditPeriodKey: user.dodoUsageCreditPeriodKey,
+        creditPaidAt: user.dodoUsageCreditPaidAt,
+      })
+    ) {
+      await markUsageInvoicePaid(ctx, {
+        invoice: submitted,
+        paidAt: user.dodoUsageCreditPaidAt!,
+        dodoPaymentId: user.dodoUsageCreditPaymentId,
+        coveredPeriodKey: submitted.periodKey,
+      });
+      await ctx.db.patch(user._id, {
+        dodoUsageCreditPeriodKey: undefined,
+        dodoUsageCreditPaidAt: undefined,
+        dodoUsageCreditPaymentId: undefined,
+      });
+    }
     return true;
   },
 });
@@ -547,9 +610,13 @@ export const settleDodoUsageFeeInvoices = internalMutation({
     if (!user) {
       return { settled: 0, reason: "user_not_found" };
     }
+    const config = getDodoPaymentsConfig();
     const merchant = dodoUsageMerchantMatch({
       paymentSubscriptionId: args.dodoSubscriptionId ?? null,
       merchantProSubscriptionId: user.dodoSubscriptionId ?? null,
+      merchantProductId: user.dodoProductId ?? null,
+      expectedProProductId: config?.proProductId ?? null,
+      merchantOnDemand: user.dodoOnDemand === true,
     });
     if (!merchant.ok) {
       return { settled: 0, reason: merchant.reason };
@@ -570,41 +637,37 @@ export const settleDodoUsageFeeInvoices = internalMutation({
           periodKey: invoice.periodKey,
           coveredPeriodKey,
           dodoUsageSubmittedAt: invoice.dodoUsageSubmittedAt,
-          paidAt: args.paidAt,
         })
       ) {
         continue;
       }
 
-      for (const feeId of invoice.feeIds) {
-        const fee = await ctx.db.get(feeId);
-        if (!fee) continue;
-        if (fee.status !== "owed") continue;
-        await ctx.db.patch(feeId, { status: "invoiced" });
-      }
-      await ctx.db.patch(invoice._id, {
-        status: "paid",
-        dodoPaymentId: args.dodoPaymentId ?? invoice.dodoPaymentId,
+      await markUsageInvoicePaid(ctx, {
+        invoice,
         paidAt: args.paidAt,
-        lastError: undefined,
-      });
-      await writeAuditLog(ctx, {
-        actorUserId: null,
-        targetUserId: invoice.userId,
-        action: "fee_invoice:paid",
-        metadata: {
-          invoiceId: invoice._id,
-          claimKey: invoice.claimKey,
-          path: "dodo_usage_subscription",
-          dodoPaymentId: args.dodoPaymentId ?? null,
-          coveredPeriodKey,
-          totalCents: invoice.totalCents,
-        },
+        dodoPaymentId: args.dodoPaymentId,
+        coveredPeriodKey,
       });
       settled += 1;
     }
 
-    return { settled, reason: settled > 0 ? "ok" : "none" };
+    if (settled > 0) {
+      if (user.dodoUsageCreditPeriodKey === coveredPeriodKey) {
+        await ctx.db.patch(user._id, {
+          dodoUsageCreditPeriodKey: undefined,
+          dodoUsageCreditPaidAt: undefined,
+          dodoUsageCreditPaymentId: undefined,
+        });
+      }
+      return { settled, reason: "ok" };
+    }
+
+    await ctx.db.patch(user._id, {
+      dodoUsageCreditPeriodKey: coveredPeriodKey,
+      dodoUsageCreditPaidAt: args.paidAt,
+      dodoUsageCreditPaymentId: args.dodoPaymentId,
+    });
+    return { settled: 0, reason: "credited" };
   },
 });
 
