@@ -283,6 +283,17 @@ type OwedFeePage = {
   continueCursor: string;
 };
 
+type ClaimingAcceptedPage = {
+  page: Array<{
+    _id: Id<"billingInvoices">;
+    userId: Id<"users">;
+    periodKey: string;
+    dodoUsageEventId: string | null;
+  }>;
+  isDone: boolean;
+  continueCursor: string;
+};
+
 type MonthlyFeeInvoiceSummary = {
   merchants: number;
   created: number;
@@ -893,25 +904,57 @@ async function invoiceMerchantViaDodo(
 
   if (persistDecision.outcome !== "created") {
     if (acceptedEventId) {
-      try {
-        await ctx.runMutation(
-          internal.functions.feeBilling.markDodoUsageAcceptedPending,
-          {
-            invoiceId,
-            dodoUsageEventId: acceptedEventId,
-            ingestedCents: persistDecision.ingestedCents,
-            nowMs,
-            monthClosed: scheduledMonthClose,
-            error: "persist_after_accept",
-          },
-        );
-      } catch (pendingErr) {
-        const pendingMessage =
-          pendingErr instanceof Error ? pendingErr.message : "Dodo Payments error";
-        console.error(
-          `Fee invoice Dodo pending-accept marker failed for ${userId}:`,
-          pendingMessage,
-        );
+      let pendingCommitted = false;
+      for (let attempt = 0; attempt < 2 && !pendingCommitted; attempt += 1) {
+        try {
+          pendingCommitted = await ctx.runMutation(
+            internal.functions.feeBilling.markDodoUsageAcceptedPending,
+            {
+              invoiceId,
+              dodoUsageEventId: acceptedEventId,
+              ingestedCents: persistDecision.ingestedCents,
+              nowMs,
+              monthClosed: scheduledMonthClose,
+              error: "persist_after_accept",
+            },
+          );
+        } catch (pendingErr) {
+          const pendingMessage =
+            pendingErr instanceof Error ? pendingErr.message : "Dodo Payments error";
+          console.error(
+            `Fee invoice Dodo pending-accept marker failed for ${userId}:`,
+            pendingMessage,
+          );
+        }
+      }
+      if (!pendingCommitted) {
+        try {
+          await persistCreditAndRecord();
+        } catch (finishErr) {
+          const finishMessage =
+            finishErr instanceof Error ? finishErr.message : "Dodo Payments error";
+          console.error(
+            `Fee invoice Dodo pending-accept attach finish failed for ${userId}:`,
+            finishMessage,
+          );
+        }
+        try {
+          await ctx.runMutation(
+            internal.functions.feeBilling.stampDodoUsageAcceptedEvent,
+            {
+              invoiceId,
+              dodoUsageEventId: acceptedEventId,
+              ingestedCents: persistDecision.ingestedCents,
+            },
+          );
+        } catch (stampErr) {
+          const stampMessage =
+            stampErr instanceof Error ? stampErr.message : "Dodo Payments error";
+          console.error(
+            `Fee invoice Dodo accepted-event stamp failed for ${userId}:`,
+            stampMessage,
+          );
+        }
       }
     }
     return {
@@ -995,6 +1038,19 @@ export const runMonthlyFeeInvoices = internalAction({
     let skippedCurrency = 0;
     let failed = 0;
 
+    let claimingCursor: string | null = null;
+    for (;;) {
+      const claimingPage: ClaimingAcceptedPage = await ctx.runQuery(
+        internal.functions.feeBilling.listClaimingAcceptedDodoUsagePage,
+        { paginationOpts: { numItems: 100, cursor: claimingCursor } },
+      );
+      for (const invoice of claimingPage.page) {
+        userIds.add(invoice.userId);
+      }
+      if (claimingPage.isDone) break;
+      claimingCursor = claimingPage.continueCursor;
+    }
+
     for (const userId of userIds) {
       const result = await invoiceMerchant(
         ctx,
@@ -1038,6 +1094,38 @@ export const runMonthlyFeeInvoices = internalAction({
     }
 
     const dodoClosedPeriodKey = dodoUsagePeriodKey(nowMs);
+    let finishCursor: string | null = null;
+    for (;;) {
+      const leftover: ClaimingAcceptedPage = await ctx.runQuery(
+        internal.functions.feeBilling.listClaimingAcceptedDodoUsagePage,
+        { paginationOpts: { numItems: 100, cursor: finishCursor } },
+      );
+      for (const invoice of leftover.page) {
+        try {
+          await ctx.runMutation(
+            internal.functions.feeBilling.attachDodoUsageSubmitted,
+            {
+              invoiceId: invoice._id,
+              ...(invoice.dodoUsageEventId
+                ? { dodoUsageEventId: invoice.dodoUsageEventId }
+                : {}),
+              nowMs,
+              monthClosed: true,
+            },
+          );
+        } catch (finishErr) {
+          const finishMessage =
+            finishErr instanceof Error ? finishErr.message : "Dodo Payments error";
+          console.error(
+            `Fee invoice Dodo leftover claiming attach failed for ${invoice._id}:`,
+            finishMessage,
+          );
+        }
+      }
+      if (leftover.isDone) break;
+      finishCursor = leftover.continueCursor;
+    }
+
     console.log(
       `Monthly fee invoices lemon=${periodKey} dodo=${dodoClosedPeriodKey}: merchants=${userIds.size} created=${created} claimed=${skippedClaimed} zero=${skippedZero} currency=${skippedCurrency} failed=${failed}`,
     );

@@ -26,6 +26,7 @@ import {
 } from "../convex/lib/billingProvider";
 import {
   dodoIngestPeriodKey,
+  claimingAcceptedDodoUsageMayFinish,
   dodoUsageAfterAcceptPersistDecision,
   dodoUsageCatchAction,
   dodoUsagePendingAcceptSettleSnapshot,
@@ -1071,6 +1072,26 @@ assert(
     pendingAfterAccept.ingestedCents === 14000 &&
     pendingAfterAccept.settleable === true &&
     pendingAfterAccept.emitAgain === false &&
+    pendingAfterAccept.appliesChargeCredit === true &&
+    usageCreditAppliesToInvoice({
+      invoicePeriodKey: "2026-01",
+      invoiceStatus: pendingAfterAccept.status,
+      monthClosed: pendingAfterAccept.monthClosed,
+      creditPeriodKey: "2026-01",
+      creditPaidAt: day1FebChargeAt,
+      merchantProSubscriptionId: "sub_pro",
+      expectedProProductId: "prod_pro",
+    }) &&
+    !usageCreditAppliesToInvoice({
+      invoicePeriodKey: "2026-01",
+      invoiceStatus: pendingAfterAccept.status,
+      monthClosed: pendingAfterAccept.monthClosed,
+      creditPeriodKey: "2026-01",
+      creditPaidAt: day1FebChargeAt,
+      merchantProSubscriptionId: "sub_pro",
+      merchantProductId: "prod_other",
+      expectedProProductId: "prod_pro",
+    }) &&
     invoiceMatchesUsageCharge({
       status: pendingAfterAccept.status,
       periodKey: "2026-01",
@@ -1083,7 +1104,41 @@ assert(
       nowMs: day1MarIngestAt,
       scheduledMonthClose: true,
     }) === "2026-02",
-  "owed-fee cron skips linked invoices; pending marker commits monthClosed so 20 Feb can settle accepted cents",
+  "owed-fee cron skips linked invoices; pending marker commits monthClosed and applies the 00:30 credit",
+);
+assert(
+  claimingAcceptedDodoUsageMayFinish({
+    status: "claiming",
+    dodoUsageEventId: acceptedEventId,
+    dodoUsageIngestedCents: 14000,
+  }) &&
+    !claimingAcceptedDodoUsageMayFinish({
+      status: "claiming",
+    }) &&
+    !claimingAcceptedDodoUsageMayFinish({
+      status: "created",
+      dodoUsageEventId: acceptedEventId,
+      dodoUsageIngestedCents: 14000,
+      dodoUsageMonthClosed: false,
+    }) &&
+    unpaidDodoUsageClaimMayReclaim({
+      scheduledMonthClose: true,
+      status: "claiming",
+      billingProvider: null,
+      dodoUsageSubmittedAt: null,
+      dodoUsageEventId: acceptedEventId,
+      dodoUsageIngestedCents: 14000,
+      paidAt: null,
+      lsCheckoutId: null,
+    }) &&
+    existingClaimBlocksNewCharge("claiming", 3, false) === true &&
+    !monthlyOwedFeeAddsMerchant({
+      testMode: false,
+      billingInvoiceId: "inv_jan",
+      feeCents: 14000,
+    }) &&
+    dodoUsageReclaimDeltaCents(14000, 14000) === 0,
+  "failed pending stamp stays finishable on the same period without a second POST or skipped_claimed forever",
 );
 assert(
   upsertDodoUsageCredit(
@@ -1689,7 +1744,7 @@ assert(
 );
 const pendingFn = feeBillingSrc.slice(
   feeBillingSrc.indexOf("export const markDodoUsageAcceptedPending"),
-  feeBillingSrc.indexOf("export const settleDodoUsageFeeInvoices"),
+  feeBillingSrc.indexOf("export const stampDodoUsageAcceptedEvent"),
 );
 const owedFeePageFn = feeBillingSrc.slice(
   feeBillingSrc.indexOf("export const listOwedFeePage"),
@@ -1697,13 +1752,19 @@ const owedFeePageFn = feeBillingSrc.slice(
 );
 assert(
   pendingFn.includes("writeDodoUsageAcceptedSnapshot") &&
+    pendingFn.includes("applyMatchingUsageCredit") &&
     pendingFn.includes("monthClosed: args.monthClosed") &&
     pendingFn.includes("nowMs: args.nowMs") &&
     pendingFn.includes("ingestedCents: args.ingestedCents") &&
+    feeBillingSrc.includes("stampDodoUsageAcceptedEvent") &&
+    feeBillingSrc.includes("listClaimingAcceptedDodoUsagePage") &&
+    feeBillingSrc.includes("claimingAcceptedDodoUsageMayFinish") &&
     owedFeePageFn.includes("billingInvoiceId: row.billingInvoiceId") &&
     feeActionsSrc.includes("monthlyOwedFeeAddsMerchant({") &&
-    feeActionsSrc.includes("billingInvoiceId: fee.billingInvoiceId"),
-  "pending accept marker commits settle fields; owed-fee cron still skips linked invoices",
+    feeActionsSrc.includes("billingInvoiceId: fee.billingInvoiceId") &&
+    feeActionsSrc.includes("listClaimingAcceptedDodoUsagePage") &&
+    feeActionsSrc.includes("stampDodoUsageAcceptedEvent"),
+  "pending accept marker applies charge credit; failed marker is stamped and finished later",
 );
 const viaDodoSrc = feeActionsSrc.slice(
   feeActionsSrc.indexOf("async function invoiceMerchantViaDodo"),

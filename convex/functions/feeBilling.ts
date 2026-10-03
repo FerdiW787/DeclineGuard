@@ -16,6 +16,7 @@ import {
   writeAuditLog,
 } from "../lib/admin";
 import {
+  claimingAcceptedDodoUsageMayFinish,
   dodoUsageReclaimFailureSnapshot,
   existingClaimBlocksNewCharge,
   feeInvoiceClaimKey,
@@ -738,7 +739,78 @@ export const markDodoUsageAcceptedPending = internalMutation({
       ingestedCents: args.ingestedCents,
       lastError: args.error,
     });
+    try {
+      await applyMatchingUsageCredit(ctx, args.invoiceId);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "credit_apply_failed";
+      console.error(
+        `Dodo usage credit apply failed after pending snapshot for ${args.invoiceId}:`,
+        message,
+      );
+    }
     return true;
+  },
+});
+
+export const stampDodoUsageAcceptedEvent = internalMutation({
+  args: {
+    invoiceId: v.id("billingInvoices"),
+    dodoUsageEventId: v.string(),
+    ingestedCents: v.number(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.invoiceId);
+    if (!invoice) return false;
+    if (invoice.status === "paid") return false;
+    await ctx.db.patch(args.invoiceId, {
+      dodoUsageEventId: args.dodoUsageEventId,
+      dodoUsageIngestedCents: Math.max(0, Math.round(args.ingestedCents)),
+      lastError: "persist_after_accept",
+    });
+    return true;
+  },
+});
+
+export const listClaimingAcceptedDodoUsagePage = internalQuery({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: v.object({
+    page: v.array(
+      v.object({
+        _id: v.id("billingInvoices"),
+        userId: v.id("users"),
+        periodKey: v.string(),
+        dodoUsageEventId: v.union(v.string(), v.null()),
+      }),
+    ),
+    isDone: v.boolean(),
+    continueCursor: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    const result = await ctx.db
+      .query("billingInvoices")
+      .withIndex("by_status_createdAt", (q) => q.eq("status", "claiming"))
+      .paginate(args.paginationOpts);
+    return {
+      page: result.page
+        .filter((row) =>
+          claimingAcceptedDodoUsageMayFinish({
+            status: row.status,
+            dodoUsageEventId: row.dodoUsageEventId,
+            dodoUsageIngestedCents: row.dodoUsageIngestedCents,
+            dodoUsageMonthClosed: row.dodoUsageMonthClosed,
+            paidAt: row.paidAt,
+          }),
+        )
+        .map((row) => ({
+          _id: row._id,
+          userId: row.userId,
+          periodKey: row.periodKey,
+          dodoUsageEventId: row.dodoUsageEventId ?? null,
+        })),
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
   },
 });
 

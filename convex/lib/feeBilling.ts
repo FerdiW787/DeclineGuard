@@ -218,6 +218,7 @@ export function dodoUsagePendingAcceptSettleSnapshot(args: {
   submittedAt: number;
   settleable: boolean;
   emitAgain: boolean;
+  appliesChargeCredit: boolean;
 } {
   const ingestedCents = Math.max(0, Math.round(args.acceptedCents));
   const monthClosed = args.scheduledMonthClose && ingestedCents > 0;
@@ -229,7 +230,29 @@ export function dodoUsagePendingAcceptSettleSnapshot(args: {
     submittedAt: args.submittedAt,
     settleable: monthClosed,
     emitAgain: false,
+    appliesChargeCredit: monthClosed,
   };
+}
+
+/**
+ * A claiming row Dodo already accepted can finish locally (no second POST)
+ * once event id or ingested cents are stamped. Linked owed fees do not
+ * re-enter the monthly merchant scan.
+ */
+export function claimingAcceptedDodoUsageMayFinish(args: {
+  status: BillingInvoiceStatus;
+  dodoUsageEventId?: string | null;
+  dodoUsageIngestedCents?: number | null;
+  dodoUsageMonthClosed?: boolean;
+  paidAt?: number | null;
+}): boolean {
+  if (args.status !== "claiming") return false;
+  if (args.paidAt != null) return false;
+  if (args.dodoUsageMonthClosed === true) return false;
+  return (
+    Boolean(args.dodoUsageEventId?.trim()) ||
+    (args.dodoUsageIngestedCents != null && args.dodoUsageIngestedCents > 0)
+  );
 }
 
 /** Idempotency key: one LS charge per merchant per UTC month. */
