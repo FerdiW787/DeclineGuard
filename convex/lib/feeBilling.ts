@@ -239,20 +239,33 @@ export function dodoUsagePendingAcceptSettleSnapshot(args: {
  * once event id or ingested cents are stamped. Linked owed fees do not
  * re-enter the monthly merchant scan.
  */
+export const PERSIST_AFTER_ACCEPT_ERROR = "persist_after_accept";
+
+/**
+ * Day-1 leftover finish: a claiming stamp is enough. A created stamp
+ * (reclaim of a force-run row) is finishable only when lastError is the
+ * persist-after-accept marker. A healthy force-run (created, no marker)
+ * is not finished here — 06:00 reclaim still owns that row.
+ */
 export function claimingAcceptedDodoUsageMayFinish(args: {
   status: BillingInvoiceStatus;
   dodoUsageEventId?: string | null;
   dodoUsageIngestedCents?: number | null;
   dodoUsageMonthClosed?: boolean;
   paidAt?: number | null;
+  lastError?: string | null;
 }): boolean {
-  if (args.status !== "claiming") return false;
   if (args.paidAt != null) return false;
   if (args.dodoUsageMonthClosed === true) return false;
-  return (
+  const accepted =
     Boolean(args.dodoUsageEventId?.trim()) ||
-    (args.dodoUsageIngestedCents != null && args.dodoUsageIngestedCents > 0)
-  );
+    (args.dodoUsageIngestedCents != null && args.dodoUsageIngestedCents > 0);
+  if (!accepted) return false;
+  if (args.status === "claiming") return true;
+  if (args.status === "created") {
+    return args.lastError === PERSIST_AFTER_ACCEPT_ERROR;
+  }
+  return false;
 }
 
 /** Idempotency key: one LS charge per merchant per UTC month. */

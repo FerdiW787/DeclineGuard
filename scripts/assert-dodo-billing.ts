@@ -27,6 +27,7 @@ import {
 import {
   dodoIngestPeriodKey,
   claimingAcceptedDodoUsageMayFinish,
+  PERSIST_AFTER_ACCEPT_ERROR,
   dodoUsageAfterAcceptPersistDecision,
   dodoUsageCatchAction,
   dodoUsagePendingAcceptSettleSnapshot,
@@ -1121,6 +1122,13 @@ assert(
       dodoUsageIngestedCents: 14000,
       dodoUsageMonthClosed: false,
     }) &&
+    claimingAcceptedDodoUsageMayFinish({
+      status: "created",
+      dodoUsageEventId: acceptedEventId,
+      dodoUsageIngestedCents: 14000,
+      dodoUsageMonthClosed: false,
+      lastError: PERSIST_AFTER_ACCEPT_ERROR,
+    }) &&
     unpaidDodoUsageClaimMayReclaim({
       scheduledMonthClose: true,
       status: "claiming",
@@ -1751,14 +1759,17 @@ const owedFeePageFn = feeBillingSrc.slice(
   feeBillingSrc.indexOf("export const getUserBillingTarget"),
 );
 assert(
-  pendingFn.includes("writeDodoUsageAcceptedSnapshot") &&
+    pendingFn.includes("writeDodoUsageAcceptedSnapshot") &&
     pendingFn.includes("applyMatchingUsageCredit") &&
+    !pendingFn.includes("credit apply failed after pending snapshot") &&
     pendingFn.includes("monthClosed: args.monthClosed") &&
     pendingFn.includes("nowMs: args.nowMs") &&
     pendingFn.includes("ingestedCents: args.ingestedCents") &&
     feeBillingSrc.includes("stampDodoUsageAcceptedEvent") &&
     feeBillingSrc.includes("listClaimingAcceptedDodoUsagePage") &&
     feeBillingSrc.includes("claimingAcceptedDodoUsageMayFinish") &&
+    feeBillingSrc.includes('withIndex("by_lastError"') &&
+    feeBillingSrc.includes("PERSIST_AFTER_ACCEPT_ERROR") &&
     owedFeePageFn.includes("billingInvoiceId: row.billingInvoiceId") &&
     feeActionsSrc.includes("monthlyOwedFeeAddsMerchant({") &&
     feeActionsSrc.includes("billingInvoiceId: fee.billingInvoiceId") &&

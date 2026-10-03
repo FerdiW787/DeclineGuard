@@ -403,7 +403,8 @@ export default defineSchema({
     .index("by_dodoCheckoutId", ["dodoCheckoutId"])
     .index("by_dodoPaymentId", ["dodoPaymentId"])
     .index("by_dodoUsageEventId", ["dodoUsageEventId"])
-    .index("by_status_createdAt", ["status", "createdAt"]),
+    .index("by_status_createdAt", ["status", "createdAt"])
+    .index("by_lastError", ["lastError"]),
 
   /**
    * Merchant-triggered test drip: Email 1 → +30s → Email 2 → +30s → Email 3.

@@ -21,6 +21,7 @@ import {
   existingClaimBlocksNewCharge,
   feeInvoiceClaimKey,
   orderCoversClaimedCents,
+  PERSIST_AFTER_ACCEPT_ERROR,
   unpaidDodoUsageClaimMayReclaim,
 } from "../lib/feeBilling";
 import { allowHttpsUrl } from "../lib/safeUrl";
@@ -680,15 +681,7 @@ export const attachDodoUsageSubmitted = internalMutation({
       monthClosed: args.monthClosed,
     });
 
-    try {
-      await applyMatchingUsageCredit(ctx, args.invoiceId);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "credit_apply_failed";
-      console.error(
-        `Dodo usage credit apply failed after persist for ${args.invoiceId}:`,
-        message,
-      );
-    }
+    await applyMatchingUsageCredit(ctx, args.invoiceId);
     return true;
   },
 });
@@ -739,15 +732,7 @@ export const markDodoUsageAcceptedPending = internalMutation({
       ingestedCents: args.ingestedCents,
       lastError: args.error,
     });
-    try {
-      await applyMatchingUsageCredit(ctx, args.invoiceId);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "credit_apply_failed";
-      console.error(
-        `Dodo usage credit apply failed after pending snapshot for ${args.invoiceId}:`,
-        message,
-      );
-    }
+    await applyMatchingUsageCredit(ctx, args.invoiceId);
     return true;
   },
 });
@@ -766,7 +751,7 @@ export const stampDodoUsageAcceptedEvent = internalMutation({
     await ctx.db.patch(args.invoiceId, {
       dodoUsageEventId: args.dodoUsageEventId,
       dodoUsageIngestedCents: Math.max(0, Math.round(args.ingestedCents)),
-      lastError: "persist_after_accept",
+      lastError: PERSIST_AFTER_ACCEPT_ERROR,
     });
     return true;
   },
@@ -789,7 +774,9 @@ export const listClaimingAcceptedDodoUsagePage = internalQuery({
   handler: async (ctx, args) => {
     const result = await ctx.db
       .query("billingInvoices")
-      .withIndex("by_status_createdAt", (q) => q.eq("status", "claiming"))
+      .withIndex("by_lastError", (q) =>
+        q.eq("lastError", PERSIST_AFTER_ACCEPT_ERROR),
+      )
       .paginate(args.paginationOpts);
     return {
       page: result.page
@@ -800,6 +787,7 @@ export const listClaimingAcceptedDodoUsagePage = internalQuery({
             dodoUsageIngestedCents: row.dodoUsageIngestedCents,
             dodoUsageMonthClosed: row.dodoUsageMonthClosed,
             paidAt: row.paidAt,
+            lastError: row.lastError,
           }),
         )
         .map((row) => ({
