@@ -17,6 +17,7 @@ import {
   sumCentsInUtcMonth,
   utcNextMonthStartMs,
 } from "../convex/lib/declineCapacity";
+import { utcCalendarMonthStartMs } from "../src/lib/utcMonth";
 
 function assert(condition: boolean, message: string): void {
   if (!condition) {
@@ -256,6 +257,11 @@ const staffSimSrc = readFileSync(
   join(repoRoot, "src/components/support/StaffDashboardSim.tsx"),
   "utf8",
 );
+const eastOfUtcLocalOctober = Date.parse("2026-10-01T00:30:00+02:00");
+assert(
+  utcCalendarMonthStartMs(eastOfUtcLocalOctober) === Date.UTC(2026, 8, 1),
+  "fee month helper must use UTC, not the browser's local October midnight",
+);
 
 assert(
   !recoveriesSrc.includes("EMAIL_QUOTA_SCAN_LIMIT"),
@@ -288,10 +294,10 @@ assert(
 );
 assert(
   dashboardSrc.includes("getFeesSummary") &&
-    dashboardSrc.includes("nowMs: emailQuotaNowMs") &&
-    !dashboardSrc.includes("{ monthStartMs }") &&
-    !dashboardSrc.includes("utcCalendarMonthStartMs"),
-  "dashboard must pass nowMs to getFeesSummary, not local midnight or client UTC midnight",
+    dashboardSrc.includes("nowMs: feeMonthStartMs") &&
+    dashboardSrc.includes("utcCalendarMonthStartMs") &&
+    !dashboardSrc.includes("{ monthStartMs }"),
+  "dashboard must pass the UTC calendar month as nowMs to getFeesSummary",
 );
 assert(
   recoveriesSrc.includes("merchantUserId") &&
@@ -304,12 +310,12 @@ assert(
 assert(
   staffSimSrc.includes("api.functions.recoveries.getFeesSummary") &&
     staffSimSrc.includes("merchantUserId") &&
-    staffSimSrc.includes("nowMs: feesNowMs") &&
+    staffSimSrc.includes("nowMs: feeMonthStartMs") &&
+    staffSimSrc.includes("utcCalendarMonthStartMs") &&
     !staffSimSrc.includes('feesOwedLabel="$0"') &&
     !staffSimSrc.includes("recoveryFeePercent={10}") &&
-    !staffSimSrc.includes("utcCalendarMonthStartMs") &&
     !staffSimSrc.includes("monthStartMs: feeMonthStartMs"),
-  "live staff snapshot must use that merchant's getFeesSummary with nowMs, not hardcoded $0/10 or monthStartMs",
+  "live staff snapshot must use that merchant's getFeesSummary with the UTC calendar month, not hardcoded $0/10",
 );
 assert(
   guardSrc.includes("gap >= 0 && gap <= ATTRIBUTION_WINDOW_MS"),
