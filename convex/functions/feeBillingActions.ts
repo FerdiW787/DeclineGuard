@@ -9,6 +9,7 @@ import {
   FEE_INVOICE_CHECKOUT_TTL_MS,
   feeInvoiceClaimKey,
   dodoIngestPeriodKey,
+  dodoUsageCatchAction,
   dodoUsagePeriodKey,
   dodoUsageReclaimDeltaCents,
   shouldUnlinkFeesAfterDodoUsageFailure,
@@ -612,6 +613,12 @@ async function invoiceMerchantViaDodo(
     feePath.path !== "usage" ||
     shouldOpenDodoFeeCheckout({ canTakeUsage: true })
   ) {
+    if (scheduledMonthClose) {
+      await ctx.runMutation(
+        internal.functions.feeBilling.markDodoUsageAcceptedCentsSettleable,
+        { userId, periodKey },
+      );
+    }
     return {
       outcome: "failed",
       invoiceId: null,
@@ -718,6 +725,8 @@ async function invoiceMerchantViaDodo(
     };
   }
 
+  let acceptedEventId: string | undefined;
+  let dodoAccepted = false;
   try {
     const aggregationKey = await fetchDodoMeterAggregationKey(config, meterId);
     const meterReady = dodoUsageMeterDecision({
@@ -746,13 +755,69 @@ async function invoiceMerchantViaDodo(
         invoiceId,
       }),
     ]);
+    dodoAccepted = true;
+    acceptedEventId = eventId;
     // Ingest is submitted/unpaid usage. Never settle here.
     if (usageIngestSettlesFeePeriod()) {
       throw new Error("usage ingest must not settle a fee period");
     }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Dodo Payments error";
+    console.error(`Fee invoice Dodo create failed for ${userId}:`, message);
+    const catchAction = dodoUsageCatchAction({
+      dodoAccepted,
+      reclaimed: claim.reclaimed,
+      priorIngestedCents: claim.priorIngestedCents,
+    });
+    switch (catchAction) {
+      case "keep_accepted":
+        break;
+      case "rollback":
+        await ctx.runMutation(
+          internal.functions.feeBilling.rollbackDodoUsageReclaim,
+          {
+            invoiceId,
+            priorIngestedCents: claim.priorIngestedCents,
+            priorFeeIds: claim.priorFeeIds,
+            error: message,
+          },
+        );
+        return {
+          outcome: "failed",
+          invoiceId,
+          totalCents: claim.totalCents,
+          feeCount: claim.feeCount,
+          error: message,
+          ...emptyCheckoutFields(),
+        };
+      case "unlink":
+        await ctx.runMutation(
+          internal.functions.feeBilling.markBillingClaimFailed,
+          {
+            invoiceId,
+            error: message,
+            unlinkFees: true,
+          },
+        );
+        return {
+          outcome: "failed",
+          invoiceId,
+          totalCents: claim.totalCents,
+          feeCount: claim.feeCount,
+          error: message,
+          ...emptyCheckoutFields(),
+        };
+      default: {
+        const _never: never = catchAction;
+        throw new Error(String(_never));
+      }
+    }
+  }
+
+  const persistAccepted = async () => {
     await ctx.runMutation(internal.functions.feeBilling.attachDodoUsageSubmitted, {
       invoiceId,
-      dodoUsageEventId: eventId,
+      ...(acceptedEventId ? { dodoUsageEventId: acceptedEventId } : {}),
       nowMs,
       monthClosed: scheduledMonthClose,
     });
@@ -760,7 +825,10 @@ async function invoiceMerchantViaDodo(
       invoiceId,
       actorUserId,
     });
+  };
 
+  try {
+    await persistAccepted();
     return {
       outcome: "created",
       invoiceId,
@@ -771,32 +839,26 @@ async function invoiceMerchantViaDodo(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Dodo Payments error";
-    console.error(`Fee invoice Dodo create failed for ${userId}:`, message);
-    if (
-      !shouldUnlinkFeesAfterDodoUsageFailure({
-        reclaimed: claim.reclaimed,
-        priorIngestedCents: claim.priorIngestedCents,
-      })
-    ) {
-      await ctx.runMutation(internal.functions.feeBilling.rollbackDodoUsageReclaim, {
-        invoiceId,
-        priorIngestedCents: claim.priorIngestedCents,
-        priorFeeIds: claim.priorFeeIds,
-        error: message,
-      });
-    } else {
-      await ctx.runMutation(internal.functions.feeBilling.markBillingClaimFailed, {
-        invoiceId,
-        error: message,
-        unlinkFees: true,
-      });
+    console.error(
+      `Fee invoice Dodo persist failed after accept for ${userId}:`,
+      message,
+    );
+    try {
+      await persistAccepted();
+    } catch (retryErr) {
+      const retryMessage =
+        retryErr instanceof Error ? retryErr.message : "Dodo Payments error";
+      console.error(
+        `Fee invoice Dodo persist retry failed after accept for ${userId}:`,
+        retryMessage,
+      );
     }
     return {
-      outcome: "failed",
+      outcome: "created",
       invoiceId,
       totalCents: claim.totalCents,
       feeCount: claim.feeCount,
-      error: message,
+      error: null,
       ...emptyCheckoutFields(),
     };
   }

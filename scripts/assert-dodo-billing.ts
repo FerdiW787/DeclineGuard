@@ -26,6 +26,7 @@ import {
 } from "../convex/lib/billingProvider";
 import {
   dodoIngestPeriodKey,
+  dodoUsageCatchAction,
   dodoUsagePeriodKey,
   dodoUsageReclaimDeltaCents,
   dodoUsageReclaimFailureSnapshot,
@@ -907,11 +908,19 @@ const failedDelta = dodoUsageReclaimFailureSnapshot({
   priorIngestedCents: 10000,
   attemptedTotalCents: 14000,
 });
+const day1MarIngestAt = Date.UTC(2026, 2, 1, 6, 0, 0);
 assert(
   failedDelta.totalCents === 10000 &&
     failedDelta.ingestedCents === 10000 &&
-    failedDelta.monthClosed === false &&
+    failedDelta.monthClosed === true &&
     failedDelta.looksMeteredAtAttempted === false &&
+    invoiceMatchesUsageCharge({
+      status: "created",
+      periodKey: "2026-01",
+      coveredPeriodKey: "2026-01",
+      dodoUsageSubmittedAt: midJanForceRunAt,
+      monthClosed: failedDelta.monthClosed,
+    }) &&
     !invoiceMatchesUsageCharge({
       status: "created",
       periodKey: "2026-01",
@@ -926,8 +935,35 @@ assert(
       dodoUsageSubmittedAt: midJanForceRunAt,
       paidAt: null,
       lsCheckoutId: null,
-    }),
-  "failed delta POST leaves the prior metered amount; charge cannot close a partial force-run",
+    }) &&
+    dodoIngestPeriodKey({
+      nowMs: day1MarIngestAt,
+      scheduledMonthClose: true,
+    }) === "2026-02",
+  "failed close keeps accepted cents settleable; charge cannot close a partial force-run; 1 Mar does not reopen January",
+);
+assert(
+  dodoUsageCatchAction({
+    dodoAccepted: true,
+    reclaimed: true,
+    priorIngestedCents: 10000,
+  }) === "keep_accepted" &&
+    dodoUsageCatchAction({
+      dodoAccepted: true,
+      reclaimed: false,
+      priorIngestedCents: 0,
+    }) === "keep_accepted" &&
+    dodoUsageCatchAction({
+      dodoAccepted: false,
+      reclaimed: true,
+      priorIngestedCents: 10000,
+    }) === "rollback" &&
+    dodoUsageCatchAction({
+      dodoAccepted: false,
+      reclaimed: false,
+      priorIngestedCents: 0,
+    }) === "unlink",
+  "after Dodo accepts cents, do not roll back or unlink; before accept, reclaim rolls back and first ingest unlinks",
 );
 assert(
   upsertDodoUsageCredit(
@@ -1069,6 +1105,42 @@ assert(
     creditPaidAt: day1FebChargeAt,
   }),
   "January credit must not settle a February ingest row",
+);
+assert(
+  !usageCreditAppliesToInvoice({
+    invoicePeriodKey: "2026-01",
+    invoiceStatus: "created",
+    monthClosed: true,
+    creditPeriodKey: "2026-01",
+    creditPaidAt: day1FebChargeAt,
+    merchantProSubscriptionId: "sub_pro",
+    merchantProductId: "prod_other",
+    expectedProProductId: "prod_pro",
+  }),
+  "credit must not apply after stored product leaves Pro",
+);
+assert(
+  usageCreditAppliesToInvoice({
+    invoicePeriodKey: "2026-01",
+    invoiceStatus: "created",
+    monthClosed: true,
+    creditPeriodKey: "2026-01",
+    creditPaidAt: day1FebChargeAt,
+    merchantProSubscriptionId: "sub_pro",
+    expectedProProductId: "prod_pro",
+  }) &&
+    !usageCreditAppliesToInvoice({
+      invoicePeriodKey: "2026-01",
+      invoiceStatus: "created",
+      monthClosed: true,
+      creditPeriodKey: "2026-01",
+      creditPaidAt: day1FebChargeAt,
+      merchantProSubscriptionId: "sub_pro",
+      merchantProductId: "prod_pro",
+      expectedProProductId: "prod_pro",
+      merchantOnDemand: true,
+    }),
+  "missing stored product_id still allows credit; on_demand credit is refused",
 );
 
 for (const eventType of [
@@ -1485,6 +1557,9 @@ assert(
     feeBillingSrc.includes("dodoUsageIngestedCents") &&
     feeBillingSrc.includes("rollbackDodoUsageReclaim") &&
     feeBillingSrc.includes("dodoUsageMonthClosed") &&
+    feeBillingSrc.includes("markDodoUsageAcceptedCentsSettleable") &&
+    feeBillingSrc.includes("dodoUsageReclaimFailureSnapshot") &&
+    feeBillingSrc.includes("merchantProductId: user.dodoProductId") &&
     settleFn.includes("upsertDodoUsageCredit") &&
     !settleFn.includes(".take(24)") &&
     !settleFn.includes(".first()"),
@@ -1502,6 +1577,13 @@ assert(
     viaDodoSrc.indexOf("dodoFeePathDecision") <
       viaDodoSrc.indexOf("claimBillingPeriod") &&
     viaDodoSrc.includes("rollbackDodoUsageReclaim") &&
+    viaDodoSrc.includes("dodoUsageCatchAction") &&
+    viaDodoSrc.includes("markDodoUsageAcceptedCentsSettleable") &&
+    viaDodoSrc.includes('case "keep_accepted"') &&
+    viaDodoSrc.indexOf("ingestDodoUsageEvents") <
+      viaDodoSrc.indexOf("dodoAccepted = true") &&
+    viaDodoSrc.indexOf("dodoAccepted = true") <
+      viaDodoSrc.indexOf("const persistAccepted") &&
     !feeActionsSrc.includes("dodoUsagePeriodKey(nowMs),"),
   "scheduled Dodo ingest uses the closed month and may reclaim a force-run row",
 );

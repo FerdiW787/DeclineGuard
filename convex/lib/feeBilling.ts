@@ -82,7 +82,12 @@ export function shouldUnlinkFeesAfterDodoUsageFailure(args: {
   return !(args.reclaimed && args.priorIngestedCents > 0);
 }
 
-/** After a failed delta POST, keep only the previously accepted meter amount. */
+/**
+ * After a failed scheduled close, keep only the previously accepted meter
+ * amount. Those accepted cents stay settleable (`monthClosed`) so a later
+ * Pro charge can mark them paid. They must not look metered at the
+ * attempted new total.
+ */
 export function dodoUsageReclaimFailureSnapshot(args: {
   priorIngestedCents: number;
   attemptedTotalCents: number;
@@ -96,9 +101,32 @@ export function dodoUsageReclaimFailureSnapshot(args: {
   return {
     totalCents: prior,
     ingestedCents: prior,
-    monthClosed: false,
+    monthClosed: prior > 0,
     looksMeteredAtAttempted: false,
   };
+}
+
+export type DodoUsageCatchAction = "keep_accepted" | "rollback" | "unlink";
+
+/**
+ * Once Dodo accepts a meter POST, keep those cents locally. A throw
+ * before accept still rolls back a reclaim or unlinks a first ingest.
+ */
+export function dodoUsageCatchAction(args: {
+  dodoAccepted: boolean;
+  reclaimed: boolean;
+  priorIngestedCents: number;
+}): DodoUsageCatchAction {
+  if (args.dodoAccepted) return "keep_accepted";
+  if (
+    !shouldUnlinkFeesAfterDodoUsageFailure({
+      reclaimed: args.reclaimed,
+      priorIngestedCents: args.priorIngestedCents,
+    })
+  ) {
+    return "rollback";
+  }
+  return "unlink";
 }
 
 /** Idempotency key: one LS charge per merchant per UTC month. */

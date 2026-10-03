@@ -565,13 +565,38 @@ export function usageCreditAppliesToInvoice(args: {
   monthClosed?: boolean;
   creditPeriodKey: string | null | undefined;
   creditPaidAt: number | null | undefined;
+  merchantProSubscriptionId?: string | null;
+  merchantProductId?: string | null;
+  expectedProProductId?: string | null;
+  merchantOnDemand?: boolean;
 }): boolean {
   if (args.invoiceStatus === "paid") return false;
   if (args.monthClosed !== true) return false;
   if (args.creditPaidAt == null || !Number.isFinite(args.creditPaidAt)) {
     return false;
   }
-  return (args.creditPeriodKey?.trim() ?? "") === args.invoicePeriodKey;
+  if ((args.creditPeriodKey?.trim() ?? "") !== args.invoicePeriodKey) {
+    return false;
+  }
+  if (args.merchantOnDemand === true) {
+    return false;
+  }
+  const storedProduct = args.merchantProductId?.trim() ?? "";
+  const expectedPro = args.expectedProProductId?.trim() ?? "";
+  if (storedProduct && expectedPro && storedProduct !== expectedPro) {
+    return false;
+  }
+  if (args.merchantProSubscriptionId !== undefined) {
+    const merchant = dodoUsageMerchantMatch({
+      paymentSubscriptionId: args.merchantProSubscriptionId,
+      merchantProSubscriptionId: args.merchantProSubscriptionId,
+      merchantProductId: args.merchantProductId,
+      expectedProProductId: args.expectedProProductId,
+      merchantOnDemand: args.merchantOnDemand,
+    });
+    if (!merchant.ok) return false;
+  }
+  return true;
 }
 
 export function pickUniqueDodoCustomerUser<
