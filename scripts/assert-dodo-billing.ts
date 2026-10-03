@@ -1205,6 +1205,7 @@ function proRenewalPayment(overrides: Record<string, unknown> = {}) {
   return {
     payment_id: "pay_renewal",
     subscription_id: "sub_pro",
+    product_id: "prod_pro",
     customer_id: "cus_1",
     total_amount: 2999,
     currency: "USD",
@@ -1468,7 +1469,7 @@ assert(
     eventType: "payment.succeeded",
     hasFeeClaimKey: false,
     subscriptionId: "sub_other",
-    productIds: [],
+    productIds: ["prod_pro"],
     expectedProProductId: "prod_pro",
     chargeKind: "recurring",
     isUpdatePaymentMethod: false,
@@ -1608,7 +1609,7 @@ assert(
       eventType: "payment.succeeded",
       hasFeeClaimKey: false,
       subscriptionId: "sub_pro",
-      productIds: [],
+      productIds: ["prod_pro"],
       expectedProProductId: "prod_pro",
       chargeKind: "recurring",
       isUpdatePaymentMethod: false,
@@ -1636,6 +1637,42 @@ assert(
   "after the stored product changes off Pro, usage does not settle",
 );
 assert(
+  dodoUsageChargeKind({
+    payment: proRenewalPayment({ product_id: undefined }),
+  }) === "recurring" &&
+    dodoUsageSettleFromPayment({
+      eventType: "payment.succeeded",
+      payment: proRenewalPayment({ product_id: undefined }),
+      hasFeeClaimKey: false,
+      expectedProProductId: "prod_pro",
+      merchantProSubscriptionId: "sub_pro",
+      merchantProductId: "prod_pro",
+    }).reason === "missing_product_id" &&
+    dodoUsageSettlePayloadDecision({
+      eventType: "payment.succeeded",
+      hasFeeClaimKey: false,
+      subscriptionId: "sub_pro",
+      productIds: [],
+      expectedProProductId: "prod_pro",
+      chargeKind: "recurring",
+      isUpdatePaymentMethod: false,
+      amountCents: 2999,
+      paymentCreatedAtMs: februaryRenewalAt,
+    }).reason === "missing_product_id" &&
+    dodoUsageSettlePayloadDecision({
+      eventType: "payment.succeeded",
+      hasFeeClaimKey: false,
+      subscriptionId: "sub_pro",
+      productIds: ["", "   "],
+      expectedProProductId: "prod_pro",
+      chargeKind: "recurring",
+      isUpdatePaymentMethod: false,
+      amountCents: 2999,
+      paymentCreatedAtMs: februaryRenewalAt,
+    }).reason === "missing_product_id",
+  "empty product ids may still classify as recurring but must not settle usage",
+);
+assert(
   dodoUsageSettleFromPayment({
     eventType: "payment.succeeded",
     payment: proRenewalPayment(),
@@ -1643,8 +1680,19 @@ assert(
     expectedProProductId: "prod_pro",
     merchantProSubscriptionId: "sub_pro",
     merchantProductId: "prod_pro",
-  }).settle === true,
-  "renewal of the stored Pro subscription with no payment product_id still settles",
+  }).settle === true &&
+    dodoUsageSettleFromPayment({
+      eventType: "payment.succeeded",
+      payment: proRenewalPayment({
+        product_id: undefined,
+        product_cart: [{ product_id: "prod_pro", quantity: 1 }],
+      }),
+      hasFeeClaimKey: false,
+      expectedProProductId: "prod_pro",
+      merchantProSubscriptionId: "sub_pro",
+      merchantProductId: "prod_pro",
+    }).settle === true,
+  "a real recurring payment that carries the Pro product id may still settle",
 );
 assert(
   pickUniqueDodoCustomerUser({
@@ -1868,6 +1916,17 @@ assert(
     )
     .includes("Date.now()"),
   "settle decision paidAt is never Date.now()",
+);
+const settlePayloadFn = dodoPaymentsSrc.slice(
+  dodoPaymentsSrc.indexOf("export function dodoUsageSettlePayloadDecision"),
+  dodoPaymentsSrc.indexOf("export function dodoUsageSettleFromPayment"),
+);
+assert(
+  settlePayloadFn.includes("missing_product_id") &&
+    settlePayloadFn.includes("presentProductIds") &&
+    dodoWebhookSrc.includes("verifyStandardWebhook") &&
+    dodoWebhookSrc.includes("dodoUsageSettlePayloadDecision"),
+  "empty product ids fail closed; webhook still verifies the Standard Webhooks signature",
 );
 
 console.log("assert-dodo-billing: ok");

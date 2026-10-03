@@ -379,8 +379,9 @@ export function dodoUsageMerchantMatch(args: {
 
 /**
  * Usage is paid only by this merchant's Pro recurring invoice for the
- * covered period. subscription_id alone, a non-Pro product, addon /
- * proration / on-demand, activation, and $0 update-PM do not settle.
+ * covered period. subscription_id alone, empty product ids, a non-Pro
+ * product, addon / proration / on-demand, activation, and $0 update-PM
+ * do not settle.
  */
 export function dodoUsageSettleDecision(args: {
   eventType: string;
@@ -446,7 +447,13 @@ export function dodoUsageSettlePayloadDecision(args: {
   if (!subscriptionId) {
     return { settle: false, reason: "missing_subscription_id" };
   }
-  if (args.productIds.some((id) => id.trim() && id.trim() !== expectedPro)) {
+  const presentProductIds = args.productIds
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+  if (presentProductIds.length === 0) {
+    return { settle: false, reason: "missing_product_id" };
+  }
+  if (presentProductIds.some((id) => id !== expectedPro)) {
     return { settle: false, reason: "non_pro_product" };
   }
   if (args.paymentCreatedAtMs == null) {

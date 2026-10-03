@@ -59,6 +59,50 @@ export function assertCanActOnTarget(
   );
 }
 
+/** Reclaim may soft-delete a merchant owner. Staff/admin owners are refused. */
+export function currentStoreOwnerMayBeReclaimed(
+  role: string | undefined | null,
+): boolean {
+  return !isPrivilegedRole(role);
+}
+
+export type ReclaimOwnerDecision =
+  | { allow: true }
+  | { allow: false; reason: "missing_owner" | "privileged_owner" };
+
+export function reclaimOwnerDecision(
+  owner: { role?: string | null } | null | undefined,
+): ReclaimOwnerDecision {
+  if (owner == null) {
+    return { allow: false, reason: "missing_owner" };
+  }
+  if (!currentStoreOwnerMayBeReclaimed(owner.role)) {
+    return { allow: false, reason: "privileged_owner" };
+  }
+  return { allow: true };
+}
+
+/** Binding owner and live connection owner both fail closed, including toUserId. */
+export function reclaimLiveConnectionMaySoftDelete(args: {
+  bindingOwner: { role?: string | null } | null | undefined;
+  connectionOwner: { role?: string | null } | null | undefined;
+}): ReclaimOwnerDecision {
+  const binding = reclaimOwnerDecision(args.bindingOwner);
+  if (!binding.allow) return binding;
+  return reclaimOwnerDecision(args.connectionOwner);
+}
+
+export function assertCurrentStoreOwnerMayBeReclaimed(
+  owner: { role?: string | null } | null | undefined,
+): void {
+  const decision = reclaimOwnerDecision(owner);
+  if (decision.allow) return;
+  if (decision.reason === "missing_owner") {
+    throw new Error("Current store owner not found");
+  }
+  throw new Error("Cannot reclaim a store from a Staff or Admin account.");
+}
+
 async function loadCurrentUser(ctx: Ctx): Promise<Doc<"users">> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) throw new Error("Not authenticated");
