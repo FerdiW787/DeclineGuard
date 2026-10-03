@@ -39,13 +39,18 @@ import CRTWarp from "@/components/homepage/crt-warp/CRTWarp";
 import type { FingerCount } from "./SequencesWarrior";
 import {
   applyCopyVars,
-  resolveEmailCopy,
+  resolveFullEmailDocument,
   type EmailCopyOverrides,
   type RecoveryTemplateId,
 } from "@/lib/recoveryEmailCopy";
 import {
+  documentForKit,
+  kitLogoAlign,
+  kitShowsGreeting,
+  kitShowsStoreName,
+} from "@/lib/emailBlockKits";
+import {
   DEFAULT_LAYOUT_PRESET_ID,
-  isLayoutPresetId,
   LAYOUT_PRESET_CATALOG,
   LAYOUT_PRESET_IDS,
   type LayoutPresetId,
@@ -208,9 +213,17 @@ export default function SequencesPage({
 
   const activeIndex = STEPS.findIndex((s) => s.id === activeStep);
   const step = STEPS[activeIndex] ?? STEPS[0]!;
-  const stepCopy = resolveEmailCopy(
-    step.templateId as RecoveryTemplateId,
-    emailCopy,
+  const kitDoc = useMemo(
+    () =>
+      documentForKit(
+        step.templateId as RecoveryTemplateId,
+        layoutKit,
+        resolveFullEmailDocument(
+          step.templateId as RecoveryTemplateId,
+          emailCopy,
+        ),
+      ),
+    [step.templateId, layoutKit, emailCopy],
   );
   const fingers = step.number as FingerCount;
 
@@ -293,17 +306,17 @@ export default function SequencesPage({
     return { product, amount, customer, fromCase: selectedFailure != null };
   }, [selectedFailure, openFailures]);
 
-  const previewSubject = applyCopyVars(stepCopy.subject, {
+  const previewSubject = applyCopyVars(kitDoc.subject, {
     product: previewSample.product,
     amount: previewSample.amount,
     firstName: previewSample.customer,
   });
-  const previewHeadline = applyCopyVars(stepCopy.headline, {
+  const previewHeadline = applyCopyVars(kitDoc.headline, {
     product: previewSample.product,
     amount: previewSample.amount,
     firstName: previewSample.customer,
   });
-  const previewBody = applyCopyVars(stepCopy.body, {
+  const previewBody = applyCopyVars(kitDoc.body, {
     product: previewSample.product,
     amount: previewSample.amount,
     firstName: previewSample.customer,
@@ -362,23 +375,6 @@ export default function SequencesPage({
                 Customize brand
               </button>
             ) : null}
-            <label className="flex min-w-0 items-center gap-1.5">
-              <span className="sr-only">Preview layout kit</span>
-              <select
-                value={layoutKit}
-                onChange={(event) => {
-                  const next = event.target.value;
-                  if (isLayoutPresetId(next)) setLayoutKit(next);
-                }}
-                className="dg-btn shrink-0 cursor-pointer !px-3 !py-1.5 text-[11px]"
-              >
-                {LAYOUT_PRESET_IDS.map((id) => (
-                  <option key={id} value={id}>
-                    {LAYOUT_PRESET_CATALOG[id]?.name ?? id}
-                  </option>
-                ))}
-              </select>
-            </label>
             <button
               type="button"
               disabled={previewBlocked}
@@ -720,6 +716,41 @@ export default function SequencesPage({
               {step.whenLabel}
             </p>
           </div>
+          <div className="mb-3">
+            <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8a8f98]">
+              Preview kit
+            </p>
+            <div
+              className="mt-2 flex flex-wrap gap-1.5"
+              role="radiogroup"
+              aria-label="Preview layout kit"
+            >
+              {LAYOUT_PRESET_IDS.map((id) => {
+                const selected = layoutKit === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setLayoutKit(id)}
+                    className={cn(
+                      "rounded-full px-2.5 py-1 text-[11px] font-semibold transition",
+                      selected
+                        ? "bg-[#08090a] text-white"
+                        : "border border-black/8 bg-white text-[#6b6f76] hover:border-black/20 hover:text-[#08090a]",
+                    )}
+                  >
+                    {LAYOUT_PRESET_CATALOG[id]?.name ?? id}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1.5 text-[11px] text-[#8a8f98]">
+              Same three emails — Gentle, Direct, Urgent. Pick a kit before
+              sending a preview to yourself.
+            </p>
+          </div>
           <div className="mx-auto w-full max-w-[512px]">
             <div className="dg-keep-light overflow-hidden rounded-md border border-black/8 bg-white">
               <div className="border-b border-black/6 bg-[#fafafa] px-5 py-3">
@@ -741,11 +772,14 @@ export default function SequencesPage({
                 content={{
                   headline: previewHeadline,
                   body: previewBody,
-                  cta: stepCopy.cta,
+                  cta: kitDoc.cta,
                 }}
-                blocks={stepCopy.blocks}
-                linkColor={linkColor?.trim() || stepCopy.linkColor}
-                emailPadding={stepCopy.emailPadding}
+                blocks={kitDoc.blocks}
+                linkColor={linkColor?.trim() || kitDoc.linkColor}
+                emailPadding={kitDoc.emailPadding}
+                logoAlign={kitLogoAlign(layoutKit)}
+                showStoreName={kitShowsStoreName(layoutKit)}
+                showGreeting={kitShowsGreeting(layoutKit)}
                 storeName={storeName}
                 storeLogoUrl={storeLogoUrl}
                 primary={brandColor}
