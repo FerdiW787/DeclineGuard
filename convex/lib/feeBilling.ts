@@ -8,6 +8,279 @@ export function utcPeriodKey(nowMs: number): string {
   return `${year}-${month}`;
 }
 
+/**
+ * UTC month closed by a charge at `paidAtMs`.
+ * February renewal covers January usage on that invoice — never `paidAt`'s month.
+ */
+export function previousUtcPeriodKey(paidAtMs: number): string {
+  const d = new Date(paidAtMs);
+  return utcPeriodKey(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1));
+}
+
+/**
+ * Period a Pro charge at `atMs` covers (the UTC month that just closed).
+ * Used by settle. The scheduled month-close job stamps this same key.
+ */
+export function dodoUsagePeriodKey(atMs: number): string {
+  return previousUtcPeriodKey(atMs);
+}
+
+/**
+ * Only the scheduled close of a finished usage month stamps the previous
+ * period. A mid-month force-run stamps the current usage month so a charge
+ * in this month cannot mark it paid. The scheduled close must reclaim that
+ * same key and recompute the finished month — not skip the partial row.
+ */
+export function dodoIngestPeriodKey(args: {
+  nowMs: number;
+  scheduledMonthClose: boolean;
+}): string {
+  if (args.scheduledMonthClose) {
+    return dodoUsagePeriodKey(args.nowMs);
+  }
+  return utcPeriodKey(args.nowMs);
+}
+
+/**
+ * Scheduled month-close may reopen an unpaid Dodo usage claim so the
+ * finished month includes fees accrued after a mid-month force-run.
+ * Paid rows and Lemon checkouts stay blocked.
+ */
+export function unpaidDodoUsageClaimMayReclaim(args: {
+  scheduledMonthClose: boolean;
+  status: BillingInvoiceStatus;
+  billingProvider?: "lemon" | "dodo" | null;
+  dodoUsageSubmittedAt?: number | null;
+  dodoUsageEventId?: string | null;
+  dodoUsageIngestedCents?: number | null;
+  paidAt?: number | null;
+  lsCheckoutId?: string | null;
+}): boolean {
+  if (!args.scheduledMonthClose) return false;
+  if (args.status === "paid" || args.paidAt != null) return false;
+  if (args.lsCheckoutId) return false;
+  if (args.billingProvider === "lemon") return false;
+  if (args.status !== "created" && args.status !== "claiming") return false;
+  return (
+    args.billingProvider === "dodo" ||
+    args.dodoUsageSubmittedAt != null ||
+    Boolean(args.dodoUsageEventId?.trim()) ||
+    (args.dodoUsageIngestedCents != null && args.dodoUsageIngestedCents > 0)
+  );
+}
+
+export function dodoUsageReclaimDeltaCents(
+  priorIngestedCents: number,
+  nextTotalCents: number,
+): number {
+  if (!Number.isFinite(priorIngestedCents) || !Number.isFinite(nextTotalCents)) {
+    return 0;
+  }
+  return Math.max(0, Math.round(nextTotalCents) - Math.round(priorIngestedCents));
+}
+
+/** Already-metered reclaim rows must not unlink or re-ingest accepted cents. */
+export function shouldUnlinkFeesAfterDodoUsageFailure(args: {
+  reclaimed: boolean;
+  priorIngestedCents: number;
+}): boolean {
+  return !(args.reclaimed && args.priorIngestedCents > 0);
+}
+
+/**
+ * After a failed scheduled close, keep only the previously accepted meter
+ * amount. Those accepted cents stay settleable (`monthClosed`) so a later
+ * Pro charge can mark them paid. They must not look metered at the
+ * attempted new total.
+ */
+export function dodoUsageReclaimFailureSnapshot(args: {
+  priorIngestedCents: number;
+  attemptedTotalCents: number;
+}): {
+  totalCents: number;
+  ingestedCents: number;
+  monthClosed: boolean;
+  looksMeteredAtAttempted: boolean;
+} {
+  const prior = Math.max(0, Math.round(args.priorIngestedCents));
+  return {
+    totalCents: prior,
+    ingestedCents: prior,
+    monthClosed: prior > 0,
+    looksMeteredAtAttempted: false,
+  };
+}
+
+export type DodoUsageCatchAction = "keep_accepted" | "rollback" | "unlink";
+
+/**
+ * Once Dodo accepts a meter POST, keep those cents locally. A throw
+ * before accept still rolls back a reclaim or unlinks a first ingest.
+ */
+export function dodoUsageCatchAction(args: {
+  dodoAccepted: boolean;
+  reclaimed: boolean;
+  priorIngestedCents: number;
+}): DodoUsageCatchAction {
+  if (args.dodoAccepted) return "keep_accepted";
+  if (
+    !shouldUnlinkFeesAfterDodoUsageFailure({
+      reclaimed: args.reclaimed,
+      priorIngestedCents: args.priorIngestedCents,
+    })
+  ) {
+    return "rollback";
+  }
+  return "unlink";
+}
+
+export type DodoUsageAfterAcceptPersistDecision = {
+  outcome: "created" | "failed";
+  status: BillingInvoiceStatus;
+  ingestedCents: number;
+  monthClosed: boolean;
+  settleable: boolean;
+  emitAgain: boolean;
+  mayFinishSamePeriod: boolean;
+  blocksFirstIngestRerun: boolean;
+};
+
+/**
+ * After Dodo accepts a meter event, local persist either commits
+ * accepted cents + monthClosed or leaves the same period finishable
+ * without a second POST. Never report created when persist did not commit.
+ */
+export function dodoUsageAfterAcceptPersistDecision(args: {
+  persistCommitted: boolean;
+  scheduledMonthClose: boolean;
+  acceptedCents: number;
+  firstIngest: boolean;
+  creditApplyThrew?: boolean;
+}): DodoUsageAfterAcceptPersistDecision {
+  const ingestedCents = Math.max(0, Math.round(args.acceptedCents));
+  if (args.creditApplyThrew) {
+    return {
+      outcome: "failed",
+      status: args.firstIngest ? "claiming" : "created",
+      ingestedCents,
+      monthClosed: false,
+      settleable: false,
+      emitAgain: false,
+      mayFinishSamePeriod: true,
+      blocksFirstIngestRerun: false,
+    };
+  }
+  if (args.persistCommitted) {
+    return {
+      outcome: "created",
+      status: "created",
+      ingestedCents,
+      monthClosed: args.scheduledMonthClose,
+      settleable: args.scheduledMonthClose && ingestedCents > 0,
+      emitAgain: false,
+      mayFinishSamePeriod: false,
+      blocksFirstIngestRerun: false,
+    };
+  }
+  return {
+    outcome: "failed",
+    status: args.firstIngest ? "claiming" : "created",
+    ingestedCents,
+    monthClosed: false,
+    settleable: false,
+    emitAgain: false,
+    mayFinishSamePeriod: true,
+    blocksFirstIngestRerun: false,
+  };
+}
+
+export function dodoUsageReuseAcceptedEventId(
+  existingEventId: string | null | undefined,
+  nextEventId: string,
+): string {
+  const existing = existingEventId?.trim() ?? "";
+  return existing || nextEventId;
+}
+
+/** Monthly owed-fee scan: linked fees never re-enter invoiceMerchant. */
+export function monthlyOwedFeeAddsMerchant(args: {
+  testMode: boolean;
+  billingInvoiceId?: string | null;
+  feeCents: number;
+}): boolean {
+  if (args.testMode) return false;
+  if (args.billingInvoiceId != null) return false;
+  if (args.feeCents <= 0) return false;
+  return true;
+}
+
+/**
+ * Last-ditch write after persist throws. Commits the settle fields for
+ * cents Dodo already accepted so a later Pro charge can pay them. The
+ * monthly owed-fee cron will not revisit those linked fees.
+ */
+export function dodoUsagePendingAcceptSettleSnapshot(args: {
+  acceptedCents: number;
+  scheduledMonthClose: boolean;
+  submittedAt: number;
+}): {
+  outcome: "failed";
+  status: "created";
+  ingestedCents: number;
+  monthClosed: boolean;
+  submittedAt: number;
+  settleable: boolean;
+  emitAgain: boolean;
+  appliesChargeCredit: boolean;
+} {
+  const ingestedCents = Math.max(0, Math.round(args.acceptedCents));
+  const monthClosed = args.scheduledMonthClose && ingestedCents > 0;
+  return {
+    outcome: "failed",
+    status: "created",
+    ingestedCents,
+    monthClosed,
+    submittedAt: args.submittedAt,
+    settleable: monthClosed,
+    emitAgain: false,
+    appliesChargeCredit: monthClosed,
+  };
+}
+
+/**
+ * A claiming row Dodo already accepted can finish locally (no second POST)
+ * once event id or ingested cents are stamped. Linked owed fees do not
+ * re-enter the monthly merchant scan.
+ */
+export const PERSIST_AFTER_ACCEPT_ERROR = "persist_after_accept";
+
+/**
+ * Day-1 leftover finish: a claiming stamp is enough. A created stamp
+ * (reclaim of a force-run row) is finishable only when lastError is the
+ * persist-after-accept marker. A healthy force-run (created, no marker)
+ * is not finished here — 06:00 reclaim still owns that row.
+ */
+export function claimingAcceptedDodoUsageMayFinish(args: {
+  status: BillingInvoiceStatus;
+  dodoUsageEventId?: string | null;
+  dodoUsageIngestedCents?: number | null;
+  dodoUsageMonthClosed?: boolean;
+  paidAt?: number | null;
+  lastError?: string | null;
+}): boolean {
+  if (args.paidAt != null) return false;
+  if (args.dodoUsageMonthClosed === true) return false;
+  const accepted =
+    Boolean(args.dodoUsageEventId?.trim()) ||
+    (args.dodoUsageIngestedCents != null && args.dodoUsageIngestedCents > 0);
+  if (!accepted) return false;
+  if (args.status === "claiming") return true;
+  if (args.status === "created") {
+    return args.lastError === PERSIST_AFTER_ACCEPT_ERROR;
+  }
+  return false;
+}
+
 /** Idempotency key: one LS charge per merchant per UTC month. */
 export function feeInvoiceClaimKey(
   userId: Id<"users">,

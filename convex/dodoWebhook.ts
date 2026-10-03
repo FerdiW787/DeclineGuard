@@ -3,12 +3,18 @@ import type { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import {
   collectDodoWebhookSecrets,
+  dodoPaymentAmountCents,
+  dodoPaymentProductIds,
+  dodoUsageChargeKind,
+  dodoUsageSettlePayloadDecision,
   extractDodoMetadata,
   extractDodoUserRefs,
   getDodoPaymentsConfig,
   isDodoPaymentEvent,
   isDodoSubscriptionEvent,
+  isDodoUpdatePaymentMethod,
   parseDodoEnvironment,
+  parseIsoMsStrict,
   statusFromDodoEvent,
   stringifyDodoId,
 } from "./lib/dodoPayments";
@@ -37,7 +43,7 @@ type DodoWebhookBody = {
  * Subscribe at least to:
  * - subscription.active, subscription.renewed, subscription.on_hold,
  *   subscription.cancelled, subscription.failed, subscription.updated
- * - payment.succeeded (recovery-fee invoices + pack receipts)
+ * - payment.succeeded (Pro usage settle + recovery-fee checkouts + pack receipts)
  *
  * Env: DODO_PAYMENTS_WEBHOOK_KEY (Standard Webhooks / Svix-style).
  * Optional DODO_PAYMENTS_WEBHOOK_KEY_PREVIOUS for rotation.
@@ -146,15 +152,18 @@ async function handleSubscriptionEvent(
   const payloadStatus =
     typeof data.status === "string" ? data.status : "";
 
+  const status = statusFromDodoEvent(eventType, payloadStatus);
+  const testMode = isDodoTestPayload(data);
   await ctx.runMutation(internal.functions.dodoBilling.applyDodoSubscription, {
     dodoSubscriptionId: subscriptionId,
     dodoCustomerId: customerId ?? undefined,
-    status: statusFromDodoEvent(eventType, payloadStatus),
+    status,
     productId: productId ?? undefined,
+    onDemand: typeof data.on_demand === "boolean" ? data.on_demand : undefined,
     convexUserId: refs.convexUserId ?? undefined,
     clerkUserId: refs.clerkUserId ?? undefined,
     checkoutNonce: refs.checkoutNonce ?? undefined,
-    testMode: isDodoTestPayload(data),
+    testMode,
   });
 }
 
@@ -206,6 +215,36 @@ async function handlePaymentEvent(
 
   const claimKey = refs.claimKey;
   if (!claimKey || !isFeeInvoiceClaimKey(claimKey)) {
+    const subscriptionId = stringifyDodoId(data.subscription_id);
+    const proProductId = getDodoPaymentsConfig()?.proProductId ?? null;
+    const decision = dodoUsageSettlePayloadDecision({
+      eventType,
+      hasFeeClaimKey: false,
+      subscriptionId,
+      productIds: dodoPaymentProductIds(data),
+      expectedProProductId: proProductId,
+      chargeKind: dodoUsageChargeKind({
+        payment: data,
+        expectedProProductId: proProductId,
+      }),
+      isUpdatePaymentMethod: isDodoUpdatePaymentMethod(data),
+      amountCents: dodoPaymentAmountCents(data),
+      paymentCreatedAtMs: parseIsoMsStrict(data.created_at),
+    });
+    if (decision.settle) {
+      const paymentId = stringifyDodoId(data.payment_id);
+      await ctx.runMutation(
+        internal.functions.feeBilling.settleDodoUsageFeeInvoices,
+        {
+          dodoCustomerId: extractCustomerId(data) ?? undefined,
+          dodoSubscriptionId: subscriptionId ?? undefined,
+          dodoPaymentId: paymentId ?? undefined,
+          paidAt: decision.paidAt,
+          coveredPeriodKey: decision.coveredPeriodKey,
+          testMode: isDodoTestPayload(data),
+        },
+      );
+    }
     return;
   }
 

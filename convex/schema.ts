@@ -77,6 +77,23 @@ export default defineSchema({
     /** Dodo Payments subscription id for DeclineGuard Pro. */
     dodoSubscriptionId: v.optional(v.string()),
     dodoSubscriptionStatus: v.optional(v.string()),
+    /** Last product_id from a Dodo subscription webhook (has product_id). */
+    dodoProductId: v.optional(v.string()),
+    /** Subscription.on_demand from Dodo. Payments do not carry this field. */
+    dodoOnDemand: v.optional(v.boolean()),
+    /** Pro charge that should close this period if ingest races after paidAt. */
+    dodoUsageCreditPeriodKey: v.optional(v.string()),
+    dodoUsageCreditPaidAt: v.optional(v.number()),
+    dodoUsageCreditPaymentId: v.optional(v.string()),
+    dodoUsageCredits: v.optional(
+      v.array(
+        v.object({
+          periodKey: v.string(),
+          paidAt: v.number(),
+          paymentId: v.optional(v.string()),
+        }),
+      ),
+    ),
     dodoCheckoutNonce: v.optional(v.string()),
     dodoCheckoutNonceExpiresAt: v.optional(v.number()),
     /** Extra monthly declines from paid $0.99 +10 packs (sum of credited units). */
@@ -362,6 +379,15 @@ export default defineSchema({
     lsOrderId: v.optional(v.string()),
     dodoCheckoutId: v.optional(v.string()),
     dodoPaymentId: v.optional(v.string()),
+    /** Idempotent Dodo usage event id. Ingest ≠ paid. */
+    dodoUsageEventId: v.optional(v.string()),
+    dodoUsageSubmittedAt: v.optional(v.number()),
+    /** Cents last accepted by Dodo ingest. Scheduled close deltas from this. */
+    dodoUsageIngestedCents: v.optional(v.number()),
+    /** Fees already accepted on the meter. Reclaim rollback restores these. */
+    dodoUsageMeteredFeeIds: v.optional(v.array(v.id("recoveryFees"))),
+    /** Set only after the scheduled close successfully meters this period. */
+    dodoUsageMonthClosed: v.optional(v.boolean()),
     lastError: v.optional(v.string()),
     createdAt: v.number(),
     createdLsAt: v.optional(v.number()),
@@ -376,7 +402,9 @@ export default defineSchema({
     .index("by_lsCheckoutId", ["lsCheckoutId"])
     .index("by_dodoCheckoutId", ["dodoCheckoutId"])
     .index("by_dodoPaymentId", ["dodoPaymentId"])
-    .index("by_status_createdAt", ["status", "createdAt"]),
+    .index("by_dodoUsageEventId", ["dodoUsageEventId"])
+    .index("by_status_createdAt", ["status", "createdAt"])
+    .index("by_lastError", ["lastError"]),
 
   /**
    * Merchant-triggered test drip: Email 1 → +30s → Email 2 → +30s → Email 3.
