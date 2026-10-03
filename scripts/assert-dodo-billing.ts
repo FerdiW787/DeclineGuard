@@ -1045,6 +1045,36 @@ assert(
     usageIngestSettlesFeePeriod() === false,
   "failed persist after accept is not created; same period can finish without a second meter event",
 );
+assert(
+  dodoUsageAfterAcceptPersistDecision({
+    persistCommitted: true,
+    creditApplyThrew: true,
+    scheduledMonthClose: true,
+    acceptedCents: 14000,
+    firstIngest: true,
+  }).outcome === "failed" &&
+    dodoUsageAfterAcceptPersistDecision({
+      persistCommitted: true,
+      creditApplyThrew: true,
+      scheduledMonthClose: true,
+      acceptedCents: 14000,
+      firstIngest: true,
+    }).monthClosed === false &&
+    dodoUsageAfterAcceptPersistDecision({
+      persistCommitted: true,
+      creditApplyThrew: true,
+      scheduledMonthClose: true,
+      acceptedCents: 14000,
+      firstIngest: true,
+    }).mayFinishSamePeriod === true &&
+    dodoUsageAfterAcceptPersistDecision({
+      persistCommitted: true,
+      scheduledMonthClose: true,
+      acceptedCents: 14000,
+      firstIngest: true,
+    }).outcome === "created",
+  "do not report created when credit apply threw after a monthClosed persist snapshot",
+);
 const pendingAfterAccept = dodoUsagePendingAcceptSettleSnapshot({
   acceptedCents: 14000,
   scheduledMonthClose: true,
@@ -1750,6 +1780,10 @@ assert(
     !settleFn.includes(".first()"),
   "settle matches the covered period instead of scanning oldest 24",
 );
+const persistAcceptedFn = feeBillingSrc.slice(
+  feeBillingSrc.indexOf("export const persistDodoUsageAccepted"),
+  feeBillingSrc.indexOf("export const markDodoUsageAcceptedPending"),
+);
 const pendingFn = feeBillingSrc.slice(
   feeBillingSrc.indexOf("export const markDodoUsageAcceptedPending"),
   feeBillingSrc.indexOf("export const stampDodoUsageAcceptedEvent"),
@@ -1759,6 +1793,10 @@ const owedFeePageFn = feeBillingSrc.slice(
   feeBillingSrc.indexOf("export const getUserBillingTarget"),
 );
 assert(
+    persistAcceptedFn.includes("writeDodoUsageAcceptedSnapshot") &&
+    persistAcceptedFn.includes("applyMatchingUsageCredit") &&
+    persistAcceptedFn.indexOf("writeDodoUsageAcceptedSnapshot") <
+      persistAcceptedFn.indexOf("applyMatchingUsageCredit") &&
     pendingFn.includes("writeDodoUsageAcceptedSnapshot") &&
     pendingFn.includes("applyMatchingUsageCredit") &&
     !pendingFn.includes("credit apply failed after pending snapshot") &&

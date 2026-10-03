@@ -706,6 +706,7 @@ export const persistDodoUsageAccepted = internalMutation({
       monthClosed: args.monthClosed,
       ingestedCents: args.ingestedCents,
     });
+    await applyMatchingUsageCredit(ctx, args.invoiceId);
     return true;
   },
 });

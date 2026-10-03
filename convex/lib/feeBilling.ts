@@ -155,8 +155,21 @@ export function dodoUsageAfterAcceptPersistDecision(args: {
   scheduledMonthClose: boolean;
   acceptedCents: number;
   firstIngest: boolean;
+  creditApplyThrew?: boolean;
 }): DodoUsageAfterAcceptPersistDecision {
   const ingestedCents = Math.max(0, Math.round(args.acceptedCents));
+  if (args.creditApplyThrew) {
+    return {
+      outcome: "failed",
+      status: args.firstIngest ? "claiming" : "created",
+      ingestedCents,
+      monthClosed: false,
+      settleable: false,
+      emitAgain: false,
+      mayFinishSamePeriod: true,
+      blocksFirstIngestRerun: false,
+    };
+  }
   if (args.persistCommitted) {
     return {
       outcome: "created",
