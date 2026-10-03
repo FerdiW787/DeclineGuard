@@ -46,6 +46,7 @@ import MerchantSupport, {
 import SettingsModule from "./settings/SettingsModule";
 import type { SettingsTabId } from "./settings/settingsTypes";
 import { PLANS } from "@/lib/pricing";
+import { utcCalendarMonthStartMs } from "@/lib/utcMonth";
 import {
   useEmailThemeQuery,
   usePersistEmailTheme,
@@ -180,6 +181,8 @@ function Dashboard() {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth() - 1, 1).getTime();
   }, []);
+  // Invoice / fee month is UTC. Do not send browser-local midnight to getFeesSummary.
+  const feeMonthStartMs = useMemo(() => utcCalendarMonthStartMs(), []);
   const chartDayWindows = useMemo(() => buildChartDayWindows(30), []);
   const chartSinceMs = chartDayWindows[0]?.startMs ?? monthStartMs;
   const openFailures = useQuery(
@@ -201,7 +204,7 @@ function Dashboard() {
   const emailQuotaNowMs = useMemo(() => Date.now(), []);
   const feesSummary = useQuery(
     api.functions.recoveries.getFeesSummary,
-    connection ? { nowMs: emailQuotaNowMs } : "skip",
+    connection ? { nowMs: feeMonthStartMs } : "skip",
   );
   const emailQuota = useQuery(
     api.functions.recoveries.getEmailQuotaStatus,

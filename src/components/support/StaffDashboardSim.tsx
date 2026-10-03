@@ -21,6 +21,7 @@ import RecoveriesPage, {
 import SequencesPage from "@/components/dashboard/SequencesPage";
 import SequencesWarrior from "@/components/dashboard/SequencesWarrior";
 import { PLANS } from "@/lib/pricing";
+import { utcCalendarMonthStartMs } from "@/lib/utcMonth";
 import {
   Check,
   ChevronsUpDown,
@@ -139,11 +140,11 @@ export default function StaffDashboardSim({
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth() - 1, 1).getTime();
   }, []);
+  const feeMonthStartMs = useMemo(() => utcCalendarMonthStartMs(), []);
   const chartDayWindows = useMemo(() => buildChartDayWindows(30), []);
   const chartSinceMs = chartDayWindows[0]?.startMs ?? monthStartMs;
 
   const uploadEmailImage = useEmailHeaderImageUpload();
-  const feesNowMs = useMemo(() => Date.now(), []);
   const data = useQuery(api.functions.supportAccess.getDashboardSimulation, {
     merchantUserId,
     monthStartMs,
@@ -153,7 +154,7 @@ export default function StaffDashboardSim({
   const merchantFeesSummary = useQuery(
     api.functions.recoveries.getFeesSummary,
     {
-      nowMs: feesNowMs,
+      nowMs: feeMonthStartMs,
       merchantUserId,
     },
   );
