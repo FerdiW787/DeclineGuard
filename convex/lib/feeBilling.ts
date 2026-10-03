@@ -8,6 +8,15 @@ export function utcPeriodKey(nowMs: number): string {
   return `${year}-${month}`;
 }
 
+/**
+ * UTC month closed by a charge at `paidAtMs`.
+ * February renewal covers January usage on that invoice — never `paidAt`'s month.
+ */
+export function previousUtcPeriodKey(paidAtMs: number): string {
+  const d = new Date(paidAtMs);
+  return utcPeriodKey(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1));
+}
+
 /** Idempotency key: one LS charge per merchant per UTC month. */
 export function feeInvoiceClaimKey(
   userId: Id<"users">,

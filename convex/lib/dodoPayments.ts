@@ -1,5 +1,6 @@
 import type { Plan } from "./accountGuard";
 import type { BillingProviderId } from "./billingProvider";
+import { previousUtcPeriodKey } from "./feeBilling";
 
 /**
  * Dodo Payments env (Convex dashboard — do not invent secrets in code):
@@ -170,7 +171,7 @@ const LEGACY_CENTS_USAGE_EVENT_NAME = "recovery_fee_cents";
 /** Test-env meter id (Fendem). Read from env; do not invent a different id. */
 export const DODO_TEST_USAGE_METER_ID = "mtr_0NottfCQQuRMUjzfjZgJY";
 
-/** Default Sum over-property when the meter is not fetched (unit is usd). */
+/** Sum-over property this meter bills. Do not invent it when GET omits the key. */
 export const DEFAULT_DODO_USAGE_AGGREGATION_KEY = "usd";
 
 export function resolveDodoUsageEventName(
@@ -219,6 +220,159 @@ export function dodoUsageEventId(args: {
   claimKey: string;
 }): string {
   return `fee-usage:${args.claimKey}:${args.invoiceId}`;
+}
+
+/** Payment created_at only. Never Date.now() and never subscription signup. */
+export function parseIsoMsStrict(value: unknown): number | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const ms = Date.parse(value.trim());
+  return Number.isFinite(ms) ? ms : null;
+}
+
+export function dodoPaymentAmountCents(data: Record<string, unknown>): number {
+  const raw = data.total_amount ?? data.amount ?? data.settlement_amount;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return Math.round(raw);
+  }
+  if (typeof raw === "string" && raw.trim()) {
+    const n = Number(raw);
+    if (Number.isFinite(n)) return Math.round(n);
+  }
+  return 0;
+}
+
+export function isDodoUpdatePaymentMethod(
+  data: Record<string, unknown>,
+): boolean {
+  return data.is_update_payment_method === true;
+}
+
+export type DodoUsageSettleDecision =
+  | {
+      settle: true;
+      paidAt: number;
+      coveredPeriodKey: string;
+      reason: "ok";
+    }
+  | { settle: false; reason: string };
+
+/**
+ * Usage is paid only by a real Pro invoice/subscription charge that covers
+ * that period. Activation, $0 update-PM, and missing payment time do not settle.
+ */
+export function dodoUsageSettleDecision(args: {
+  eventType: string;
+  hasFeeClaimKey: boolean;
+  hasSubscriptionId: boolean;
+  matchesProProduct: boolean;
+  isUpdatePaymentMethod: boolean;
+  amountCents: number;
+  paymentCreatedAtMs: number | null;
+}): DodoUsageSettleDecision {
+  if (args.eventType !== "payment.succeeded") {
+    return { settle: false, reason: "not_payment_succeeded" };
+  }
+  if (args.hasFeeClaimKey) {
+    return { settle: false, reason: "fee_claim_key" };
+  }
+  if (args.isUpdatePaymentMethod) {
+    return { settle: false, reason: "update_payment_method" };
+  }
+  if (args.amountCents <= 0) {
+    return { settle: false, reason: "zero_amount" };
+  }
+  if (!args.hasSubscriptionId && !args.matchesProProduct) {
+    return { settle: false, reason: "not_pro_subscription_payment" };
+  }
+  if (args.paymentCreatedAtMs == null) {
+    return { settle: false, reason: "missing_payment_created_at" };
+  }
+  return {
+    settle: true,
+    paidAt: args.paymentCreatedAtMs,
+    coveredPeriodKey: previousUtcPeriodKey(args.paymentCreatedAtMs),
+    reason: "ok",
+  };
+}
+
+export function invoiceMatchesUsageCharge(args: {
+  status: string;
+  periodKey: string;
+  coveredPeriodKey: string;
+  dodoUsageSubmittedAt: number | null | undefined;
+  paidAt: number;
+}): boolean {
+  if (args.status !== "created") return false;
+  if (args.dodoUsageSubmittedAt == null) return false;
+  if (args.periodKey !== args.coveredPeriodKey) return false;
+  return args.dodoUsageSubmittedAt <= args.paidAt;
+}
+
+export function pickUniqueDodoCustomerUser<
+  T extends { dodoSubscriptionId?: string },
+>(args: {
+  users: T[];
+  dodoSubscriptionId?: string | null;
+}): T | null {
+  if (args.users.length === 0) return null;
+  if (args.users.length === 1) {
+    return args.users[0] ?? null;
+  }
+  const sub = args.dodoSubscriptionId?.trim();
+  if (!sub) return null;
+  const matches = args.users.filter((user) => user.dodoSubscriptionId === sub);
+  return matches.length === 1 ? (matches[0] ?? null) : null;
+}
+
+export function requireDodoUsageMeterId(
+  meterId: string | null | undefined,
+): string {
+  const trimmed = meterId?.trim() ?? "";
+  if (!trimmed) {
+    throw new Error("missing_dodo_meter_id");
+  }
+  return trimmed;
+}
+
+export function dodoMeterAggregationKeyFromResponse(
+  json: unknown,
+): string | null {
+  if (!json || typeof json !== "object") return null;
+  const rec = json as Record<string, unknown>;
+  const aggregation =
+    rec.aggregation && typeof rec.aggregation === "object"
+      ? (rec.aggregation as Record<string, unknown>)
+      : null;
+  if (typeof aggregation?.key !== "string") return null;
+  const key = aggregation.key.trim();
+  return key || null;
+}
+
+export function assertUsdMeterAggregationKey(
+  key: string | null | undefined,
+): string {
+  const trimmed = key?.trim() ?? "";
+  if (trimmed !== DEFAULT_DODO_USAGE_AGGREGATION_KEY) {
+    throw new Error("invalid_dodo_meter_aggregation_key");
+  }
+  return trimmed;
+}
+
+export function dodoUsageMeterDecision(args: {
+  meterId: string | null | undefined;
+  aggregationKey: string | null | undefined;
+}):
+  | { ingest: true; meterId: string; aggregationKey: string }
+  | { ingest: false; reason: string } {
+  const meterId = args.meterId?.trim() ?? "";
+  if (!meterId) {
+    return { ingest: false, reason: "missing_dodo_meter_id" };
+  }
+  const key = args.aggregationKey?.trim() ?? "";
+  if (key !== DEFAULT_DODO_USAGE_AGGREGATION_KEY) {
+    return { ingest: false, reason: "invalid_dodo_meter_aggregation_key" };
+  }
+  return { ingest: true, meterId, aggregationKey: key };
 }
 
 export function stringifyDodoId(value: unknown): string | null {
@@ -458,16 +612,8 @@ export async function fetchDodoMeterAggregationKey(
   if (!json || typeof json !== "object") {
     throw new Error("Dodo meter response was empty");
   }
-  const rec = json as Record<string, unknown>;
-  const aggregation =
-    rec.aggregation && typeof rec.aggregation === "object"
-      ? (rec.aggregation as Record<string, unknown>)
-      : null;
-  const key =
-    typeof aggregation?.key === "string" && aggregation.key.trim()
-      ? aggregation.key.trim()
-      : DEFAULT_DODO_USAGE_AGGREGATION_KEY;
-  return key;
+  const key = dodoMeterAggregationKeyFromResponse(json);
+  return assertUsdMeterAggregationKey(key);
 }
 
 export async function ingestDodoUsageEvents(

@@ -29,6 +29,7 @@ import { releaseHeldAndSchedule } from "../lib/declineHoldQueue";
 import {
   getDodoPaymentsConfig,
   matchesDodoProProduct,
+  pickUniqueDodoCustomerUser,
   planFromDodoStatus,
   shouldIgnoreDodoTestEvent,
 } from "../lib/dodoPayments";
@@ -203,8 +204,12 @@ async function findDodoBillingUser(
       .withIndex("by_dodoCustomerId", (q) =>
         q.eq("dodoCustomerId", args.dodoCustomerId),
       )
-      .first();
-    if (byCustomer) return byCustomer;
+      .collect();
+    const picked = pickUniqueDodoCustomerUser({
+      users: byCustomer,
+      dodoSubscriptionId: args.dodoSubscriptionId,
+    });
+    if (picked) return picked;
   }
 
   return null;

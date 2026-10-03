@@ -16,13 +16,14 @@ import {
 } from "../lib/billingProvider";
 import {
   buildRecoveryFeeUsageEvent,
-  DEFAULT_DODO_USAGE_AGGREGATION_KEY,
   dodoFeePathDecision,
   dodoUsageEventId,
+  dodoUsageMeterDecision,
   feeCentsToUsageUsd,
   fetchDodoMeterAggregationKey,
   getDodoPaymentsConfig,
   ingestDodoUsageEvents,
+  requireDodoUsageMeterId,
   shouldOpenDodoFeeCheckout,
 } from "../lib/dodoPayments";
 import { allowHttpsUrl } from "../lib/safeUrl";
@@ -584,6 +585,20 @@ async function invoiceMerchantViaDodo(
       ...emptyCheckoutFields(),
     };
   }
+  let meterId: string;
+  try {
+    meterId = requireDodoUsageMeterId(config.meterId);
+  } catch {
+    console.error("Fee invoice skipped: DODO_PAYMENTS_METER_ID not set");
+    return {
+      outcome: "skipped_unconfigured",
+      invoiceId: null,
+      totalCents: 0,
+      feeCount: 0,
+      error: "missing_dodo_meter_id",
+      ...emptyCheckoutFields(),
+    };
+  }
 
   const claim = await ctx.runMutation(
     internal.functions.feeBilling.claimBillingPeriod,
@@ -675,9 +690,14 @@ async function invoiceMerchantViaDodo(
   }
 
   try {
-    const aggregationKey = config.meterId
-      ? await fetchDodoMeterAggregationKey(config, config.meterId)
-      : DEFAULT_DODO_USAGE_AGGREGATION_KEY;
+    const aggregationKey = await fetchDodoMeterAggregationKey(config, meterId);
+    const meterReady = dodoUsageMeterDecision({
+      meterId,
+      aggregationKey,
+    });
+    if (!meterReady.ingest) {
+      throw new Error(meterReady.reason);
+    }
     const eventId = dodoUsageEventId({
       invoiceId,
       claimKey,

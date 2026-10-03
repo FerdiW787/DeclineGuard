@@ -24,7 +24,10 @@ import {
   shouldSkipLemonPlatformCharge,
   usageIngestSettlesFeePeriod,
 } from "../convex/lib/billingProvider";
-import { existingClaimBlocksNewCharge } from "../convex/lib/feeBilling";
+import {
+  existingClaimBlocksNewCharge,
+  previousUtcPeriodKey,
+} from "../convex/lib/feeBilling";
 import {
   availableDeclineCapacity,
   clampPackQuantity,
@@ -47,11 +50,20 @@ import {
 import {
   DEFAULT_DODO_USAGE_EVENT_NAME,
   DODO_TEST_USAGE_METER_ID,
+  assertUsdMeterAggregationKey,
   dodoFeePathDecision,
+  dodoMeterAggregationKeyFromResponse,
+  dodoPaymentAmountCents,
   dodoUsageEventId,
+  dodoUsageMeterDecision,
+  dodoUsageSettleDecision,
   extractDodoUserRefs,
   feeCentsToUsageUsd,
+  invoiceMatchesUsageCharge,
   isDodoTestBillingAllowed,
+  isDodoUpdatePaymentMethod,
+  parseIsoMsStrict,
+  pickUniqueDodoCustomerUser,
   planFromDodoStatus,
   resolveDodoUsageEventName,
   shouldIgnoreDodoTestEvent,
@@ -809,6 +821,258 @@ assert(
 assert(
   parseBillingProviderEnv(undefined) === "lemon",
   "BILLING_PROVIDER default stays lemon",
+);
+
+const janUsageSubmittedAt = Date.UTC(2026, 0, 15);
+const decUsageSubmittedAt = Date.UTC(2025, 11, 15);
+const subscriptionSignupAt = Date.UTC(2025, 5, 1);
+const februaryRenewalAt = Date.UTC(2026, 1, 1, 12, 0, 0);
+assert(
+  previousUtcPeriodKey(februaryRenewalAt) === "2026-01",
+  "February charge covers January usage",
+);
+assert(
+  parseIsoMsStrict(null) === null &&
+    parseIsoMsStrict("") === null &&
+    parseIsoMsStrict(subscriptionSignupAt) === null,
+  "usage paidAt parser never falls back to Date.now() or non-ISO values",
+);
+assert(
+  parseIsoMsStrict("2026-02-01T12:00:00.000Z") === februaryRenewalAt,
+  "payment created_at is the usage paidAt",
+);
+
+const renewalNoProduct = dodoUsageSettleDecision({
+  eventType: "payment.succeeded",
+  hasFeeClaimKey: false,
+  hasSubscriptionId: true,
+  matchesProProduct: false,
+  isUpdatePaymentMethod: false,
+  amountCents: 3499,
+  paymentCreatedAtMs: februaryRenewalAt,
+});
+assert(
+  renewalNoProduct.settle === true &&
+    renewalNoProduct.coveredPeriodKey === "2026-01" &&
+    renewalNoProduct.paidAt === februaryRenewalAt &&
+    renewalNoProduct.paidAt !== subscriptionSignupAt,
+  "renewal payment.succeeded with subscription_id and no product_id settles January",
+);
+assert(
+  invoiceMatchesUsageCharge({
+    status: "created",
+    periodKey: "2026-01",
+    coveredPeriodKey: renewalNoProduct.settle
+      ? renewalNoProduct.coveredPeriodKey
+      : "",
+    dodoUsageSubmittedAt: janUsageSubmittedAt,
+    paidAt: renewalNoProduct.settle ? renewalNoProduct.paidAt : 0,
+  }),
+  "January usage ingested after signup is on the February charge",
+);
+
+for (const eventType of [
+  "subscription.active",
+  "subscription.renewed",
+  "subscription.updated",
+] as const) {
+  const activation = dodoUsageSettleDecision({
+    eventType,
+    hasFeeClaimKey: false,
+    hasSubscriptionId: true,
+    matchesProProduct: true,
+    isUpdatePaymentMethod: false,
+    amountCents: 2999,
+    paymentCreatedAtMs: subscriptionSignupAt,
+  });
+  assert(
+    activation.settle === false &&
+      activation.reason === "not_payment_succeeded",
+    `${eventType} must not mark usage paid`,
+  );
+}
+
+assert(
+  !invoiceMatchesUsageCharge({
+    status: "created",
+    periodKey: "2025-12",
+    coveredPeriodKey: "2026-01",
+    dodoUsageSubmittedAt: decUsageSubmittedAt,
+    paidAt: februaryRenewalAt,
+  }),
+  "one February payment must not close December",
+);
+assert(
+  invoiceMatchesUsageCharge({
+    status: "created",
+    periodKey: "2026-01",
+    coveredPeriodKey: "2026-01",
+    dodoUsageSubmittedAt: Date.UTC(2026, 1, 2),
+    paidAt: februaryRenewalAt,
+  }) === false,
+  "usage submitted after the charge is not on that invoice",
+);
+
+const updatePm = dodoUsageSettleDecision({
+  eventType: "payment.succeeded",
+  hasFeeClaimKey: false,
+  hasSubscriptionId: true,
+  matchesProProduct: true,
+  isUpdatePaymentMethod: true,
+  amountCents: 0,
+  paymentCreatedAtMs: februaryRenewalAt,
+});
+assert(
+  updatePm.settle === false &&
+    updatePm.reason === "update_payment_method" &&
+    isDodoUpdatePaymentMethod({ is_update_payment_method: true }) &&
+    dodoPaymentAmountCents({ total_amount: 0 }) === 0,
+  "$0 update-payment-method must not settle usage",
+);
+assert(
+  dodoUsageSettleDecision({
+    eventType: "payment.succeeded",
+    hasFeeClaimKey: false,
+    hasSubscriptionId: true,
+    matchesProProduct: false,
+    isUpdatePaymentMethod: false,
+    amountCents: 2999,
+    paymentCreatedAtMs: null,
+  }).reason === "missing_payment_created_at",
+  "missing payment created_at must not settle (no Date.now())",
+);
+assert(
+  dodoUsageSettleDecision({
+    eventType: "payment.succeeded",
+    hasFeeClaimKey: true,
+    hasSubscriptionId: false,
+    matchesProProduct: false,
+    isUpdatePaymentMethod: false,
+    amountCents: 199,
+    paymentCreatedAtMs: februaryRenewalAt,
+  }).reason === "fee_claim_key",
+  "fee claim_key must not settle usage",
+);
+
+const missingMeter = dodoUsageMeterDecision({
+  meterId: null,
+  aggregationKey: "usd",
+});
+assert(
+  missingMeter.ingest === false &&
+    missingMeter.reason === "missing_dodo_meter_id",
+  "missing meter id must not ingest or mark submitted",
+);
+assert(
+  dodoUsageMeterDecision({ meterId: "", aggregationKey: "usd" }).ingest ===
+    false,
+  "empty meter id fails closed",
+);
+const omittedKey = dodoUsageMeterDecision({
+  meterId: DODO_TEST_USAGE_METER_ID,
+  aggregationKey: null,
+});
+assert(
+  omittedKey.ingest === false &&
+    omittedKey.reason === "invalid_dodo_meter_aggregation_key",
+  "omitted aggregation key must not invent usd",
+);
+assert(
+  dodoUsageMeterDecision({
+    meterId: DODO_TEST_USAGE_METER_ID,
+    aggregationKey: "tokens",
+  }).ingest === false,
+  "non-usd aggregation key fails closed",
+);
+assert(
+  dodoMeterAggregationKeyFromResponse({ aggregation: { type: "sum" } }) ===
+    null &&
+    dodoMeterAggregationKeyFromResponse({ name: "recovery.fee" }) === null,
+  "GET without aggregation.key does not fall back to usd",
+);
+try {
+  assertUsdMeterAggregationKey(null);
+  throw new Error("expected assertUsdMeterAggregationKey to throw");
+} catch (err) {
+  assert(
+    err instanceof Error &&
+      err.message === "invalid_dodo_meter_aggregation_key",
+    "null aggregation key throws rather than inventing usd",
+  );
+}
+assert(
+  dodoUsageMeterDecision({
+    meterId: DODO_TEST_USAGE_METER_ID,
+    aggregationKey: "usd",
+  }).ingest === true,
+  "known usd meter may ingest",
+);
+assert(
+  pickUniqueDodoCustomerUser({
+    users: [
+      { dodoSubscriptionId: "sub_a" },
+      { dodoSubscriptionId: "sub_b" },
+    ],
+    dodoSubscriptionId: undefined,
+  }) === null,
+  "ambiguous by_dodoCustomerId must not pick .first()",
+);
+
+const dodoWebhookSrc = readFileSync(
+  join(repoRoot, "convex/dodoWebhook.ts"),
+  "utf8",
+);
+const feeBillingSrc = readFileSync(
+  join(repoRoot, "convex/functions/feeBilling.ts"),
+  "utf8",
+);
+const subHandler = dodoWebhookSrc.slice(
+  dodoWebhookSrc.indexOf("async function handleSubscriptionEvent"),
+  dodoWebhookSrc.indexOf("async function handlePaymentEvent"),
+);
+assert(
+  !subHandler.includes("settleDodoUsageFeeInvoices"),
+  "subscription.active/renewed/updated must not call usage settle",
+);
+assert(
+  dodoWebhookSrc.includes("parseIsoMsStrict(data.created_at)") &&
+    dodoWebhookSrc.includes("coveredPeriodKey: decision.coveredPeriodKey") &&
+    dodoWebhookSrc.includes("hasSubscriptionId: subscriptionId != null"),
+  "usage settle uses payment created_at + subscription_id, not signup/now",
+);
+const settleFn = feeBillingSrc.slice(
+  feeBillingSrc.indexOf("export const settleDodoUsageFeeInvoices"),
+  feeBillingSrc.indexOf("export const recordCheckoutEmailSent"),
+);
+assert(
+  settleFn.includes("coveredPeriodKey") &&
+    settleFn.includes("invoiceMatchesUsageCharge") &&
+    settleFn.includes('.eq("periodKey", coveredPeriodKey)') &&
+    !settleFn.includes(".take(24)") &&
+    !settleFn.includes(".first()"),
+  "settle matches the covered period instead of scanning oldest 24",
+);
+assert(
+  feeActionsSrc.includes("requireDodoUsageMeterId") &&
+    feeActionsSrc.includes("missing_dodo_meter_id") &&
+    !feeActionsSrc.includes(": DEFAULT_DODO_USAGE_AGGREGATION_KEY"),
+  "missing meter id must not ingest with invented usd",
+);
+assert(
+  dodoPaymentsSrc.includes("assertUsdMeterAggregationKey") &&
+    !dodoPaymentsSrc.includes(
+      ": DEFAULT_DODO_USAGE_AGGREGATION_KEY;",
+    ),
+  "meter GET must not fall back to inventing usd",
+);
+assert(
+  !dodoPaymentsSrc
+    .slice(
+      dodoPaymentsSrc.indexOf("export function dodoUsageSettleDecision"),
+      dodoPaymentsSrc.indexOf("export function invoiceMatchesUsageCharge"),
+    )
+    .includes("Date.now()"),
+  "settle decision paidAt is never Date.now()",
 );
 
 console.log("assert-dodo-billing: ok");

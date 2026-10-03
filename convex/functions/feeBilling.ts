@@ -22,7 +22,11 @@ import {
 } from "../lib/feeBilling";
 import { allowHttpsUrl } from "../lib/safeUrl";
 import { resolveProductUserOrNull } from "../lib/accountGuard";
-import { shouldIgnoreDodoTestEvent } from "../lib/dodoPayments";
+import {
+  invoiceMatchesUsageCharge,
+  pickUniqueDodoCustomerUser,
+  shouldIgnoreDodoTestEvent,
+} from "../lib/dodoPayments";
 
 /**
  * Caps per-merchant owed-fee load when claiming a period.
@@ -495,6 +499,7 @@ export const settleDodoUsageFeeInvoices = internalMutation({
     dodoSubscriptionId: v.optional(v.string()),
     dodoPaymentId: v.optional(v.string()),
     paidAt: v.number(),
+    coveredPeriodKey: v.string(),
     testMode: v.boolean(),
   },
   returns: v.object({
@@ -504,6 +509,10 @@ export const settleDodoUsageFeeInvoices = internalMutation({
   handler: async (ctx, args) => {
     if (shouldIgnoreDodoTestEvent(args.testMode)) {
       return { settled: 0, reason: "test_mode_ignored" };
+    }
+    const coveredPeriodKey = args.coveredPeriodKey.trim();
+    if (!coveredPeriodKey) {
+      return { settled: 0, reason: "missing_covered_period" };
     }
 
     let userId = args.userId ?? null;
@@ -522,8 +531,12 @@ export const settleDodoUsageFeeInvoices = internalMutation({
         .withIndex("by_dodoCustomerId", (q) =>
           q.eq("dodoCustomerId", args.dodoCustomerId),
         )
-        .first();
-      userId = byCustomer?._id ?? null;
+        .collect();
+      const picked = pickUniqueDodoCustomerUser({
+        users: byCustomer,
+        dodoSubscriptionId: args.dodoSubscriptionId,
+      });
+      userId = picked?._id ?? null;
     }
     if (!userId) {
       return { settled: 0, reason: "user_not_found" };
@@ -531,15 +544,24 @@ export const settleDodoUsageFeeInvoices = internalMutation({
 
     const rows = await ctx.db
       .query("billingInvoices")
-      .withIndex("by_user_period", (q) => q.eq("userId", userId))
-      .take(24);
+      .withIndex("by_user_period", (q) =>
+        q.eq("userId", userId).eq("periodKey", coveredPeriodKey),
+      )
+      .collect();
 
     let settled = 0;
     for (const invoice of rows) {
-      if (invoice.status === "paid") continue;
-      if (invoice.status !== "created") continue;
-      if (invoice.dodoUsageSubmittedAt == null) continue;
-      if (invoice.dodoUsageSubmittedAt > args.paidAt) continue;
+      if (
+        !invoiceMatchesUsageCharge({
+          status: invoice.status,
+          periodKey: invoice.periodKey,
+          coveredPeriodKey,
+          dodoUsageSubmittedAt: invoice.dodoUsageSubmittedAt,
+          paidAt: args.paidAt,
+        })
+      ) {
+        continue;
+      }
 
       for (const feeId of invoice.feeIds) {
         const fee = await ctx.db.get(feeId);
@@ -562,6 +584,7 @@ export const settleDodoUsageFeeInvoices = internalMutation({
           claimKey: invoice.claimKey,
           path: "dodo_usage_subscription",
           dodoPaymentId: args.dodoPaymentId ?? null,
+          coveredPeriodKey,
           totalCents: invoice.totalCents,
         },
       });
