@@ -362,6 +362,9 @@ export default defineSchema({
     lsOrderId: v.optional(v.string()),
     dodoCheckoutId: v.optional(v.string()),
     dodoPaymentId: v.optional(v.string()),
+    /** Idempotent Dodo usage event id. Ingest ≠ paid. */
+    dodoUsageEventId: v.optional(v.string()),
+    dodoUsageSubmittedAt: v.optional(v.number()),
     lastError: v.optional(v.string()),
     createdAt: v.number(),
     createdLsAt: v.optional(v.number()),
@@ -376,6 +379,7 @@ export default defineSchema({
     .index("by_lsCheckoutId", ["lsCheckoutId"])
     .index("by_dodoCheckoutId", ["dodoCheckoutId"])
     .index("by_dodoPaymentId", ["dodoPaymentId"])
+    .index("by_dodoUsageEventId", ["dodoUsageEventId"])
     .index("by_status_createdAt", ["status", "createdAt"]),
 
   /**

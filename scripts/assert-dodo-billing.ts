@@ -45,11 +45,17 @@ import {
   webhookSendsAfterUpsert,
 } from "../convex/lib/declineCapacity";
 import {
+  DEFAULT_DODO_USAGE_EVENT_NAME,
+  DODO_TEST_USAGE_METER_ID,
+  dodoFeePathDecision,
   dodoUsageEventId,
   extractDodoUserRefs,
+  feeCentsToUsageUsd,
   isDodoTestBillingAllowed,
   planFromDodoStatus,
+  resolveDodoUsageEventName,
   shouldIgnoreDodoTestEvent,
+  shouldOpenDodoFeeCheckout,
   statusFromDodoEvent,
 } from "../convex/lib/dodoPayments";
 import {
@@ -195,6 +201,73 @@ assert(
 assert(
   usageIngestSettlesFeePeriod() === false,
   "fee path never settles on usage ingest",
+);
+assert(
+  resolveDodoUsageEventName(undefined) === "recovery.fee",
+  "unset usage event name is recovery.fee",
+);
+assert(
+  resolveDodoUsageEventName("") === "recovery.fee",
+  "empty usage event name is recovery.fee",
+);
+assert(
+  resolveDodoUsageEventName("recovery.fee") === "recovery.fee",
+  "env recovery.fee is used as-is",
+);
+assert(
+  resolveDodoUsageEventName("recovery_fee_cents") === "recovery.fee",
+  "must not emit recovery_fee_cents",
+);
+assert(
+  DEFAULT_DODO_USAGE_EVENT_NAME === "recovery.fee",
+  "default event name is recovery.fee",
+);
+assert(
+  DODO_TEST_USAGE_METER_ID === "mtr_0NottfCQQuRMUjzfjZgJY",
+  "known test meter id is not invented",
+);
+assert(
+  feeCentsToUsageUsd(199) === 1.99 && feeCentsToUsageUsd(100) === 1,
+  "fee cents convert to USD dollars once",
+);
+assert(
+  dodoFeePathDecision({
+    dodoCustomerId: "cus_1",
+    dodoSubscriptionId: "sub_1",
+    hasActivePro: true,
+  }).path === "usage",
+  "Dodo Pro with customer+sub takes usage path",
+);
+assert(
+  dodoFeePathDecision({
+    dodoCustomerId: null,
+    dodoSubscriptionId: "sub_1",
+    hasActivePro: true,
+  }).reason === "missing_dodo_customer",
+  "no Dodo customer fails closed",
+);
+assert(
+  dodoFeePathDecision({
+    dodoCustomerId: "cus_1",
+    dodoSubscriptionId: null,
+    hasActivePro: true,
+  }).reason === "missing_dodo_subscription",
+  "no Dodo subscription fails closed",
+);
+assert(
+  shouldOpenDodoFeeCheckout({ canTakeUsage: true }) === false,
+  "Dodo Pro 4% must not also open one-time fee checkout",
+);
+assert(
+  shouldOpenDodoFeeCheckout({ canTakeUsage: false }) === false,
+  "missing usage target must not silently fall back to fee checkout",
+);
+assert(
+  dodoUsageEventId({
+    invoiceId: "inv_1",
+    claimKey: "fee-invoice:user:2026-10",
+  }) === "fee-usage:fee-invoice:user:2026-10:inv_1",
+  "usage event id is deterministic (idempotent ingest)",
 );
 
 assert(packExtraDeclines(1) === 10, "one pack credits +10 declines");
@@ -687,6 +760,55 @@ assert(
     recoveriesSrc.includes("scheduledFailureIds") &&
     lemonWebhookSrc.includes("releaseScheduledEmail"),
   "upsert returns releaseScheduledEmail; webhook skips dual sendForFailure",
+);
+
+const feeActionsSrc = readFileSync(
+  join(repoRoot, "convex/functions/feeBillingActions.ts"),
+  "utf8",
+);
+const dodoPaymentsSrc = readFileSync(
+  join(repoRoot, "convex/lib/dodoPayments.ts"),
+  "utf8",
+);
+const docsSrc = readFileSync(
+  join(repoRoot, "docs/dodo-payments-billing.md"),
+  "utf8",
+);
+assert(
+  feeActionsSrc.includes("ingestDodoUsageEvents") &&
+    feeActionsSrc.includes("attachDodoUsageSubmitted") &&
+    feeActionsSrc.includes("dodoFeePathDecision"),
+  "Dodo Pro 4% emits usage; one-time checkout is not the only path",
+);
+assert(
+  !feeActionsSrc.includes("createDodoCheckoutSession"),
+  "Dodo Pro fee path must not open FEE_PRODUCT checkout",
+);
+assert(
+  !feeActionsSrc.includes("markBillingInvoicePaid"),
+  "usage ingest must not mark the fee period paid",
+);
+assert(
+  feeActionsSrc.includes("usageIngestSettlesFeePeriod") &&
+    dodoPaymentsSrc.includes('DEFAULT_DODO_USAGE_EVENT_NAME = "recovery.fee"'),
+  "ingest settlement guard + recovery.fee default are wired",
+);
+assert(
+  !dodoPaymentsSrc.includes('event_name: "recovery_fee_cents"') &&
+    !feeActionsSrc.includes("recovery_fee_cents"),
+  "must not hardcode recovery_fee_cents as the emitted event",
+);
+assert(
+  docsSrc.includes("recovery.fee") &&
+    docsSrc.includes("mtr_0NottfCQQuRMUjzfjZgJY") &&
+    docsSrc.includes("Ingest is not paid") &&
+    !docsSrc.includes("recovery_fee_cents") &&
+    !docsSrc.includes("docs-only meter"),
+  "docs: recovery.fee + test meter are the Pro-invoice path",
+);
+assert(
+  parseBillingProviderEnv(undefined) === "lemon",
+  "BILLING_PROVIDER default stays lemon",
 );
 
 console.log("assert-dodo-billing: ok");

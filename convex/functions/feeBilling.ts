@@ -22,6 +22,7 @@ import {
 } from "../lib/feeBilling";
 import { allowHttpsUrl } from "../lib/safeUrl";
 import { resolveProductUserOrNull } from "../lib/accountGuard";
+import { shouldIgnoreDodoTestEvent } from "../lib/dodoPayments";
 
 /**
  * Caps per-merchant owed-fee load when claiming a period.
@@ -299,6 +300,8 @@ export const claimBillingPeriod = internalMutation({
         lsOrderId: undefined,
         dodoCheckoutId: undefined,
         dodoPaymentId: undefined,
+        dodoUsageEventId: undefined,
+        dodoUsageSubmittedAt: undefined,
         lastError: undefined,
         createdAt: args.nowMs,
         createdLsAt: undefined,
@@ -459,6 +462,113 @@ export const attachDodoCheckout = internalMutation({
       lastError: safeUrl ? undefined : "missing_checkout_url",
     });
     return true;
+  },
+});
+
+export const attachDodoUsageSubmitted = internalMutation({
+  args: {
+    invoiceId: v.id("billingInvoices"),
+    dodoUsageEventId: v.string(),
+    nowMs: v.number(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.invoiceId);
+    if (!invoice) return false;
+    if (invoice.status === "paid") return false;
+
+    await ctx.db.patch(args.invoiceId, {
+      status: "created",
+      billingProvider: "dodo",
+      dodoUsageEventId: args.dodoUsageEventId,
+      dodoUsageSubmittedAt: args.nowMs,
+      lastError: undefined,
+    });
+    return true;
+  },
+});
+
+export const settleDodoUsageFeeInvoices = internalMutation({
+  args: {
+    userId: v.optional(v.id("users")),
+    dodoCustomerId: v.optional(v.string()),
+    dodoSubscriptionId: v.optional(v.string()),
+    dodoPaymentId: v.optional(v.string()),
+    paidAt: v.number(),
+    testMode: v.boolean(),
+  },
+  returns: v.object({
+    settled: v.number(),
+    reason: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    if (shouldIgnoreDodoTestEvent(args.testMode)) {
+      return { settled: 0, reason: "test_mode_ignored" };
+    }
+
+    let userId = args.userId ?? null;
+    if (!userId && args.dodoSubscriptionId) {
+      const bySub = await ctx.db
+        .query("users")
+        .withIndex("by_dodoSubscriptionId", (q) =>
+          q.eq("dodoSubscriptionId", args.dodoSubscriptionId),
+        )
+        .unique();
+      userId = bySub?._id ?? null;
+    }
+    if (!userId && args.dodoCustomerId) {
+      const byCustomer = await ctx.db
+        .query("users")
+        .withIndex("by_dodoCustomerId", (q) =>
+          q.eq("dodoCustomerId", args.dodoCustomerId),
+        )
+        .first();
+      userId = byCustomer?._id ?? null;
+    }
+    if (!userId) {
+      return { settled: 0, reason: "user_not_found" };
+    }
+
+    const rows = await ctx.db
+      .query("billingInvoices")
+      .withIndex("by_user_period", (q) => q.eq("userId", userId))
+      .take(24);
+
+    let settled = 0;
+    for (const invoice of rows) {
+      if (invoice.status === "paid") continue;
+      if (invoice.status !== "created") continue;
+      if (invoice.dodoUsageSubmittedAt == null) continue;
+      if (invoice.dodoUsageSubmittedAt > args.paidAt) continue;
+
+      for (const feeId of invoice.feeIds) {
+        const fee = await ctx.db.get(feeId);
+        if (!fee) continue;
+        if (fee.status !== "owed") continue;
+        await ctx.db.patch(feeId, { status: "invoiced" });
+      }
+      await ctx.db.patch(invoice._id, {
+        status: "paid",
+        dodoPaymentId: args.dodoPaymentId ?? invoice.dodoPaymentId,
+        paidAt: args.paidAt,
+        lastError: undefined,
+      });
+      await writeAuditLog(ctx, {
+        actorUserId: null,
+        targetUserId: invoice.userId,
+        action: "fee_invoice:paid",
+        metadata: {
+          invoiceId: invoice._id,
+          claimKey: invoice.claimKey,
+          path: "dodo_usage_subscription",
+          dodoPaymentId: args.dodoPaymentId ?? null,
+          totalCents: invoice.totalCents,
+        },
+      });
+      settled += 1;
+    }
+
+    return { settled, reason: settled > 0 ? "ok" : "none" };
   },
 });
 

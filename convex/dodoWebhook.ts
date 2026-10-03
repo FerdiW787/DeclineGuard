@@ -8,7 +8,9 @@ import {
   getDodoPaymentsConfig,
   isDodoPaymentEvent,
   isDodoSubscriptionEvent,
+  matchesDodoProProduct,
   parseDodoEnvironment,
+  planFromDodoStatus,
   statusFromDodoEvent,
   stringifyDodoId,
 } from "./lib/dodoPayments";
@@ -146,16 +148,36 @@ async function handleSubscriptionEvent(
   const payloadStatus =
     typeof data.status === "string" ? data.status : "";
 
+  const status = statusFromDodoEvent(eventType, payloadStatus);
+  const testMode = isDodoTestPayload(data);
   await ctx.runMutation(internal.functions.dodoBilling.applyDodoSubscription, {
     dodoSubscriptionId: subscriptionId,
     dodoCustomerId: customerId ?? undefined,
-    status: statusFromDodoEvent(eventType, payloadStatus),
+    status,
     productId: productId ?? undefined,
     convexUserId: refs.convexUserId ?? undefined,
     clerkUserId: refs.clerkUserId ?? undefined,
     checkoutNonce: refs.checkoutNonce ?? undefined,
-    testMode: isDodoTestPayload(data),
+    testMode,
   });
+
+  if (planFromDodoStatus(status) === "pro") {
+    await ctx.runMutation(
+      internal.functions.feeBilling.settleDodoUsageFeeInvoices,
+      {
+        dodoCustomerId: customerId ?? undefined,
+        dodoSubscriptionId: subscriptionId,
+        paidAt: parseIsoMs(
+          typeof data.created_at === "string"
+            ? data.created_at
+            : typeof data.updated_at === "string"
+              ? data.updated_at
+              : null,
+        ),
+        testMode,
+      },
+    );
+  }
 }
 
 async function handlePaymentEvent(
@@ -206,6 +228,31 @@ async function handlePaymentEvent(
 
   const claimKey = refs.claimKey;
   if (!claimKey || !isFeeInvoiceClaimKey(claimKey)) {
+    const proProductId = getDodoPaymentsConfig()?.proProductId;
+    if (
+      proProductId &&
+      matchesDodoProProduct({
+        productId,
+        expectedProductId: proProductId,
+      })
+    ) {
+      const paymentId = stringifyDodoId(data.payment_id);
+      await ctx.runMutation(
+        internal.functions.feeBilling.settleDodoUsageFeeInvoices,
+        {
+          dodoCustomerId: extractCustomerId(data) ?? undefined,
+          dodoPaymentId: paymentId ?? undefined,
+          paidAt: parseIsoMs(
+            typeof data.created_at === "string"
+              ? data.created_at
+              : typeof data.updated_at === "string"
+                ? data.updated_at
+                : null,
+          ),
+          testMode: isDodoTestPayload(data),
+        },
+      );
+    }
     return;
   }
 

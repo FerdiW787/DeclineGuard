@@ -11,13 +11,13 @@ import type { BillingProviderId } from "./billingProvider";
  *   DODO_PAYMENTS_PRO_PRODUCT_ID       Pro $29.99/mo subscription product
  *   DODO_PAYMENTS_FEE_PRODUCT_ID       One-time recovery-fee product (amount override)
  *   DODO_PAYMENTS_PACK_PRODUCT_ID      Optional $0.99 +10 decline pack (one-time)
- *   DODO_PAYMENTS_USAGE_EVENT_NAME     Meter event name for 4% recovered volume
- *   DODO_PAYMENTS_METER_ID             Optional dashboard meter id (docs only)
+ *   DODO_PAYMENTS_USAGE_EVENT_NAME     Meter event name (default recovery.fee)
+ *   DODO_PAYMENTS_METER_ID             Pro-invoice usage meter (test: mtr_0NottfCQQuRMUjzfjZgJY)
  *   ALLOW_DODO_TEST_BILLING            true|1 — let test_mode write users.plan
  *
  * Dashboard blockers until Fendem/CoS create the products + webhook:
  * Pro product id, fee product id, pack product id (if packs go live on Dodo),
- * usage meter + event name, webhook endpoint → POST /dodo with the signing secret.
+ * usage meter (recovery.fee on the Pro invoice) + webhook → POST /dodo.
  */
 
 export type DodoEnvironment = "test_mode" | "live_mode";
@@ -29,7 +29,7 @@ export type DodoPaymentsConfig = {
   proProductId: string;
   feeProductId: string | null;
   packProductId: string | null;
-  usageEventName: string | null;
+  usageEventName: string;
   meterId: string | null;
 };
 
@@ -92,7 +92,7 @@ export function getDodoPaymentsConfig(
     proProductId,
     feeProductId: env.DODO_PAYMENTS_FEE_PRODUCT_ID?.trim() || null,
     packProductId: env.DODO_PAYMENTS_PACK_PRODUCT_ID?.trim() || null,
-    usageEventName: env.DODO_PAYMENTS_USAGE_EVENT_NAME?.trim() || null,
+    usageEventName: resolveDodoUsageEventName(env.DODO_PAYMENTS_USAGE_EVENT_NAME),
     meterId: env.DODO_PAYMENTS_METER_ID?.trim() || null,
   };
 }
@@ -161,6 +161,57 @@ export function isDodoSubscriptionEvent(eventType: string): boolean {
 
 export function isDodoPaymentEvent(eventType: string): boolean {
   return (DODO_PAYMENT_EVENT_TYPES as readonly string[]).includes(eventType);
+}
+
+/** Dashboard meter event name. Never emit `recovery_fee_cents`. */
+export const DEFAULT_DODO_USAGE_EVENT_NAME = "recovery.fee";
+const LEGACY_CENTS_USAGE_EVENT_NAME = "recovery_fee_cents";
+
+/** Test-env meter id (Fendem). Read from env; do not invent a different id. */
+export const DODO_TEST_USAGE_METER_ID = "mtr_0NottfCQQuRMUjzfjZgJY";
+
+/** Default Sum over-property when the meter is not fetched (unit is usd). */
+export const DEFAULT_DODO_USAGE_AGGREGATION_KEY = "usd";
+
+export function resolveDodoUsageEventName(
+  raw: string | undefined | null = process.env.DODO_PAYMENTS_USAGE_EVENT_NAME,
+): string {
+  const trimmed = raw?.trim();
+  if (!trimmed || trimmed === LEGACY_CENTS_USAGE_EVENT_NAME) {
+    return DEFAULT_DODO_USAGE_EVENT_NAME;
+  }
+  return trimmed;
+}
+
+/** Cents → USD dollars once. Do not divide again. */
+export function feeCentsToUsageUsd(cents: number): number {
+  if (!Number.isFinite(cents) || cents <= 0) return 0;
+  return Math.round(cents) / 100;
+}
+
+export function dodoFeePathDecision(args: {
+  dodoCustomerId: string | null;
+  dodoSubscriptionId: string | null;
+  hasActivePro: boolean;
+}): { path: "usage"; reason: "ok" } | { path: "fail_closed"; reason: string } {
+  if (!args.dodoCustomerId) {
+    return { path: "fail_closed", reason: "missing_dodo_customer" };
+  }
+  if (!args.dodoSubscriptionId) {
+    return { path: "fail_closed", reason: "missing_dodo_subscription" };
+  }
+  if (!args.hasActivePro) {
+    return { path: "fail_closed", reason: "dodo_pro_inactive" };
+  }
+  return { path: "usage", reason: "ok" };
+}
+
+/** Dodo Pro 4% is usage on the Pro invoice — never a second fee checkout. */
+export function shouldOpenDodoFeeCheckout(args: {
+  canTakeUsage: boolean;
+}): boolean {
+  if (args.canTakeUsage) return false;
+  return false;
 }
 
 export function dodoUsageEventId(args: {
@@ -244,13 +295,36 @@ export type DodoPortalResponse = {
   portalUrl: string;
 };
 
+export type DodoUsageMetadataValue = string | number | boolean;
+
 export type DodoUsageEvent = {
   eventId: string;
   customerId: string;
   eventName: string;
   timestampIso?: string;
-  metadata: Record<string, string>;
+  metadata: Record<string, DodoUsageMetadataValue>;
 };
+
+export function buildRecoveryFeeUsageEvent(args: {
+  eventId: string;
+  customerId: string;
+  eventName: string;
+  usd: number;
+  aggregationKey: string;
+  claimKey: string;
+  invoiceId: string;
+}): DodoUsageEvent {
+  return {
+    eventId: args.eventId,
+    customerId: args.customerId,
+    eventName: args.eventName,
+    metadata: {
+      [args.aggregationKey]: args.usd,
+      claim_key: args.claimKey,
+      billing_invoice_id: args.invoiceId,
+    },
+  };
+}
 
 /**
  * Thin HTTP adapter. Callers (Convex actions) pass a configured client.
@@ -371,6 +445,29 @@ export async function createDodoCustomerPortal(
     throw new Error("Dodo Payments portal response missing link");
   }
   return { portalUrl: link };
+}
+
+export async function fetchDodoMeterAggregationKey(
+  config: DodoPaymentsConfig,
+  meterId: string,
+): Promise<string> {
+  const json = await dodoFetchJson(
+    config,
+    `/meters/${encodeURIComponent(meterId)}`,
+  );
+  if (!json || typeof json !== "object") {
+    throw new Error("Dodo meter response was empty");
+  }
+  const rec = json as Record<string, unknown>;
+  const aggregation =
+    rec.aggregation && typeof rec.aggregation === "object"
+      ? (rec.aggregation as Record<string, unknown>)
+      : null;
+  const key =
+    typeof aggregation?.key === "string" && aggregation.key.trim()
+      ? aggregation.key.trim()
+      : DEFAULT_DODO_USAGE_AGGREGATION_KEY;
+  return key;
 }
 
 export async function ingestDodoUsageEvents(

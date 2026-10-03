@@ -10,10 +10,20 @@ import {
   feeInvoiceClaimKey,
   utcPeriodKey,
 } from "../lib/feeBilling";
-import { lemonPlatformPathBlocked } from "../lib/billingProvider";
 import {
-  createDodoCheckoutSession,
+  lemonPlatformPathBlocked,
+  usageIngestSettlesFeePeriod,
+} from "../lib/billingProvider";
+import {
+  buildRecoveryFeeUsageEvent,
+  DEFAULT_DODO_USAGE_AGGREGATION_KEY,
+  dodoFeePathDecision,
+  dodoUsageEventId,
+  feeCentsToUsageUsd,
+  fetchDodoMeterAggregationKey,
   getDodoPaymentsConfig,
+  ingestDodoUsageEvents,
+  shouldOpenDodoFeeCheckout,
 } from "../lib/dodoPayments";
 import { allowHttpsUrl } from "../lib/safeUrl";
 import { resolveFromAddress } from "../lib/recoveryEmailFrom";
@@ -293,6 +303,11 @@ async function invoiceMerchant(
       periodKey,
       nowMs,
       actorUserId,
+      {
+        dodoCustomerId: targetProvider.dodoCustomerId,
+        dodoSubscriptionId: targetProvider.dodoSubscriptionId,
+        hasActivePro: targetProvider.hasActivePro,
+      },
     );
   }
 
@@ -549,6 +564,11 @@ async function invoiceMerchantViaDodo(
   periodKey: string,
   nowMs: number,
   actorUserId: Id<"users"> | null,
+  billing: {
+    dodoCustomerId: string | null;
+    dodoSubscriptionId: string | null;
+    hasActivePro: boolean;
+  },
 ): Promise<InvoiceMerchantResult> {
   const config = getDodoPaymentsConfig();
   if (!config) {
@@ -574,14 +594,6 @@ async function invoiceMerchantViaDodo(
       nowMs,
     },
   );
-
-  const target = await ctx.runQuery(
-    internal.functions.feeBilling.getUserBillingTarget,
-    { userId },
-  );
-  const email = target
-    ? await lookupClerkEmail(target.clerkUserId)
-    : undefined;
 
   if (claim.skippedZero) {
     return {
@@ -624,50 +636,70 @@ async function invoiceMerchantViaDodo(
 
   const invoiceId = claim.invoiceId;
   const claimKey = feeInvoiceClaimKey(userId, periodKey);
-  const expiresAt = nowMs + FEE_INVOICE_CHECKOUT_TTL_MS;
-
-  // One-time FEE_PRODUCT_ID checkout only. Usage ingest is not a paid
-  // confirmation and must not block/settle a fee period.
-  if (!config.feeProductId) {
+  const feePath = dodoFeePathDecision(billing);
+  if (
+    feePath.path !== "usage" ||
+    shouldOpenDodoFeeCheckout({ canTakeUsage: true })
+  ) {
     await ctx.runMutation(internal.functions.feeBilling.markBillingClaimFailed, {
       invoiceId,
-      error: "dodo_fee_product_unconfigured",
+      error: feePath.reason,
       unlinkFees: true,
     });
     return {
-      outcome: "skipped_unconfigured",
+      outcome: "failed",
       invoiceId,
       totalCents: claim.totalCents,
       feeCount: claim.feeCount,
-      error: "not_configured",
+      error: feePath.reason,
+      ...emptyCheckoutFields(),
+    };
+  }
+
+  const customerId = billing.dodoCustomerId!;
+  const usd = feeCentsToUsageUsd(claim.totalCents);
+  if (usd <= 0) {
+    await ctx.runMutation(internal.functions.feeBilling.markBillingClaimFailed, {
+      invoiceId,
+      error: "invalid_usage_amount",
+      unlinkFees: true,
+    });
+    return {
+      outcome: "skipped_zero",
+      invoiceId,
+      totalCents: claim.totalCents,
+      feeCount: claim.feeCount,
+      error: "invalid_usage_amount",
       ...emptyCheckoutFields(),
     };
   }
 
   try {
-
-    const session = await createDodoCheckoutSession(config, {
-      kind: "fee",
-      productId: config.feeProductId,
-      quantity: 1,
-      amountCents: claim.totalCents,
-      returnUrl: null,
-      email,
-      name: target?.userName,
-      metadata: {
-        claim_key: claimKey,
-        billing_invoice_id: invoiceId,
-        convex_user_id: userId,
-        billing_kind: "fee",
-        period_key: periodKey,
-      },
-    });
-    const checkoutUrl = allowHttpsUrl(session.checkoutUrl);
-    await ctx.runMutation(internal.functions.feeBilling.attachDodoCheckout, {
+    const aggregationKey = config.meterId
+      ? await fetchDodoMeterAggregationKey(config, config.meterId)
+      : DEFAULT_DODO_USAGE_AGGREGATION_KEY;
+    const eventId = dodoUsageEventId({
       invoiceId,
-      dodoCheckoutId: session.checkoutId,
-      checkoutUrl: checkoutUrl ?? undefined,
-      expiresAt,
+      claimKey,
+    });
+    await ingestDodoUsageEvents(config, [
+      buildRecoveryFeeUsageEvent({
+        eventId,
+        customerId,
+        eventName: config.usageEventName,
+        usd,
+        aggregationKey,
+        claimKey,
+        invoiceId,
+      }),
+    ]);
+    // Ingest is submitted/unpaid usage. Never settle here.
+    if (usageIngestSettlesFeePeriod()) {
+      throw new Error("usage ingest must not settle a fee period");
+    }
+    await ctx.runMutation(internal.functions.feeBilling.attachDodoUsageSubmitted, {
+      invoiceId,
+      dodoUsageEventId: eventId,
       nowMs,
     });
     await ctx.runMutation(internal.functions.feeBilling.recordFeeInvoiceCreated, {
@@ -675,33 +707,13 @@ async function invoiceMerchantViaDodo(
       actorUserId,
     });
 
-    let checkoutEmailSent = false;
-    if (checkoutUrl && email) {
-      checkoutEmailSent = await sendFeeInvoiceEmail({
-        to: email,
-        merchantName: target?.userName ?? "there",
-        periodKey,
-        totalCents: claim.totalCents,
-        currency: claim.currency ?? "USD",
-        checkoutUrl,
-      });
-      if (checkoutEmailSent) {
-        await ctx.runMutation(
-          internal.functions.feeBilling.recordCheckoutEmailSent,
-          { invoiceId, nowMs },
-        );
-      }
-    }
-
     return {
       outcome: "created",
       invoiceId,
       totalCents: claim.totalCents,
       feeCount: claim.feeCount,
-      error: checkoutUrl ? null : "missing_checkout_url",
-      lsCheckoutId: session.checkoutId,
-      lsCheckoutUrl: checkoutUrl,
-      checkoutEmailSent,
+      error: null,
+      ...emptyCheckoutFields(),
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Dodo Payments error";

@@ -1,6 +1,6 @@
 # Dodo Payments — DeclineGuard merchant billing
 
-DeclineGuard charging **merchants** (Pro $29.99/mo + recovery-fee invoices).
+DeclineGuard charging **merchants** (Pro $29.99/mo + 4% recovery usage on that same invoice).
 Merchant store recovery emails stay on Lemon Squeezy. No PayPal. No price changes.
 
 ## Feature flag (no dual charge)
@@ -47,13 +47,13 @@ npx convex env set DODO_PAYMENTS_WEBHOOK_KEY "whsec_..."
 # npx convex env set DODO_PAYMENTS_WEBHOOK_KEY_PREVIOUS "whsec_..."
 npx convex env set DODO_PAYMENTS_ENVIRONMENT test_mode   # or live_mode
 npx convex env set DODO_PAYMENTS_PRO_PRODUCT_ID "prod_..."
-npx convex env set DODO_PAYMENTS_FEE_PRODUCT_ID "prod_..."
+npx convex env set DODO_PAYMENTS_FEE_PRODUCT_ID "prod_..."  # not the Dodo Pro 4% path
 # optional — $0.99 +10 decline pack (one-time)
 npx convex env set DODO_PAYMENTS_PACK_PRODUCT_ID "prod_..."
-# optional — 4% recovered volume on the Pro subscription
-npx convex env set DODO_PAYMENTS_USAGE_EVENT_NAME "recovery_fee_cents"
-# optional docs-only meter id
-npx convex env set DODO_PAYMENTS_METER_ID "mtr_..."
+# 4% recovered volume on the Pro subscription invoice (default if unset)
+npx convex env set DODO_PAYMENTS_USAGE_EVENT_NAME "recovery.fee"
+# Pro-invoice usage meter (test). Code reads this; do not invent another id.
+npx convex env set DODO_PAYMENTS_METER_ID "mtr_0NottfCQQuRMUjzfjZgJY"
 # isolated preview only — never production
 npx convex env set ALLOW_DODO_TEST_BILLING true
 ```
@@ -72,9 +72,9 @@ Subscribe: `subscription.active`, `subscription.renewed`, `subscription.on_hold`
 
 Until these exist in the live/test Dodo business, checkout/fees throw “not configured”:
 
-1. **Pro $29.99/mo** subscription product → `DODO_PAYMENTS_PRO_PRODUCT_ID`
-2. **Recovery-fee** one-time product (amount override in cents) → `DODO_PAYMENTS_FEE_PRODUCT_ID`
-3. **Usage meter is not a settlement path.** Fees use `DODO_PAYMENTS_FEE_PRODUCT_ID` one-time checkout; `payment.succeeded` + `claim_key` marks paid.
+1. **Pro $29.99/mo** subscription product → `DODO_PAYMENTS_PRO_PRODUCT_ID` (meter `mtr_0NottfCQQuRMUjzfjZgJY` attached; Sum over `customer_id`, unit `usd`)
+2. **4% recovery fee for Dodo Pro** is unpaid usage on that Pro invoice. Event name is exactly `recovery.fee` (or `DODO_PAYMENTS_USAGE_EVENT_NAME` if set). Amount is USD dollars (cents ÷ 100 once). Idempotent `event_id`. **Ingest is not paid** — `usageIngestSettlesFeePeriod` stays false. Paid only from a real Dodo payment/subscription webhook.
+3. **Do not also open** `DODO_PAYMENTS_FEE_PRODUCT_ID` checkout for a Dodo Pro customer who can take usage. No customer/subscription → fail closed (no silent one-time-fee fallback). Lemon-resolved merchants still use Lemon fee checkout.
 4. **Pack** product if `$0.99 +10` should charge on Dodo → `DODO_PAYMENTS_PACK_PRODUCT_ID`. `payment.succeeded` credits `users.declinePackExtra` only when the product id matches (cart qty preferred, clamp ≤20). Extra declines raise Free 50 / Pro 500 hold-queue capacity and unhold oldest held rows. Test-mode packs use the same `test_mode_ignored` gate as plan webhooks. Month rollover (cron + lazy first-touch) and Free→Pro promote call the same unhold + email schedule.
 5. Webhook signing secret → `DODO_PAYMENTS_WEBHOOK_KEY`
 
@@ -107,7 +107,7 @@ Dodo has no subscription import. Approach: **soft per-user flag + migrate-on-nex
 | `convex/functions/dodoBillingActions.ts` | Checkout / portal / pack |
 | `convex/dodoWebhook.ts` | `POST /dodo` |
 | `convex/functions/lemonSqueezyActions.ts` | Stable `createProCheckout` / `createBillingPortal` |
-| `convex/functions/feeBillingActions.ts` | Fee path switches on resolved provider |
+| `convex/functions/feeBillingActions.ts` | Lemon fee checkout; Dodo Pro 4% = `recovery.fee` usage |
 
 ## Asserts
 
