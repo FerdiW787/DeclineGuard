@@ -224,9 +224,13 @@ function Dashboard() {
   );
   const ensureCurrentUser = useMutation(api.functions.user.ensureCurrentUser);
   const currentUser = useQuery(api.functions.user.getCurrentUser);
-  const plan = currentUser?.plan ?? "free";
+  // Product plan / fee % come from getFeesSummary (takeover target).
+  // getCurrentUser is the signed-in viewer — Pro staff would otherwise show 4%.
+  const plan = feesSummary?.plan ?? currentUser?.plan ?? "free";
   const recoveryFeePercent =
-    currentUser?.recoveryFeePercent ?? PLANS[plan].recoveryFeePercent;
+    feesSummary?.recoveryFeePercent ??
+    currentUser?.recoveryFeePercent ??
+    PLANS[plan].recoveryFeePercent;
   const planTier = PLANS[plan].name;
   const unreadHelpCount = useQuery(
     api.functions.support.countUnreadThreads,

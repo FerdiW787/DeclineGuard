@@ -120,9 +120,17 @@ function BillingTabView({
   billing: BillingSnapshot | null;
   showActions: boolean;
 }) {
-  const isPro = (billing?.plan ?? planId) === "pro";
+  // Display plan / fee % from the merchant ledger (takeover-safe).
+  // Checkout actions stay on the signed-in viewer via getMyBilling.
+  const displayPlan = feesSummary?.plan ?? billing?.plan ?? planId;
+  const displayPlanTier = feesSummary
+    ? PLANS[feesSummary.plan].name
+    : planTier;
+  const feePercent = feesSummary?.recoveryFeePercent ?? recoveryFeePercent;
+  const isPro = displayPlan === "pro";
+  const viewerIsPro = (billing?.plan ?? planId) === "pro";
   const pro = PLANS.pro;
-  const feeLabel = `${recoveryFeePercent}%`;
+  const feeLabel = `${feePercent}%`;
   const provider = billing?.billingProvider;
   const subscriptionStatus = subscriptionStatusFor(billing, lsSubscriptionStatus);
   // portalAvailable is true if a Dodo customer or an LS subscription exists.
@@ -134,8 +142,8 @@ function BillingTabView({
       title="Billing"
       description={
         isPro
-          ? `${planTier} plan: ${feeLabel} of recovered revenue if payment returns within ${ATTRIBUTION_WINDOW_DAYS} days of our first recovery email. Pro is $29.99/mo.`
-          : `${planTier} plan: ${feeLabel} of recovered revenue if payment returns within ${ATTRIBUTION_WINDOW_DAYS} days of our first recovery email. Upgrade to Pro for ${pro.recoveryFeePercent}% fees.`
+          ? `${displayPlanTier} plan: ${feeLabel} of recovered revenue if payment returns within ${ATTRIBUTION_WINDOW_DAYS} days of our first recovery email. Pro is $29.99/mo.`
+          : `${displayPlanTier} plan: ${feeLabel} of recovered revenue if payment returns within ${ATTRIBUTION_WINDOW_DAYS} days of our first recovery email. Upgrade to Pro for ${pro.recoveryFeePercent}% fees.`
       }
     >
       <SettingsCard>
@@ -147,9 +155,11 @@ function BillingTabView({
             subscriptionStatus,
           })}
         >
-          <p className="text-[15px] font-semibold text-[#08090a]">{planTier}</p>
+          <p className="text-[15px] font-semibold text-[#08090a]">
+            {displayPlanTier}
+          </p>
         </SettingsRow>
-        {isPro || !showActions ? null : (
+        {viewerIsPro || !showActions ? null : (
           <SettingsRow
             title="DeclineGuard Pro"
             description={`$${pro.monthlyPriceUsd}/mo · ${pro.recoveryFeePercent}% recovery fee · unlimited stores.`}
