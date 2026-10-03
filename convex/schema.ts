@@ -421,6 +421,8 @@ export default defineSchema({
     userId: v.id("users"),
     connectionId: v.id("lemonConnections"),
     toEmail: v.string(),
+    /** Chosen Set A kit (LAYOUT_PRESET_IDS). Required on new starts. */
+    layoutKit: v.optional(v.string()),
     status: v.union(
       v.literal("running"),
       v.literal("completed"),

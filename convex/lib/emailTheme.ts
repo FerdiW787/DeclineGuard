@@ -309,6 +309,16 @@ export function isLayoutPresetId(value: unknown): value is LayoutPresetId {
   );
 }
 
+/** Preview / public kit id — current LAYOUT_PRESET_IDS only, no legacy aliases. */
+export function requireLayoutKit(value: string): LayoutPresetId {
+  if (!isLayoutPresetId(value)) {
+    throw new Error(
+      `Unknown layout kit. Valid ids: ${LAYOUT_PRESET_IDS.join(", ")}`,
+    );
+  }
+  return value;
+}
+
 export function isRecoverySequenceStep(
   value: unknown,
 ): value is RecoverySequenceStep {

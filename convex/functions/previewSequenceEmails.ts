@@ -9,10 +9,11 @@ import {
   type RecoveryTemplateId,
 } from "../lib/recoveryEmailTemplate";
 import {
+  requireLayoutKit,
   recoveryColorsFromTheme,
   resolveSendTheme,
+  type LayoutPresetId,
 } from "../lib/emailTheme";
-import { resolveSendKit } from "../lib/kitExperiment";
 import { resolveFromAddress } from "../lib/recoveryEmailFrom";
 import { isResendQuotaError, parseResendError } from "../lib/resendErrors";
 
@@ -47,10 +48,16 @@ export const sendStep = internalAction({
   args: {
     previewId: v.id("previewSequences"),
     step: previewStepValidator,
+    layoutKit: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await runPreviewStep(ctx, args.previewId, args.step);
+    await runPreviewStep(
+      ctx,
+      args.previewId,
+      args.step,
+      requireLayoutKit(args.layoutKit),
+    );
     return null;
   },
 });
@@ -59,6 +66,7 @@ async function runPreviewStep(
   ctx: ActionCtx,
   previewId: Id<"previewSequences">,
   step: PreviewStep,
+  layoutKit: LayoutPresetId,
 ) {
   const claim = await ctx.runMutation(
     internal.functions.previewSequence.claimStep,
@@ -95,12 +103,7 @@ async function runPreviewStep(
   );
 
   const templateId = STEP_TEMPLATE[step];
-  const kitId = resolveSendKit({
-    experimentStatus: settings?.kitExperimentStatus,
-    winnerKitId: settings?.layoutPresetId,
-    assignedKitId: null,
-  });
-  const theme = resolveSendTheme(kitId, settings);
+  const theme = resolveSendTheme(layoutKit, settings);
   const colors = recoveryColorsFromTheme(theme.tokens);
   const amountLabel = formatMoney(
     PREVIEW_SAMPLE.amountCents,
@@ -204,6 +207,7 @@ async function runPreviewStep(
   await ctx.runMutation(internal.functions.previewSequence.recordStepSent, {
     previewId,
     step,
+    layoutKit,
   });
 }
 

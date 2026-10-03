@@ -43,6 +43,13 @@ import {
   type EmailCopyOverrides,
   type RecoveryTemplateId,
 } from "@/lib/recoveryEmailCopy";
+import {
+  DEFAULT_LAYOUT_PRESET_ID,
+  isLayoutPresetId,
+  LAYOUT_PRESET_CATALOG,
+  LAYOUT_PRESET_IDS,
+  type LayoutPresetId,
+} from "@/lib/emailTheme";
 
 const STEPS = [
   {
@@ -195,6 +202,9 @@ export default function SequencesPage({
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [mobilePane, setMobilePane] = useState<MobilePane>("people");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [layoutKit, setLayoutKit] = useState<LayoutPresetId>(
+    DEFAULT_LAYOUT_PRESET_ID,
+  );
 
   const activeIndex = STEPS.findIndex((s) => s.id === activeStep);
   const step = STEPS[activeIndex] ?? STEPS[0]!;
@@ -352,6 +362,23 @@ export default function SequencesPage({
                 Customize brand
               </button>
             ) : null}
+            <label className="flex min-w-0 items-center gap-1.5">
+              <span className="sr-only">Preview layout kit</span>
+              <select
+                value={layoutKit}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  if (isLayoutPresetId(next)) setLayoutKit(next);
+                }}
+                className="dg-btn shrink-0 cursor-pointer !px-3 !py-1.5 text-[11px]"
+              >
+                {LAYOUT_PRESET_IDS.map((id) => (
+                  <option key={id} value={id}>
+                    {LAYOUT_PRESET_CATALOG[id]?.name ?? id}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
               type="button"
               disabled={previewBlocked}
@@ -757,6 +784,7 @@ export default function SequencesPage({
           open={previewOpen}
           onClose={() => setPreviewOpen(false)}
           onContactSupport={onContactSupport}
+          layoutKit={layoutKit}
         />
       ) : null}
     </div>
