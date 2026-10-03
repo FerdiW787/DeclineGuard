@@ -49,8 +49,8 @@ export function WebhooksTab({
             title="Signing secret"
             description={
               webhookSetup.serverConfigured
-                ? "Configured on the server and never shown here."
-                : "Set LEMONSQUEEZY_WEBHOOK_SECRET on Convex before installing."
+                ? "Unique per store, generated on install, and never shown here."
+                : "Set CONVEX_SITE_URL on Convex before installing."
             }
           />
           <SettingsRow title="Health" description={healthDetail(webhookStatus)}>

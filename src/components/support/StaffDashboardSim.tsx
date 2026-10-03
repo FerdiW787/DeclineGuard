@@ -20,6 +20,7 @@ import RecoveriesPage, {
 } from "@/components/dashboard/RecoveriesPage";
 import SequencesPage from "@/components/dashboard/SequencesPage";
 import SequencesWarrior from "@/components/dashboard/SequencesWarrior";
+import { PLANS } from "@/lib/pricing";
 import {
   Check,
   ChevronsUpDown,
@@ -142,12 +143,20 @@ export default function StaffDashboardSim({
   const chartSinceMs = chartDayWindows[0]?.startMs ?? monthStartMs;
 
   const uploadEmailImage = useEmailHeaderImageUpload();
+  const feesNowMs = useMemo(() => Date.now(), []);
   const data = useQuery(api.functions.supportAccess.getDashboardSimulation, {
     merchantUserId,
     monthStartMs,
     priorMonthStartMs,
     sinceMs: chartSinceMs,
   });
+  const merchantFeesSummary = useQuery(
+    api.functions.recoveries.getFeesSummary,
+    {
+      nowMs: feesNowMs,
+      merchantUserId,
+    },
+  );
 
   const [nav, setNav] = useState<NavId>("overview");
   const [recoveriesFilter, setRecoveriesFilter] =
@@ -377,6 +386,26 @@ export default function StaffDashboardSim({
   const emailsSentLabel = summary
     ? String(summary.emailsSentThisMonth)
     : "—";
+  const liveFeesOwedLabel =
+    merchantFeesSummary == null
+      ? "—"
+      : merchantFeesSummary.owedThisMonthCents > 0
+        ? `${formatMoneyAmount(
+            merchantFeesSummary.owedThisMonthCents,
+            merchantFeesSummary.currency ?? displayCurrency,
+          )}${merchantFeesSummary.currencyMixed ? " · mixed" : ""}`
+        : formatMoneyAmount(0, displayCurrency);
+  const liveYouKeepLabel = (() => {
+    if (merchantFeesSummary == null) return recoveredLabel;
+    const recoveredCents = summary?.recoveredThisMonthCents ?? 0;
+    const feeCents = merchantFeesSummary.owedThisMonthCents;
+    const keptCents = Math.max(0, recoveredCents - feeCents);
+    const currency = summary?.recoveredCurrency ?? displayCurrency;
+    const mixed =
+      Boolean(summary?.recoveredCurrencyMixed) ||
+      Boolean(merchantFeesSummary.currencyMixed);
+    return `${formatMoneyAmount(keptCents, currency)}${mixed ? " · mixed" : ""}`;
+  })();
 
   const storeName =
     activeStore?.name ?? data?.connection?.storeName ?? "No store";
@@ -669,9 +698,11 @@ export default function StaffDashboardSim({
                 openAtRiskLabel={viewingDummy ? "—" : openAtRiskLabel}
                 emailsSentLabel={viewingDummy ? "0" : emailsSentLabel}
                 recoveryRateLabel={viewingDummy ? "—" : recoveryRateLabel}
-                feesOwedLabel="$0"
-                youKeepLabel={viewingDummy ? "$0" : recoveredLabel}
-                recoveryFeePercent={10}
+                feesOwedLabel={viewingDummy ? "$0" : liveFeesOwedLabel}
+                youKeepLabel={viewingDummy ? "$0" : liveYouKeepLabel}
+                recoveryFeePercent={
+                  viewingDummy ? 10 : merchantFeesSummary?.recoveryFeePercent
+                }
                 openFailures={viewingDummy ? [] : data.openFailures}
                 recentActivity={viewingDummy ? [] : data.recentActivity}
                 brandColor={brandColor}
@@ -833,6 +864,13 @@ export default function StaffDashboardSim({
         allowDisconnect={false}
         readOnlyNotice="Simulation mode — sender settings won’t save; Disconnect is disabled."
         showAccount={false}
+        planTier={
+          viewingDummy || !merchantFeesSummary
+            ? undefined
+            : PLANS[merchantFeesSummary.plan].name
+        }
+        planId={viewingDummy ? undefined : merchantFeesSummary?.plan}
+        feesSummary={viewingDummy ? undefined : merchantFeesSummary}
         onSaveSender={async () => {
           flash(
             "Simulated sender save — their real settings were not changed.",

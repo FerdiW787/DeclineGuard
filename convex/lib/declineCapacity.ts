@@ -81,6 +81,22 @@ export function emailMeterMonthBounds(nowMs: number): {
 }
 
 /**
+ * Sum cents whose timestamp falls in the UTC month containing `nowMs`.
+ * Same bounds as the email meter — never a client local midnight.
+ */
+export function sumCentsInUtcMonth(
+  rows: Array<{ atMs: number; cents: number }>,
+  nowMs: number,
+): number {
+  const { startMs, endMs } = emailMeterMonthBounds(nowMs);
+  let total = 0;
+  for (const row of rows) {
+    if (row.atMs >= startMs && row.atMs < endMs) total += row.cents;
+  }
+  return total;
+}
+
+/**
  * Prefer Dodo `product_cart` quantity over checkout metadata.
  * Metadata is attacker-controlled; cart qty is what was charged.
  */

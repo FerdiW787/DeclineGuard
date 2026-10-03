@@ -14,6 +14,7 @@ import {
   createDodoCustomerPortal,
   getDodoPaymentsConfig,
 } from "../lib/dodoPayments";
+import { generateMerchantWebhookSecret } from "../lib/lemonWebhookAuth";
 import { apiKeyLast4, decryptApiKey, encryptApiKey } from "../lib/lsCrypto";
 import { allowAppHttpsUrl, allowHttpsUrl } from "../lib/safeUrl";
 
@@ -98,18 +99,34 @@ function normalizeWebhookUrl(url: string): string {
   return url.trim().replace(/\/+$/, "").toLowerCase();
 }
 
-function webhookCallbackConfig(): { callbackUrl: string; signingSecret: string } {
-  const secret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET?.trim();
+function webhookCallbackUrl(): string {
   const site = process.env.CONVEX_SITE_URL?.trim().replace(/\/$/, "");
-  if (!secret || !site) {
+  if (!site) {
     throw new Error(
-      "Webhook is not configured on the server (missing LEMONSQUEEZY_WEBHOOK_SECRET or CONVEX_SITE_URL).",
+      "Webhook is not configured on the server (missing CONVEX_SITE_URL).",
     );
   }
-  return {
-    callbackUrl: `${site}/lemonsqueezy`,
-    signingSecret: secret,
-  };
+  return `${site}/lemonsqueezy`;
+}
+
+async function merchantWebhookSigningSecret(args: {
+  existingCipher: string | null;
+}): Promise<{ signingSecret: string; cipher: string; created: boolean }> {
+  if (args.existingCipher) {
+    try {
+      const signingSecret = await decryptApiKey(args.existingCipher);
+      if (signingSecret) {
+        return { signingSecret, cipher: args.existingCipher, created: false };
+      }
+    } catch {
+      // Rotate: stored cipher cannot be decrypted (key change).
+    }
+  }
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  const signingSecret = generateMerchantWebhookSecret(bytes);
+  const cipher = await encryptApiKey(signingSecret);
+  return { signingSecret, cipher, created: true };
 }
 
 type ListedWebhook = {
@@ -419,7 +436,18 @@ export const installStoreWebhook = action({
       );
     }
 
-    const { callbackUrl, signingSecret } = webhookCallbackConfig();
+    const callbackUrl = webhookCallbackUrl();
+    const { signingSecret, cipher, created: secretCreated } =
+      await merchantWebhookSigningSecret({
+        existingCipher: secret.webhookSecretCipher,
+      });
+    if (secretCreated) {
+      await ctx.runMutation(internal.functions.lemonSqueezy.saveWebhookSecretCipher, {
+        connectionId: secret._id,
+        clerkUserId,
+        webhookSecretCipher: cipher,
+      });
+    }
     const targetUrl = normalizeWebhookUrl(callbackUrl);
     const events = [...REQUIRED_WEBHOOK_EVENTS];
 
@@ -546,7 +574,25 @@ export const sendWebhookTestPing = action({
     );
     if (!secret) throw new Error("No Lemon Squeezy connection");
 
-    const { callbackUrl, signingSecret } = webhookCallbackConfig();
+    if (!secret.webhookSecretCipher) {
+      throw new Error(
+        "Install the Lemon Squeezy webhook first so we can sign the test ping with this store’s secret.",
+      );
+    }
+    let signingSecret: string;
+    try {
+      signingSecret = await decryptApiKey(secret.webhookSecretCipher);
+    } catch {
+      throw new Error(
+        "Could not decrypt this store’s webhook secret. Refresh the webhook from Settings.",
+      );
+    }
+    if (!signingSecret) {
+      throw new Error(
+        "Install the Lemon Squeezy webhook first so we can sign the test ping with this store’s secret.",
+      );
+    }
+    const callbackUrl = webhookCallbackUrl();
     await signAndPostWebhookPing({
       storeId: secret.storeId,
       callbackUrl,

@@ -197,7 +197,8 @@ export const getConnection = query({
 
 /**
  * Public webhook callback URL for Settings / onboarding.
- * Never returns the signing secret — it stays server-side only.
+ * Never returns a signing secret — Lemon does not return webhook secrets,
+ * and the platform secret must not be shown or copied onto merchant webhooks.
  */
 export const getWebhookSetup = query({
   args: {},
@@ -216,13 +217,12 @@ export const getWebhookSetup = query({
     const connection = await getActiveConnectionForUser(ctx, user._id);
     if (!connection) return null;
 
-    const secret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET?.trim();
     const site = process.env.CONVEX_SITE_URL?.trim().replace(/\/$/, "");
     if (!site) return null;
 
     return {
       callbackUrl: `${site}/lemonsqueezy`,
-      serverConfigured: Boolean(secret),
+      serverConfigured: true,
     };
   },
 });
@@ -329,6 +329,7 @@ export const getConnectionSecret = internalQuery({
     v.object({
       _id: v.id("lemonConnections"),
       apiKeyCipher: v.string(),
+      webhookSecretCipher: v.union(v.string(), v.null()),
       storeId: v.string(),
       testMode: v.boolean(),
     }),
@@ -348,9 +349,55 @@ export const getConnectionSecret = internalQuery({
     return {
       _id: row._id,
       apiKeyCipher: row.apiKeyCipher,
+      webhookSecretCipher: row.webhookSecretCipher ?? null,
       storeId: row.storeId,
       testMode: row.testMode,
     };
+  },
+});
+
+/** Encrypted per-store merchant webhook secret. Never the platform secret. */
+export const getWebhookSecretCipherByStoreId = internalQuery({
+  args: { storeId: v.string() },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, args) => {
+    const binding = await ctx.db
+      .query("lemonStoreBindings")
+      .withIndex("by_storeId", (q) => q.eq("storeId", args.storeId))
+      .collect();
+    if (binding.length === 0) return null;
+    let latest = binding[0]!;
+    for (const row of binding) {
+      if (row._creationTime > latest._creationTime) latest = row;
+    }
+    const connection = await ctx.db.get(latest.connectionId);
+    if (!connection || isSoftDeleted(connection)) return null;
+    return connection.webhookSecretCipher ?? null;
+  },
+});
+
+export const saveWebhookSecretCipher = internalMutation({
+  args: {
+    connectionId: v.id("lemonConnections"),
+    clerkUserId: v.string(),
+    webhookSecretCipher: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const user = await requireLiveProductForClerkUser(ctx, args.clerkUserId);
+    const connection = await ctx.db.get(args.connectionId);
+    if (!connection || isSoftDeleted(connection)) {
+      throw new Error("Connection not found");
+    }
+    if (connection.userId !== user._id) {
+      throw new Error(
+        "Your access to this account ended or changed. Retry the operation.",
+      );
+    }
+    await ctx.db.patch(args.connectionId, {
+      webhookSecretCipher: args.webhookSecretCipher,
+    });
+    return null;
   },
 });
 

@@ -37,6 +37,7 @@ import {
   quotaHeldAfterLazyRelease,
   utcMonthStartMs,
   emailMeterMonthBounds,
+  sumCentsInUtcMonth,
 } from "../lib/declineCapacity";
 import {
   releaseHeldAndSchedule,
@@ -1918,9 +1919,81 @@ export const listActivityCustomerEmails = query({
   },
 });
 
+type FeesSummary = {
+  owedThisMonthCents: number;
+  owedAllTimeCents: number;
+  owedCount: number;
+  currency: string | null;
+  currencyMixed: boolean;
+  plan: "free" | "pro";
+  recoveryFeePercent: number;
+};
+
+const emptyFeesSummary = (): FeesSummary => ({
+  owedThisMonthCents: 0,
+  owedAllTimeCents: 0,
+  owedCount: 0,
+  currency: null,
+  currencyMixed: false,
+  plan: "free",
+  recoveryFeePercent: recoveryFeePercent("free"),
+});
+
+/** Server UTC month from nowMs. Does not take a client monthStartMs. */
+async function feesSummaryForUser(
+  ctx: QueryCtx,
+  user: Doc<"users">,
+  nowMs: number,
+): Promise<FeesSummary> {
+  const plan = resolvePlan(user);
+
+  const rows = await ctx.db
+    .query("recoveryFees")
+    .withIndex("by_user_recoveredAt", (q) => q.eq("userId", user._id))
+    .order("desc")
+    .take(SUMMARY_SCAN_LIMIT);
+
+  const owed = rows.filter((r) => r.status === "owed" && !r.testMode);
+  let owedAllTimeCents = 0;
+  const byCurrency = new Map<string, number>();
+
+  for (const row of owed) {
+    owedAllTimeCents += row.feeCents;
+    const code = row.currency.trim().toUpperCase() || "USD";
+    byCurrency.set(code, (byCurrency.get(code) ?? 0) + row.feeCents);
+  }
+  const owedThisMonthCents = sumCentsInUtcMonth(
+    owed.map((row) => ({ atMs: row.recoveredAt, cents: row.feeCents })),
+    nowMs,
+  );
+
+  let currency: string | null = null;
+  let max = 0;
+  for (const [code, total] of byCurrency) {
+    if (total > max) {
+      max = total;
+      currency = code;
+    }
+  }
+
+  return {
+    owedThisMonthCents,
+    owedAllTimeCents,
+    owedCount: owed.length,
+    currency,
+    currencyMixed: byCurrency.size > 1,
+    plan,
+    recoveryFeePercent: recoveryFeePercent(plan),
+  };
+}
+
 /** Fee ledger summary for Overview / Settings (product user, including takeover). */
 export const getFeesSummary = query({
-  args: { monthStartMs: v.number() },
+  args: {
+    nowMs: v.number(),
+    /** Staff live snapshot: this merchant, never the signed-in viewer. */
+    merchantUserId: v.optional(v.id("users")),
+  },
   returns: v.object({
     owedThisMonthCents: v.number(),
     owedAllTimeCents: v.number(),
@@ -1931,57 +2004,17 @@ export const getFeesSummary = query({
     recoveryFeePercent: v.number(),
   }),
   handler: async (ctx, args) => {
-    const empty = {
-      owedThisMonthCents: 0,
-      owedAllTimeCents: 0,
-      owedCount: 0,
-      currency: null as string | null,
-      currencyMixed: false,
-      plan: "free" as const,
-      recoveryFeePercent: recoveryFeePercent("free"),
-    };
+    if (args.merchantUserId !== undefined) {
+      const actor = await requireStaff(ctx);
+      const merchant = await ctx.db.get(args.merchantUserId);
+      if (!merchant) throw new Error("User not found");
+      assertCanActOnTarget(actor, merchant);
+      return await feesSummaryForUser(ctx, merchant, args.nowMs);
+    }
+
     const user = await requireUser(ctx);
-    if (!user) return empty;
-    const plan = resolvePlan(user);
-
-    const rows = await ctx.db
-      .query("recoveryFees")
-      .withIndex("by_user_recoveredAt", (q) => q.eq("userId", user._id))
-      .order("desc")
-      .take(SUMMARY_SCAN_LIMIT);
-
-    const owed = rows.filter((r) => r.status === "owed" && !r.testMode);
-    let owedThisMonthCents = 0;
-    let owedAllTimeCents = 0;
-    const byCurrency = new Map<string, number>();
-
-    for (const row of owed) {
-      owedAllTimeCents += row.feeCents;
-      if (row.recoveredAt >= args.monthStartMs) {
-        owedThisMonthCents += row.feeCents;
-      }
-      const code = row.currency.trim().toUpperCase() || "USD";
-      byCurrency.set(code, (byCurrency.get(code) ?? 0) + row.feeCents);
-    }
-
-    let currency: string | null = null;
-    let max = 0;
-    for (const [code, total] of byCurrency) {
-      if (total > max) {
-        max = total;
-        currency = code;
-      }
-    }
-
-    return {
-      owedThisMonthCents,
-      owedAllTimeCents,
-      owedCount: owed.length,
-      currency,
-      currencyMixed: byCurrency.size > 1,
-      plan,
-      recoveryFeePercent: recoveryFeePercent(plan),
-    };
+    if (!user) return emptyFeesSummary();
+    return await feesSummaryForUser(ctx, user, args.nowMs);
   },
 });
 

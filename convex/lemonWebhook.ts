@@ -3,16 +3,22 @@ import type { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import {
   extractCustomUserRefs,
-  extractProductId,
-  extractVariantId,
   isPlatformBillingEventName,
   isPlatformBillingStore,
-  statusFromBillingEvent,
+  planFromLsStatus,
 } from "./lib/billingPlan";
 import {
-  isFeeInvoiceClaimKey,
-  parseBillingCustomData,
-} from "./lib/feeBilling";
+  applyPlatformSubscriptionAllowed,
+  feeInvoicePaidFromVerifiedOrder,
+  invoiceOwnsVerifiedLemonOrder,
+  lemonFeeInvoiceLookupFromOrder,
+  lemonWebhookSecretChoice,
+  merchantRecoveredPaymentAuthorized,
+  parseLemonOrderForFeeInvoice,
+  parseLemonSubscription,
+  type LemonWebhookSecretChoice,
+} from "./lib/lemonWebhookAuth";
+import { decryptApiKey } from "./lib/lsCrypto";
 import { allowHttpsUrl } from "./lib/safeUrl";
 
 type LsWebhookBody = {
@@ -37,32 +43,14 @@ type LsWebhookBody = {
  * - order_created — recovery-fee invoices (claim/release + mark paid)
  * - subscription_* — Pro $29.99/mo (applyPlatformSubscription)
  *
- * Env: LEMONSQUEEZY_WEBHOOK_SECRET (same signing secret you enter in LS)
- * Platform events also need LEMONSQUEEZY_STORE_ID.
+ * Env: LEMONSQUEEZY_WEBHOOK_SECRET verifies only LEMONSQUEEZY_STORE_ID.
+ * Merchant stores use a per-connection secret generated at install — never
+ * the platform secret. Lemon does not return webhook secrets from the API.
  * Test-mode Pro events do not write users.plan unless ALLOW_LS_TEST_BILLING=true.
  */
 export const handleLemonSqueezyWebhook = httpAction(
   async (ctx: ActionCtx, request: Request) => {
-    // Dual-secret rotation: accept signatures from current or previous secret.
-    // This allows rotating webhook secrets without downtime during the overlap window.
-    const currentSecret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET?.trim();
-    const previousSecret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET_PREVIOUS?.trim();
-
-    const secrets = [currentSecret, previousSecret].filter(
-      (s): s is string => typeof s === "string" && s.length > 0,
-    );
-
-    if (secrets.length === 0) {
-      console.error("LEMONSQUEEZY_WEBHOOK_SECRET is not set");
-      return new Response("Webhook secret not configured", { status: 500 });
-    }
-
     const rawBody = await request.text();
-    const signature = request.headers.get("X-Signature");
-    const valid = await verifyLemonSignature(rawBody, signature, secrets);
-    if (!valid) {
-      return new Response("Invalid signature", { status: 400 });
-    }
 
     let body: LsWebhookBody;
     try {
@@ -70,6 +58,23 @@ export const handleLemonSqueezyWebhook = httpAction(
     } catch {
       return new Response("Invalid JSON", { status: 400 });
     }
+
+    const storeIdForVerify = stringifyId(body.data?.attributes?.store_id);
+    const resolved = await secretsForStore(ctx, storeIdForVerify);
+    if (resolved.choice === "platform" && resolved.secrets.length === 0) {
+      return new Response("Webhook secret not configured", { status: 500 });
+    }
+    if (resolved.choice === "reject" || resolved.secrets.length === 0) {
+      return new Response("Invalid signature", { status: 400 });
+    }
+
+    const signature = request.headers.get("X-Signature");
+    const valid = await verifyLemonSignature(rawBody, signature, resolved.secrets);
+    if (!valid) {
+      return new Response("Invalid signature", { status: 400 });
+    }
+
+    const secretChoice = resolved.choice;
 
     const eventName =
       request.headers.get("X-Event-Name") ?? body.meta?.event_name ?? "";
@@ -101,7 +106,7 @@ export const handleLemonSqueezyWebhook = httpAction(
       return await handleBillingOrderWebhook(ctx, {
         eventName,
         storeId: storeIdEarly,
-        body,
+        secretChoice,
         data,
         attrs,
       });
@@ -215,22 +220,41 @@ export const handleLemonSqueezyWebhook = httpAction(
     // so LS retries get a fresh chance (not stuck "Already processed" forever)
     try {
       if (isBillingEvent) {
-        const attrsStatus =
-          typeof attrs.status === "string" ? attrs.status : "";
-        const customRefs = extractCustomUserRefs(body.meta ?? {});
-        await ctx.runMutation(
-          internal.functions.billing.applyPlatformSubscription,
-          {
-            lsSubscriptionId: subscriptionId,
-            status: statusFromBillingEvent(eventName, attrsStatus),
-            variantId: extractVariantId(attrs) ?? undefined,
-            productId: extractProductId(attrs) ?? undefined,
-            convexUserId: customRefs.convexUserId ?? undefined,
-            clerkUserId: customRefs.clerkUserId ?? undefined,
-            checkoutNonce: customRefs.checkoutNonce ?? undefined,
-            testMode,
-          },
-        );
+        const subLookup = await fetchLemonPlatformSubscription(subscriptionId);
+        if (subLookup.kind === "error") {
+          throw new Error("Lemon subscription lookup failed");
+        }
+        const verifiedSub = subLookup.subscription;
+        if (verifiedSub) {
+          const customRefs = extractCustomUserRefs(body.meta ?? {});
+          const userSource = await ctx.runQuery(
+            internal.functions.billing.resolvePlatformBillingUserSource,
+            {
+              lsSubscriptionId: verifiedSub.subscriptionId,
+              checkoutNonce: customRefs.checkoutNonce ?? undefined,
+            },
+          );
+          const nextPlan = planFromLsStatus(verifiedSub.status);
+          const allowed = applyPlatformSubscriptionAllowed({
+            verifiedFromLemonApi: true,
+            userResolvedBy: userSource,
+            nextPlan,
+          });
+          if (allowed.allow) {
+            await ctx.runMutation(
+              internal.functions.billing.applyPlatformSubscription,
+              {
+                lsSubscriptionId: verifiedSub.subscriptionId,
+                status: verifiedSub.status,
+                variantId: verifiedSub.variantId ?? undefined,
+                productId: verifiedSub.productId ?? undefined,
+                checkoutNonce: customRefs.checkoutNonce ?? undefined,
+                testMode: verifiedSub.testMode,
+                verifiedFromLemonApi: true,
+              },
+            );
+          }
+        }
       }
 
       if (binding && eventName === "subscription_payment_failed" && customerEmail) {
@@ -271,6 +295,7 @@ export const handleLemonSqueezyWebhook = httpAction(
         }
       } else if (
         binding &&
+        merchantRecoveredPaymentAuthorized(secretChoice) &&
         eventName === "subscription_payment_recovered" &&
         customerEmail
       ) {
@@ -337,7 +362,7 @@ async function handleBillingOrderWebhook(
   args: {
     eventName: string;
     storeId: string;
-    body: LsWebhookBody;
+    secretChoice: LemonWebhookSecretChoice;
     data: LsWebhookBody["data"];
     attrs: Record<string, unknown> | undefined;
   },
@@ -346,18 +371,38 @@ async function handleBillingOrderWebhook(
     return new Response("Missing payload data", { status: 400 });
   }
 
-  const custom = parseBillingCustomData(args.body.meta?.custom_data);
-  const claimKey = custom.claimKey;
-  if (!claimKey || !isFeeInvoiceClaimKey(claimKey)) {
+  const orderLookup = await fetchLemonPlatformOrder(String(args.data.id));
+  if (orderLookup.kind === "error") {
+    return new Response("Internal error", { status: 500 });
+  }
+  const verifiedOrder = orderLookup.order;
+  const paidDecision = feeInvoicePaidFromVerifiedOrder({
+    secretChoice: args.secretChoice,
+    platformStoreId: process.env.LEMONSQUEEZY_STORE_ID?.trim() || null,
+    feeVariantId: process.env.LEMONSQUEEZY_FEE_VARIANT_ID?.trim() || null,
+    verifiedOrder,
+    claimedCents: 0,
+  });
+  if (!paidDecision.accept || !verifiedOrder) {
     await ctx.runMutation(internal.functions.recoveries.recordWebhookEvent, {
-      eventKey: `${args.eventName}:${args.data.type ?? "orders"}:${args.data.id}`,
+      eventKey: `${args.eventName}:${args.data.type ?? "orders"}:${args.data.id}:rejected:${paidDecision.accept ? "no_order" : paidDecision.reason}`,
       eventName: args.eventName,
       storeId: args.storeId,
     });
     return new Response("Ignored", { status: 200 });
   }
 
-  const eventKey = `${args.eventName}:${args.data.type ?? "orders"}:${args.data.id}`;
+  const lookup = lemonFeeInvoiceLookupFromOrder(verifiedOrder);
+  const invoiceId = await ctx.runQuery(
+    internal.functions.feeBilling.findBillingInvoiceForPaidOrder,
+    {
+      claimKey: lookup.claimKey ?? undefined,
+      lsCheckoutId: lookup.lsCheckoutId ?? undefined,
+      lsOrderId: lookup.lsOrderId,
+    },
+  );
+
+  const eventKey = `${args.eventName}:${args.data.type ?? "orders"}:${verifiedOrder.orderId}`;
   const { claimed } = await ctx.runMutation(
     internal.functions.recoveries.claimWebhookEvent,
     { eventKey, eventName: args.eventName, storeId: args.storeId },
@@ -366,66 +411,82 @@ async function handleBillingOrderWebhook(
     return new Response("Already processed", { status: 200 });
   }
 
+  const releaseAndIgnore = async (): Promise<Response> => {
+    try {
+      await ctx.runMutation(internal.functions.recoveries.releaseWebhookEvent, {
+        eventKey,
+      });
+    } catch (releaseErr) {
+      console.error(`Failed to release claim for ${eventKey}:`, releaseErr);
+    }
+    return new Response("Ignored", { status: 200 });
+  };
+
   try {
-    const invoiceId = await ctx.runQuery(
-      internal.functions.feeBilling.findBillingInvoiceForPaidOrder,
-      {
-        claimKey,
-        billingInvoiceId: custom.billingInvoiceId,
-        lsOrderId: String(args.data.id),
-      },
-    );
     if (!invoiceId) {
-      throw new Error(
-        `No billingInvoices row for ${claimKey} / order ${args.data.id}`,
-      );
+      return await releaseAndIgnore();
     }
 
     const invoiceMeta = await ctx.runQuery(
       internal.functions.feeBilling.getInvoiceProvider,
       { invoiceId },
     );
-    if (invoiceMeta?.billingProvider === "dodo") {
-      return new Response("Ignored dodo invoice", { status: 200 });
+    if (
+      !invoiceMeta ||
+      !invoiceOwnsVerifiedLemonOrder({
+        invoice: {
+          claimKey: invoiceMeta.claimKey,
+          lsOrderId: invoiceMeta.lsOrderId,
+          lsCheckoutId: invoiceMeta.lsCheckoutId,
+        },
+        order: verifiedOrder,
+      })
+    ) {
+      return await releaseAndIgnore();
+    }
+    if (invoiceMeta.billingProvider === "dodo") {
+      return await releaseAndIgnore();
     }
 
-    const userProvider = invoiceMeta
-      ? await ctx.runQuery(
-          internal.functions.dodoBilling.getUserBillingProvider,
-          { userId: invoiceMeta.userId },
-        )
-      : null;
-    if (userProvider?.billingProvider === "dodo") {
-      return new Response("Ignored dodo merchant", { status: 200 });
-    }
-
-    const orderStatus =
-      typeof args.attrs.status === "string" ? args.attrs.status : "";
-    const testMode = args.attrs.test_mode === true;
-    const paidAt = parseIsoMs(
-      typeof args.attrs.updated_at === "string"
-        ? args.attrs.updated_at
-        : typeof args.attrs.created_at === "string"
-          ? args.attrs.created_at
-          : null,
+    const userProvider = await ctx.runQuery(
+      internal.functions.dodoBilling.getUserBillingProvider,
+      { userId: invoiceMeta.userId },
     );
+    if (userProvider?.billingProvider === "dodo") {
+      return await releaseAndIgnore();
+    }
+
+    const paidDecisionForInvoice = feeInvoicePaidFromVerifiedOrder({
+      secretChoice: args.secretChoice,
+      platformStoreId: process.env.LEMONSQUEEZY_STORE_ID?.trim() || null,
+      feeVariantId: process.env.LEMONSQUEEZY_FEE_VARIANT_ID?.trim() || null,
+      verifiedOrder,
+      claimedCents: invoiceMeta.totalCents,
+    });
+    if (!paidDecisionForInvoice.accept) {
+      return await releaseAndIgnore();
+    }
 
     const marked = await ctx.runMutation(
       internal.functions.feeBilling.markBillingInvoicePaid,
       {
         invoiceId,
-        lsOrderId: String(args.data.id),
-        orderStatus,
-        subtotalCents: asCents(args.attrs.subtotal),
-        totalCents: asCents(args.attrs.total),
-        testMode,
-        paidAt,
+        lsOrderId: verifiedOrder.orderId,
+        orderStatus: verifiedOrder.status,
+        subtotalCents: verifiedOrder.subtotalCents,
+        totalCents: verifiedOrder.totalCents,
+        testMode: verifiedOrder.testMode,
+        paidAt: verifiedOrder.paidAtMs || parseIsoMs(
+          typeof args.attrs.updated_at === "string"
+            ? args.attrs.updated_at
+            : typeof args.attrs.created_at === "string"
+              ? args.attrs.created_at
+              : null,
+        ),
       },
     );
-    if (marked.reason === "not_found") {
-      throw new Error(
-        `billingInvoices ${invoiceId} disappeared before mark paid`,
-      );
+    if (marked.reason === "not_found" || marked.reason === "order_already_used") {
+      return await releaseAndIgnore();
     }
   } catch (err) {
     console.error(
@@ -443,6 +504,114 @@ async function handleBillingOrderWebhook(
   }
 
   return new Response("OK", { status: 200 });
+}
+
+async function secretsForStore(
+  ctx: ActionCtx,
+  storeId: string | null,
+): Promise<{ choice: LemonWebhookSecretChoice; secrets: string[] }> {
+  const platformStoreId = process.env.LEMONSQUEEZY_STORE_ID?.trim() || null;
+  const choice = lemonWebhookSecretChoice({ storeId, platformStoreId });
+  if (choice === "reject") {
+    return { choice, secrets: [] };
+  }
+  if (choice === "platform") {
+    const currentSecret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET?.trim();
+    const previousSecret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET_PREVIOUS?.trim();
+    const secrets = [currentSecret, previousSecret].filter(
+      (s): s is string => typeof s === "string" && s.length > 0,
+    );
+    if (secrets.length === 0) {
+      console.error("LEMONSQUEEZY_WEBHOOK_SECRET is not set");
+    }
+    return { choice, secrets };
+  }
+
+  if (!storeId) return { choice: "reject", secrets: [] };
+  const cipher = await ctx.runQuery(
+    internal.functions.lemonSqueezy.getWebhookSecretCipherByStoreId,
+    { storeId },
+  );
+  if (!cipher) return { choice, secrets: [] };
+  try {
+    const secret = await decryptApiKey(cipher);
+    if (!secret) return { choice, secrets: [] };
+    return { choice, secrets: [secret] };
+  } catch {
+    return { choice, secrets: [] };
+  }
+}
+
+type LemonOrderLookup =
+  | { kind: "ok"; order: ReturnType<typeof parseLemonOrderForFeeInvoice> }
+  | { kind: "error" };
+
+async function fetchLemonPlatformOrder(orderId: string): Promise<LemonOrderLookup> {
+  const apiKey = process.env.LEMONSQUEEZY_API_KEY?.trim();
+  if (!apiKey) {
+    console.error("LEMONSQUEEZY_API_KEY is not set — cannot verify fee order");
+    return { kind: "error" };
+  }
+  try {
+    const res = await fetch(
+      `https://api.lemonsqueezy.com/v1/orders/${encodeURIComponent(orderId)}`,
+      {
+        headers: {
+          Accept: "application/vnd.api+json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+      },
+    );
+    if (res.status === 404) {
+      return { kind: "ok", order: null };
+    }
+    if (!res.ok) {
+      console.error(`Lemon order lookup failed (${res.status})`);
+      return { kind: "error" };
+    }
+    const json: unknown = await res.json();
+    return { kind: "ok", order: parseLemonOrderForFeeInvoice(json) };
+  } catch (err) {
+    console.error("Lemon order lookup threw", err);
+    return { kind: "error" };
+  }
+}
+
+type LemonSubscriptionLookup =
+  | { kind: "ok"; subscription: ReturnType<typeof parseLemonSubscription> }
+  | { kind: "error" };
+
+async function fetchLemonPlatformSubscription(
+  subscriptionId: string,
+): Promise<LemonSubscriptionLookup> {
+  const apiKey = process.env.LEMONSQUEEZY_API_KEY?.trim();
+  if (!apiKey) {
+    console.error("LEMONSQUEEZY_API_KEY is not set — cannot verify subscription");
+    return { kind: "error" };
+  }
+  try {
+    const res = await fetch(
+      `https://api.lemonsqueezy.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
+      {
+        headers: {
+          Accept: "application/vnd.api+json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+      },
+    );
+    if (res.status === 404) {
+      return { kind: "ok", subscription: null };
+    }
+    if (!res.ok) {
+      console.error(`Lemon subscription lookup failed (${res.status})`);
+      return { kind: "error" };
+    }
+    const json: unknown = await res.json();
+    return { kind: "ok", subscription: parseLemonSubscription(json) };
+  } catch (err) {
+    console.error("Lemon subscription lookup threw", err);
+    return { kind: "error" };
+  }
 }
 
 /**

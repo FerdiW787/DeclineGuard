@@ -198,11 +198,11 @@ function Dashboard() {
     api.functions.recoveries.getRecoverySummary,
     connection ? { monthStartMs, priorMonthStartMs } : "skip",
   );
+  const emailQuotaNowMs = useMemo(() => Date.now(), []);
   const feesSummary = useQuery(
     api.functions.recoveries.getFeesSummary,
-    connection ? { monthStartMs } : "skip",
+    connection ? { nowMs: emailQuotaNowMs } : "skip",
   );
-  const emailQuotaNowMs = useMemo(() => Date.now(), []);
   const emailQuota = useQuery(
     api.functions.recoveries.getEmailQuotaStatus,
     connection ? { nowMs: emailQuotaNowMs } : "skip",

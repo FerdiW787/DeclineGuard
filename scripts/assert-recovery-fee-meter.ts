@@ -14,6 +14,7 @@ import {
 } from "../convex/lib/accountGuard";
 import {
   emailMeterMonthBounds,
+  sumCentsInUtcMonth,
   utcNextMonthStartMs,
 } from "../convex/lib/declineCapacity";
 
@@ -177,6 +178,67 @@ assert(
   "local midnight is not a nowMs — only nowMs selects the current UTC month",
 );
 
+// PDT Oct 1 00:00 = Oct 1 07:00 UTC. Fees between UTC midnight and local
+// midnight must stay in this month. JST Oct 1 00:00 = Sep 30 15:00 UTC —
+// the previous UTC month's tail must not be included.
+const westOfUtcLocalMidnight = Date.UTC(2026, 9, 1, 7, 0, 0);
+const eastOfUtcLocalMidnightFees = Date.UTC(2026, 8, 30, 15, 0, 0);
+const nowMidOctoberUtc = Date.UTC(2026, 9, 15, 12, 0, 0);
+const feeAfterUtcMidnightBeforeWestLocal = Date.UTC(2026, 9, 1, 3, 0, 0);
+const feeInPriorUtcMonthTail = Date.UTC(2026, 8, 30, 18, 0, 0);
+const feeInsideOctoberUtc = Date.UTC(2026, 9, 10, 12, 0, 0);
+
+assert(
+  feeAfterUtcMidnightBeforeWestLocal < westOfUtcLocalMidnight,
+  "west-of-UTC fixture: 03:00 UTC is before local midnight",
+);
+assert(
+  feeAfterUtcMidnightBeforeWestLocal >= Date.UTC(2026, 9, 1),
+  "west-of-UTC fixture: 03:00 UTC is in October UTC",
+);
+assert(
+  !(feeAfterUtcMidnightBeforeWestLocal >= westOfUtcLocalMidnight),
+  "legacy recoveredAt >= local midnight drops the west-of-UTC early-UTC fee",
+);
+assert(
+  feeInPriorUtcMonthTail >= eastOfUtcLocalMidnightFees &&
+    feeInPriorUtcMonthTail < Date.UTC(2026, 9, 1),
+  "legacy recoveredAt >= east local midnight includes September's tail",
+);
+
+const owedThisMonth = sumCentsInUtcMonth(
+  [
+    { atMs: feeAfterUtcMidnightBeforeWestLocal, cents: 111 },
+    { atMs: feeInPriorUtcMonthTail, cents: 222 },
+    { atMs: feeInsideOctoberUtc, cents: 333 },
+    { atMs: Date.UTC(2026, 10, 1, 0, 0, 0), cents: 444 },
+  ],
+  nowMidOctoberUtc,
+);
+assert(
+  owedThisMonth === 111 + 333,
+  `owed-this-month must use server UTC bounds (got ${owedThisMonth})`,
+);
+assert(
+  sumCentsInUtcMonth(
+    [{ atMs: feeAfterUtcMidnightBeforeWestLocal, cents: 111 }],
+    nowMidOctoberUtc,
+  ) === 111,
+  "west-of-UTC local midnight must not drop fees between UTC midnight and local midnight",
+);
+assert(
+  sumCentsInUtcMonth(
+    [{ atMs: feeInPriorUtcMonthTail, cents: 222 }],
+    nowMidOctoberUtc,
+  ) === 0,
+  "east-of-UTC local midnight must not include the previous UTC month's tail",
+);
+assert(
+  emailMeterMonthBounds(nowMidOctoberUtc).startMs === Date.UTC(2026, 9, 1) &&
+    emailMeterMonthBounds(nowMidOctoberUtc).endMs === Date.UTC(2026, 10, 1),
+  "owed-this-month bounds match the email meter",
+);
+
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const recoveriesSrc = readFileSync(
   join(repoRoot, "convex/functions/recoveries.ts"),
@@ -188,6 +250,10 @@ const guardSrc = readFileSync(
 );
 const dashboardSrc = readFileSync(
   join(repoRoot, "src/components/dashboard/Dashboard.tsx"),
+  "utf8",
+);
+const staffSimSrc = readFileSync(
+  join(repoRoot, "src/components/support/StaffDashboardSim.tsx"),
   "utf8",
 );
 
@@ -213,10 +279,43 @@ assert(
   "dashboard must pass nowMs to the email meter, not local midnight",
 );
 assert(
+  recoveriesSrc.includes("sumCentsInUtcMonth") &&
+    recoveriesSrc.includes("getFeesSummary") &&
+    recoveriesSrc.includes("args.nowMs") &&
+    recoveriesSrc.includes("SUMMARY_SCAN_LIMIT = 400") &&
+    !recoveriesSrc.includes("row.recoveredAt >= args.monthStartMs"),
+  "owed-this-month must use server UTC bounds from nowMs, keep the 400-row scan",
+);
+assert(
+  dashboardSrc.includes("getFeesSummary") &&
+    dashboardSrc.includes("nowMs: emailQuotaNowMs") &&
+    !dashboardSrc.includes("{ monthStartMs }") &&
+    !dashboardSrc.includes("utcCalendarMonthStartMs"),
+  "dashboard must pass nowMs to getFeesSummary, not local midnight or client UTC midnight",
+);
+assert(
+  recoveriesSrc.includes("merchantUserId") &&
+    recoveriesSrc.includes("requireStaff") &&
+    recoveriesSrc.includes("assertCanActOnTarget") &&
+    recoveriesSrc.includes("sumCentsInUtcMonth") &&
+    !recoveriesSrc.includes("feesSummaryForUser(ctx, merchant, args.monthStartMs)"),
+  "getFeesSummary keeps the staff merchant gate and server UTC nowMs bounds",
+);
+assert(
+  staffSimSrc.includes("api.functions.recoveries.getFeesSummary") &&
+    staffSimSrc.includes("merchantUserId") &&
+    staffSimSrc.includes("nowMs: feesNowMs") &&
+    !staffSimSrc.includes('feesOwedLabel="$0"') &&
+    !staffSimSrc.includes("recoveryFeePercent={10}") &&
+    !staffSimSrc.includes("utcCalendarMonthStartMs") &&
+    !staffSimSrc.includes("monthStartMs: feeMonthStartMs"),
+  "live staff snapshot must use that merchant's getFeesSummary with nowMs, not hardcoded $0/10 or monthStartMs",
+);
+assert(
   guardSrc.includes("gap >= 0 && gap <= ATTRIBUTION_WINDOW_MS"),
   "attribution window must reject recoveredAt before Day-0",
 );
 
 console.log(
-  "asserts green: no Day-0 / before Day-0 skip fee; Day-0 instant and last-in-window owe; past 30d skip; meter counts live month sends over 2000 including deletes; UTC bounds keep east-of-UTC October sends; pre-Day-0 activity line is not past-window",
+  "asserts green: no Day-0 / before Day-0 skip fee; Day-0 instant and last-in-window owe; past 30d skip; meter counts live month sends over 2000 including deletes; UTC bounds keep east-of-UTC October sends; owed-this-month uses the same UTC bounds; pre-Day-0 activity line is not past-window",
 );

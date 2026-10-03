@@ -2,10 +2,12 @@ import {
   internalMutation,
   internalQuery,
   query,
-  type MutationCtx,
+  type QueryCtx,
 } from "../_generated/server";
 import { v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
+import type { PlatformBillingUserSource } from "../lib/lemonWebhookAuth";
+import { applyPlatformSubscriptionAllowed } from "../lib/lemonWebhookAuth";
 import {
   getAuthenticatedUser,
   resolvePlan,
@@ -15,6 +17,7 @@ import { writeAuditLog } from "../lib/admin";
 import {
   canPromoteWithoutCatalogIds,
   checkoutNonceMatches,
+  checkoutNonceSourceMayPromote,
   getPlatformBillingConfig,
   matchesProCatalog,
   planFromLsStatus,
@@ -113,37 +116,49 @@ export const getMyBilling = query({
   },
 });
 
-async function findPlatformBillingUser(
-  ctx: { db: MutationCtx["db"] },
+async function findPlatformBillingUserBySource(
+  ctx: { db: QueryCtx["db"] },
   args: {
     lsSubscriptionId: string;
-    convexUserId?: string;
-    clerkUserId?: string;
+    checkoutNonce?: string;
   },
-): Promise<Doc<"users"> | null> {
-  if (args.convexUserId) {
-    const normalized = ctx.db.normalizeId("users", args.convexUserId);
-    if (normalized) {
-      const byConvexId = await ctx.db.get(normalized);
-      if (byConvexId) return byConvexId;
-    }
-  }
-
-  if (args.clerkUserId) {
-    const byClerk = await ctx.db
-      .query("users")
-      .withIndex("by_userId", (q) => q.eq("userId", args.clerkUserId!))
-      .unique();
-    if (byClerk) return byClerk;
-  }
-
-  return await ctx.db
+): Promise<{ user: Doc<"users"> | null; source: PlatformBillingUserSource }> {
+  const bySub = await ctx.db
     .query("users")
     .withIndex("by_lsSubscriptionId", (q) =>
       q.eq("lsSubscriptionId", args.lsSubscriptionId),
     )
     .unique();
+  if (bySub) return { user: bySub, source: "lsSubscriptionId" };
+
+  const nonce = args.checkoutNonce?.trim();
+  if (nonce) {
+    const byNonce = await ctx.db
+      .query("users")
+      .withIndex("by_lsCheckoutNonce", (q) => q.eq("lsCheckoutNonce", nonce))
+      .unique();
+    if (byNonce) return { user: byNonce, source: "checkoutNonce" };
+  }
+
+  return { user: null, source: "none" };
 }
+
+export const resolvePlatformBillingUserSource = internalQuery({
+  args: {
+    lsSubscriptionId: v.string(),
+    checkoutNonce: v.optional(v.string()),
+  },
+  returns: v.union(
+    v.literal("lsSubscriptionId"),
+    v.literal("checkoutNonce"),
+    v.literal("bodyUserId"),
+    v.literal("none"),
+  ),
+  handler: async (ctx, args) => {
+    const found = await findPlatformBillingUserBySource(ctx, args);
+    return found.source;
+  },
+});
 
 /**
  * Store a one-time nonce on the signed-in viewer before createProCheckout.
@@ -179,10 +194,9 @@ export const applyPlatformSubscription = internalMutation({
     status: v.string(),
     variantId: v.optional(v.string()),
     productId: v.optional(v.string()),
-    convexUserId: v.optional(v.string()),
-    clerkUserId: v.optional(v.string()),
     checkoutNonce: v.optional(v.string()),
     testMode: v.boolean(),
+    verifiedFromLemonApi: v.boolean(),
   },
   returns: v.object({
     applied: v.boolean(),
@@ -195,8 +209,21 @@ export const applyPlatformSubscription = internalMutation({
       return { applied: false, reason: "platform_billing_not_configured" };
     }
 
-    const previewUser = await findPlatformBillingUser(ctx, args);
+    if (!args.verifiedFromLemonApi) {
+      return { applied: false, reason: "subscription_not_verified" };
+    }
+
+    const previewFound = await findPlatformBillingUserBySource(ctx, args);
+    const previewUser = previewFound.user;
     const nextPlanPreview = planFromLsStatus(args.status);
+    const allowed = applyPlatformSubscriptionAllowed({
+      verifiedFromLemonApi: true,
+      userResolvedBy: previewFound.source,
+      nextPlan: nextPlanPreview,
+    });
+    if (!allowed.allow) {
+      return { applied: false, reason: allowed.reason };
+    }
     if (previewUser) {
       const eventAction = lsPlatformEventAction({
         provider: billingProviderForUser(previewUser),
@@ -208,7 +235,7 @@ export const applyPlatformSubscription = internalMutation({
     }
 
     if (shouldIgnoreLsTestEvent(args.testMode)) {
-      const user = await findPlatformBillingUser(ctx, args);
+      const user = previewUser;
       if (user) {
         await writeAuditLog(ctx, {
           actorUserId: null,
@@ -238,7 +265,7 @@ export const applyPlatformSubscription = internalMutation({
       expectedProductId: config.productId,
     });
 
-    const user = await findPlatformBillingUser(ctx, args);
+    const user = previewUser;
     if (!user) {
       return { applied: false, reason: "user_not_found" };
     }
@@ -255,6 +282,15 @@ export const applyPlatformSubscription = internalMutation({
     // are omitted (payment_success invoices), require a known subscription or
     // the pending-checkout nonce — not bare custom_data user ids.
     if (nextPlan === "pro") {
+      const nonceGate = checkoutNonceSourceMayPromote({
+        userResolvedBy: previewFound.source,
+        nextPlan,
+        checkoutNonceOk,
+        catalogOk,
+      });
+      if (!nonceGate.allow) {
+        return { applied: false, reason: nonceGate.reason };
+      }
       if (args.variantId && args.variantId !== config.variantId) {
         return { applied: false, reason: "variant_mismatch" };
       }
