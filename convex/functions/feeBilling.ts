@@ -947,6 +947,10 @@ export const getInvoiceProvider = internalQuery({
     v.object({
       billingProvider: v.union(v.literal("lemon"), v.literal("dodo"), v.null()),
       userId: v.id("users"),
+      claimKey: v.string(),
+      totalCents: v.number(),
+      lsOrderId: v.union(v.string(), v.null()),
+      lsCheckoutId: v.union(v.string(), v.null()),
     }),
     v.null(),
   ),
@@ -956,6 +960,10 @@ export const getInvoiceProvider = internalQuery({
     return {
       billingProvider: row.billingProvider ?? null,
       userId: row.userId,
+      claimKey: row.claimKey,
+      totalCents: row.totalCents,
+      lsOrderId: row.lsOrderId ?? null,
+      lsCheckoutId: row.lsCheckoutId ?? null,
     };
   },
 });
@@ -1144,6 +1152,26 @@ export const findBillingInvoiceForPaidOrder = internalQuery({
   },
   returns: v.union(v.id("billingInvoices"), v.null()),
   handler: async (ctx, args) => {
+    // Lemon paid path: order id / checkout id first so a webhook body
+    // claim key cannot steal a real order for a different invoice.
+    if (args.lsOrderId) {
+      const byOrder = await ctx.db
+        .query("billingInvoices")
+        .withIndex("by_lsOrderId", (q) => q.eq("lsOrderId", args.lsOrderId))
+        .first();
+      if (byOrder) return byOrder._id;
+    }
+
+    if (args.lsCheckoutId) {
+      const byCheckout = await ctx.db
+        .query("billingInvoices")
+        .withIndex("by_lsCheckoutId", (q) =>
+          q.eq("lsCheckoutId", args.lsCheckoutId),
+        )
+        .first();
+      if (byCheckout) return byCheckout._id;
+    }
+
     if (args.claimKey) {
       const byClaim = await winnerForClaimKey(ctx, args.claimKey);
       if (byClaim) return byClaim._id;
@@ -1158,24 +1186,6 @@ export const findBillingInvoiceForPaidOrder = internalQuery({
       } catch {
         // Malformed Convex id from webhook custom data — fall through.
       }
-    }
-
-    if (args.lsCheckoutId) {
-      const byCheckout = await ctx.db
-        .query("billingInvoices")
-        .withIndex("by_lsCheckoutId", (q) =>
-          q.eq("lsCheckoutId", args.lsCheckoutId),
-        )
-        .first();
-      if (byCheckout) return byCheckout._id;
-    }
-
-    if (args.lsOrderId) {
-      const byOrder = await ctx.db
-        .query("billingInvoices")
-        .withIndex("by_lsOrderId", (q) => q.eq("lsOrderId", args.lsOrderId))
-        .first();
-      if (byOrder) return byOrder._id;
     }
 
     if (args.dodoCheckoutId) {
@@ -1245,6 +1255,32 @@ export const markBillingInvoicePaid = internalMutation({
         reason: null,
         feeCount: invoice.feeIds.length,
       };
+    }
+
+    if (args.lsOrderId) {
+      const other = await ctx.db
+        .query("billingInvoices")
+        .withIndex("by_lsOrderId", (q) => q.eq("lsOrderId", args.lsOrderId))
+        .first();
+      if (other && other._id !== invoice._id) {
+        await writeAuditLog(ctx, {
+          actorUserId: null,
+          targetUserId: invoice.userId,
+          action: "fee_invoice:order_already_used",
+          metadata: {
+            invoiceId: invoice._id,
+            lsOrderId: args.lsOrderId,
+            otherInvoiceId: other._id,
+            claimKey: invoice.claimKey,
+          },
+        });
+        return {
+          marked: false,
+          alreadyPaid: false,
+          reason: "order_already_used",
+          feeCount: invoice.feeIds.length,
+        };
+      }
     }
 
     if (args.testMode) {

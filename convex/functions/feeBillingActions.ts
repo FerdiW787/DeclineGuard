@@ -439,7 +439,7 @@ async function invoiceMerchant(
           attributes: {
             custom_price: claim.totalCents,
             product_options: {
-              name: `DeclineGuard recovery fees — ${periodKey}`,
+              name: `DeclineGuard recovery fees — ${periodKey} ${feeInvoiceClaimKey(userId, periodKey)}`,
               description: `${claim.feeCount} recovered payment${claim.feeCount === 1 ? "" : "s"}`,
             },
             checkout_data: {

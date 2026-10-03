@@ -2,13 +2,18 @@
  * Pure-function checks for LS test-mode plan gating and catalog-omit promote.
  * Run: npx tsx scripts/assert-ls-test-billing.ts
  */
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   canPromoteWithoutCatalogIds,
   checkoutNonceMatches,
+  checkoutNonceSourceMayPromote,
   extractCustomUserRefs,
   isLsTestBillingAllowed,
   shouldIgnoreLsTestEvent,
 } from "../convex/lib/billingPlan";
+import { applyPlatformSubscriptionAllowed } from "../convex/lib/lemonWebhookAuth";
 
 function assert(condition: boolean, message: string): void {
   if (!condition) {
@@ -91,5 +96,65 @@ const refs = extractCustomUserRefs({
 });
 assert(refs.checkoutNonce === "abc", "extractCustomUserRefs must read checkout_nonce");
 assert(refs.convexUserId === "user123", "extractCustomUserRefs must read convex_user_id");
+
+assert(
+  applyPlatformSubscriptionAllowed({
+    verifiedFromLemonApi: false,
+    userResolvedBy: "bodyUserId",
+    nextPlan: "pro",
+  }).reason === "subscription_not_verified",
+  "body user id + catalog variant without subscription GET must not promote",
+);
+
+const expiredNonceOk = checkoutNonceMatches({
+  provided: "nonce-1",
+  stored: "nonce-1",
+  expiresAt: now,
+  nowMs: now,
+});
+const freshNonceOk = checkoutNonceMatches({
+  provided: "nonce-1",
+  stored: "nonce-1",
+  expiresAt: now + 1,
+  nowMs: now,
+});
+assert(
+  checkoutNonceSourceMayPromote({
+    userResolvedBy: "checkoutNonce",
+    nextPlan: "pro",
+    checkoutNonceOk: expiredNonceOk,
+    catalogOk: true,
+  }).allow === false,
+  "expired checkout nonce must not promote even when the catalog matches",
+);
+assert(
+  checkoutNonceSourceMayPromote({
+    userResolvedBy: "checkoutNonce",
+    nextPlan: "pro",
+    checkoutNonceOk: freshNonceOk,
+    catalogOk: true,
+  }).allow === true,
+  "fresh checkout nonce may still promote when the catalog matches",
+);
+assert(
+  checkoutNonceSourceMayPromote({
+    userResolvedBy: "lsSubscriptionId",
+    nextPlan: "pro",
+    checkoutNonceOk: false,
+    catalogOk: true,
+  }).allow === true,
+  "stored subscription id may promote without a checkout nonce",
+);
+
+const billingSrc = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), "..", "convex/functions/billing.ts"),
+  "utf8",
+);
+assert(
+  billingSrc.includes("checkoutNonceSourceMayPromote") &&
+    billingSrc.includes("checkoutNonceOk") &&
+    billingSrc.includes("catalogOk"),
+  "applyPlatformSubscription must run the nonce TTL even when the catalog matches",
+);
 
 console.log("assert-ls-test-billing: ok");

@@ -103,6 +103,7 @@ export default defineSchema({
   })
     .index("by_userId", ["userId"])
     .index("by_lsSubscriptionId", ["lsSubscriptionId"])
+    .index("by_lsCheckoutNonce", ["lsCheckoutNonce"])
     .index("by_dodoSubscriptionId", ["dodoSubscriptionId"])
     .index("by_dodoCustomerId", ["dodoCustomerId"]),
 
@@ -127,6 +128,12 @@ export default defineSchema({
     ),
     apiKeyCipher: v.string(),
     apiKeyLast4: v.string(),
+    /**
+     * Per-connection Lemon webhook signing secret (encrypted).
+     * Never the platform LEMONSQUEEZY_WEBHOOK_SECRET — Lemon does not
+     * return webhook secrets, so we generate and store our own.
+     */
+    webhookSecretCipher: v.optional(v.string()),
     testMode: v.boolean(),
     connectedAt: v.number(),
     /** Soft-delete archive (90-day restore window) */

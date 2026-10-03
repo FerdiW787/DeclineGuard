@@ -342,8 +342,29 @@ export function parseBillingCustomData(
   return { claimKey, billingInvoiceId };
 }
 
+export type ParsedFeeInvoiceClaimKey = {
+  userId: string;
+  periodKey: string;
+};
+
+/**
+ * Real key is `fee-invoice`, then the user id, then the UTC period
+ * (`YYYY-MM`). A bare prefix is not a claim key.
+ */
+export function parseFeeInvoiceClaimKey(
+  claimKey: string,
+): ParsedFeeInvoiceClaimKey | null {
+  const trimmed = claimKey.trim();
+  const match = /^fee-invoice:([^:]+):(\d{4}-\d{2})$/.exec(trimmed);
+  if (!match) return null;
+  const userId = match[1];
+  const periodKey = match[2];
+  if (!userId || !periodKey) return null;
+  return { userId, periodKey };
+}
+
 export function isFeeInvoiceClaimKey(claimKey: string): boolean {
-  return claimKey.startsWith("fee-invoice:");
+  return parseFeeInvoiceClaimKey(claimKey) !== null;
 }
 
 /** LS checkout lifetime used by the monthly job (45 days). */
