@@ -28,7 +28,8 @@ export function dodoUsagePeriodKey(atMs: number): string {
 /**
  * Only the scheduled close of a finished usage month stamps the previous
  * period. A mid-month force-run stamps the current usage month so a charge
- * in this month cannot mark it paid and the next cycle can still find it.
+ * in this month cannot mark it paid. The scheduled close must reclaim that
+ * same key and recompute the finished month — not skip the partial row.
  */
 export function dodoIngestPeriodKey(args: {
   nowMs: number;
@@ -38,6 +39,39 @@ export function dodoIngestPeriodKey(args: {
     return dodoUsagePeriodKey(args.nowMs);
   }
   return utcPeriodKey(args.nowMs);
+}
+
+/**
+ * Scheduled month-close may reopen an unpaid Dodo usage claim so the
+ * finished month includes fees accrued after a mid-month force-run.
+ * Paid rows and Lemon checkouts stay blocked.
+ */
+export function unpaidDodoUsageClaimMayReclaim(args: {
+  scheduledMonthClose: boolean;
+  status: BillingInvoiceStatus;
+  billingProvider?: "lemon" | "dodo" | null;
+  dodoUsageSubmittedAt?: number | null;
+  paidAt?: number | null;
+  lsCheckoutId?: string | null;
+}): boolean {
+  if (!args.scheduledMonthClose) return false;
+  if (args.status === "paid" || args.paidAt != null) return false;
+  if (args.lsCheckoutId) return false;
+  if (args.billingProvider === "lemon") return false;
+  if (args.status !== "created" && args.status !== "claiming") return false;
+  return (
+    args.billingProvider === "dodo" || args.dodoUsageSubmittedAt != null
+  );
+}
+
+export function dodoUsageReclaimDeltaCents(
+  priorIngestedCents: number,
+  nextTotalCents: number,
+): number {
+  if (!Number.isFinite(priorIngestedCents) || !Number.isFinite(nextTotalCents)) {
+    return 0;
+  }
+  return Math.max(0, Math.round(nextTotalCents) - Math.round(priorIngestedCents));
 }
 
 /** Idempotency key: one LS charge per merchant per UTC month. */

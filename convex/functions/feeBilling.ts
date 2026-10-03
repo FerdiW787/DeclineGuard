@@ -19,6 +19,7 @@ import {
   existingClaimBlocksNewCharge,
   feeInvoiceClaimKey,
   orderCoversClaimedCents,
+  unpaidDodoUsageClaimMayReclaim,
 } from "../lib/feeBilling";
 import { allowHttpsUrl } from "../lib/safeUrl";
 import { resolveProductUserOrNull } from "../lib/accountGuard";
@@ -79,6 +80,18 @@ function isBillableFee(fee: Doc<"recoveryFees">): boolean {
     !fee.testMode &&
     fee.billingInvoiceId == null &&
     fee.feeCents > 0
+  );
+}
+
+function isBillableFeeOnInvoice(
+  fee: Doc<"recoveryFees">,
+  invoiceId: Id<"billingInvoices">,
+): boolean {
+  return (
+    fee.status === "owed" &&
+    !fee.testMode &&
+    fee.feeCents > 0 &&
+    (fee.billingInvoiceId == null || fee.billingInvoiceId === invoiceId)
   );
 }
 
@@ -189,12 +202,15 @@ export const claimBillingPeriod = internalMutation({
     periodKey: v.string(),
     storeCurrency: v.string(),
     nowMs: v.number(),
+    reclaimUnpaidDodoUsage: v.optional(v.boolean()),
   },
   returns: v.object({
     claimed: v.boolean(),
     skippedZero: v.boolean(),
     currencyMismatch: v.boolean(),
     currencyMixed: v.boolean(),
+    reclaimed: v.boolean(),
+    priorIngestedCents: v.number(),
     reason: v.union(v.string(), v.null()),
     invoiceId: v.union(v.id("billingInvoices"), v.null()),
     totalCents: v.number(),
@@ -207,6 +223,8 @@ export const claimBillingPeriod = internalMutation({
       skippedZero: false,
       currencyMismatch: false,
       currencyMixed: false,
+      reclaimed: false,
+      priorIngestedCents: 0,
       reason: null as string | null,
       invoiceId: null as Id<"billingInvoices"> | null,
       totalCents: 0,
@@ -216,6 +234,22 @@ export const claimBillingPeriod = internalMutation({
 
     const claimKey = feeInvoiceClaimKey(args.userId, args.periodKey);
     const existingWinner = await winnerForClaimKey(ctx, claimKey);
+    const mayReclaim =
+      existingWinner != null &&
+      unpaidDodoUsageClaimMayReclaim({
+        scheduledMonthClose: args.reclaimUnpaidDodoUsage === true,
+        status: existingWinner.status,
+        billingProvider: existingWinner.billingProvider,
+        dodoUsageSubmittedAt: existingWinner.dodoUsageSubmittedAt,
+        paidAt: existingWinner.paidAt,
+        lsCheckoutId: existingWinner.lsCheckoutId,
+      });
+    const priorIngestedCents = mayReclaim && existingWinner
+      ? (existingWinner.dodoUsageIngestedCents ??
+        (existingWinner.dodoUsageSubmittedAt != null
+          ? existingWinner.totalCents
+          : 0))
+      : 0;
 
     if (
       existingWinner &&
@@ -224,7 +258,8 @@ export const claimBillingPeriod = internalMutation({
         existingWinner.feeIds.length,
         existingWinner.lsCheckoutId != null ||
           existingWinner.dodoCheckoutId != null,
-      )
+      ) &&
+      !mayReclaim
     ) {
       return {
         ...none,
@@ -236,7 +271,17 @@ export const claimBillingPeriod = internalMutation({
       };
     }
 
-    const billable = await loadBillableFeesForUser(ctx, args.userId);
+    const billable =
+      mayReclaim && existingWinner
+        ? (await ctx.db
+            .query("recoveryFees")
+            .withIndex("by_user_status", (q) =>
+              q.eq("userId", args.userId).eq("status", "owed"),
+            )
+            .take(FEE_INVOICE_SCAN_LIMIT)).filter((fee) =>
+            isBillableFeeOnInvoice(fee, existingWinner._id),
+          )
+        : await loadBillableFeesForUser(ctx, args.userId);
     if (billable.length === 0) {
       if (existingWinner?.status === "failed" || existingWinner?.status === "claiming") {
         return { ...none, skippedZero: true, invoiceId: existingWinner._id, reason: "zero_owed" };
@@ -294,7 +339,16 @@ export const claimBillingPeriod = internalMutation({
     }
 
     let invoiceId: Id<"billingInvoices">;
-    if (existingWinner && existingWinner.status === "failed") {
+    if (mayReclaim && existingWinner) {
+      invoiceId = existingWinner._id;
+      await ctx.db.patch(invoiceId, {
+        currency,
+        feeIds: [],
+        totalCents,
+        lastError: undefined,
+        createdAt: args.nowMs,
+      });
+    } else if (existingWinner && existingWinner.status === "failed") {
       invoiceId = existingWinner._id;
       await ctx.db.patch(invoiceId, {
         currency,
@@ -309,6 +363,7 @@ export const claimBillingPeriod = internalMutation({
         dodoPaymentId: undefined,
         dodoUsageEventId: undefined,
         dodoUsageSubmittedAt: undefined,
+        dodoUsageIngestedCents: undefined,
         lastError: undefined,
         createdAt: args.nowMs,
         createdLsAt: undefined,
@@ -358,7 +413,11 @@ export const claimBillingPeriod = internalMutation({
     const feeIds: Id<"recoveryFees">[] = [];
     for (const fee of fees) {
       const fresh = await ctx.db.get(fee._id);
-      if (!fresh || !isBillableFee(fresh)) continue;
+      if (!fresh) continue;
+      const stillBillable = mayReclaim
+        ? isBillableFeeOnInvoice(fresh, invoiceId)
+        : isBillableFee(fresh);
+      if (!stillBillable) continue;
       await ctx.db.patch(fee._id, { billingInvoiceId: invoiceId });
       feeIds.push(fee._id);
     }
@@ -386,7 +445,9 @@ export const claimBillingPeriod = internalMutation({
     await ctx.db.patch(invoiceId, {
       feeIds,
       totalCents: linkedTotal,
-      status: "claiming",
+      status: mayReclaim && existingWinner?.status === "created"
+        ? "created"
+        : "claiming",
     });
 
     return {
@@ -394,6 +455,8 @@ export const claimBillingPeriod = internalMutation({
       skippedZero: false,
       currencyMismatch: false,
       currencyMixed: false,
+      reclaimed: mayReclaim,
+      priorIngestedCents,
       reason: null,
       invoiceId,
       totalCents: linkedTotal,
@@ -525,6 +588,7 @@ export const attachDodoUsageSubmitted = internalMutation({
       billingProvider: "dodo",
       dodoUsageEventId: args.dodoUsageEventId,
       dodoUsageSubmittedAt: args.nowMs,
+      dodoUsageIngestedCents: invoice.totalCents,
       lastError: undefined,
     });
 

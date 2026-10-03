@@ -218,8 +218,13 @@ export function shouldOpenDodoFeeCheckout(args: {
 export function dodoUsageEventId(args: {
   invoiceId: string;
   claimKey: string;
+  amountCents?: number;
 }): string {
-  return `fee-usage:${args.claimKey}:${args.invoiceId}`;
+  const base = `fee-usage:${args.claimKey}:${args.invoiceId}`;
+  if (args.amountCents != null && Number.isFinite(args.amountCents)) {
+    return `${base}:${Math.round(args.amountCents)}`;
+  }
+  return base;
 }
 
 /** Payment created_at only. Never Date.now() and never subscription signup. */
@@ -300,14 +305,28 @@ export function paymentCartHasAddon(data: Record<string, unknown>): boolean {
   return false;
 }
 
+export function dodoCartProductIds(data: Record<string, unknown>): string[] {
+  const ids: string[] = [];
+  const cart = data.product_cart;
+  if (!Array.isArray(cart)) return ids;
+  for (const item of cart) {
+    if (!item || typeof item !== "object") continue;
+    const id = stringifyDodoId((item as Record<string, unknown>).product_id);
+    if (id && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
 /**
  * Classify from fields Dodo actually sends.
  * Payment.succeeded has product_cart / subscription_id / created_at.
+ * Renewals commonly include product_cart for the subscription product.
  * on_demand lives on the subscription object, not the payment.
  */
 export function dodoUsageChargeKind(args: {
   payment: Record<string, unknown>;
   subscriptionOnDemand?: boolean;
+  expectedProProductId?: string | null;
 }): DodoUsageChargeKind {
   if (args.subscriptionOnDemand === true) return "on_demand";
   if (paymentCartHasAddon(args.payment)) return "addon";
@@ -315,7 +334,16 @@ export function dodoUsageChargeKind(args: {
   const hasCart = Array.isArray(cart) && cart.length > 0;
   const hasSub = stringifyDodoId(args.payment.subscription_id) != null;
   if (hasCart && !hasSub) return "one_time";
-  if (hasCart && hasSub) return "proration";
+  if (hasCart && hasSub) {
+    const expectedPro = args.expectedProProductId?.trim() ?? "";
+    const cartProducts = dodoCartProductIds(args.payment);
+    if (
+      expectedPro &&
+      cartProducts.some((id) => id.trim() && id.trim() !== expectedPro)
+    ) {
+      return "proration";
+    }
+  }
   return "recurring";
 }
 
@@ -452,6 +480,7 @@ export function dodoUsageSettleFromPayment(args: {
     chargeKind: dodoUsageChargeKind({
       payment: args.payment,
       subscriptionOnDemand: args.merchantOnDemand === true,
+      expectedProProductId: args.expectedProProductId,
     }),
     isUpdatePaymentMethod: isDodoUpdatePaymentMethod(args.payment),
     amountCents: dodoPaymentAmountCents(args.payment),

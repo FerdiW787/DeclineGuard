@@ -373,6 +373,8 @@ export default defineSchema({
     /** Idempotent Dodo usage event id. Ingest ≠ paid. */
     dodoUsageEventId: v.optional(v.string()),
     dodoUsageSubmittedAt: v.optional(v.number()),
+    /** Cents last accepted by Dodo ingest. Scheduled close deltas from this. */
+    dodoUsageIngestedCents: v.optional(v.number()),
     lastError: v.optional(v.string()),
     createdAt: v.number(),
     createdLsAt: v.optional(v.number()),

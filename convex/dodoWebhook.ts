@@ -223,7 +223,10 @@ async function handlePaymentEvent(
       subscriptionId,
       productIds: dodoPaymentProductIds(data),
       expectedProProductId: proProductId,
-      chargeKind: dodoUsageChargeKind({ payment: data }),
+      chargeKind: dodoUsageChargeKind({
+        payment: data,
+        expectedProProductId: proProductId,
+      }),
       isUpdatePaymentMethod: isDodoUpdatePaymentMethod(data),
       amountCents: dodoPaymentAmountCents(data),
       paymentCreatedAtMs: parseIsoMsStrict(data.created_at),

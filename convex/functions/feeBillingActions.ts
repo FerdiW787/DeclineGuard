@@ -10,6 +10,7 @@ import {
   feeInvoiceClaimKey,
   dodoIngestPeriodKey,
   dodoUsagePeriodKey,
+  dodoUsageReclaimDeltaCents,
   utcPeriodKey,
 } from "../lib/feeBilling";
 import {
@@ -312,6 +313,7 @@ async function invoiceMerchant(
         dodoSubscriptionId: targetProvider.dodoSubscriptionId,
         hasActivePro: targetProvider.hasActivePro,
       },
+      scheduledMonthClose,
     );
   }
 
@@ -573,6 +575,7 @@ async function invoiceMerchantViaDodo(
     dodoSubscriptionId: string | null;
     hasActivePro: boolean;
   },
+  scheduledMonthClose: boolean,
 ): Promise<InvoiceMerchantResult> {
   const config = getDodoPaymentsConfig();
   if (!config) {
@@ -610,6 +613,7 @@ async function invoiceMerchantViaDodo(
       periodKey,
       storeCurrency: "USD",
       nowMs,
+      reclaimUnpaidDodoUsage: scheduledMonthClose,
     },
   );
 
@@ -654,6 +658,9 @@ async function invoiceMerchantViaDodo(
 
   const invoiceId = claim.invoiceId;
   const claimKey = feeInvoiceClaimKey(userId, periodKey);
+  const ingestCents = claim.reclaimed
+    ? dodoUsageReclaimDeltaCents(claim.priorIngestedCents, claim.totalCents)
+    : claim.totalCents;
   const feePath = dodoFeePathDecision(billing);
   if (
     feePath.path !== "usage" ||
@@ -675,8 +682,22 @@ async function invoiceMerchantViaDodo(
   }
 
   const customerId = billing.dodoCustomerId!;
-  const usd = feeCentsToUsageUsd(claim.totalCents);
+  const usd = feeCentsToUsageUsd(ingestCents);
   if (usd <= 0) {
+    if (claim.reclaimed && claim.totalCents > 0) {
+      await ctx.runMutation(internal.functions.feeBilling.recordFeeInvoiceCreated, {
+        invoiceId,
+        actorUserId,
+      });
+      return {
+        outcome: "created",
+        invoiceId,
+        totalCents: claim.totalCents,
+        feeCount: claim.feeCount,
+        error: null,
+        ...emptyCheckoutFields(),
+      };
+    }
     await ctx.runMutation(internal.functions.feeBilling.markBillingClaimFailed, {
       invoiceId,
       error: "invalid_usage_amount",
@@ -704,6 +725,10 @@ async function invoiceMerchantViaDodo(
     const eventId = dodoUsageEventId({
       invoiceId,
       claimKey,
+      amountCents:
+        claim.reclaimed && claim.priorIngestedCents > 0
+          ? claim.totalCents
+          : undefined,
     });
     await ingestDodoUsageEvents(config, [
       buildRecoveryFeeUsageEvent({
@@ -741,11 +766,13 @@ async function invoiceMerchantViaDodo(
   } catch (err) {
     const message = err instanceof Error ? err.message : "Dodo Payments error";
     console.error(`Fee invoice Dodo create failed for ${userId}:`, message);
-    await ctx.runMutation(internal.functions.feeBilling.markBillingClaimFailed, {
-      invoiceId,
-      error: message,
-      unlinkFees: true,
-    });
+    if (!claim.reclaimed) {
+      await ctx.runMutation(internal.functions.feeBilling.markBillingClaimFailed, {
+        invoiceId,
+        error: message,
+        unlinkFees: true,
+      });
+    }
     return {
       outcome: "failed",
       invoiceId,
