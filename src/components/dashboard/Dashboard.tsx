@@ -202,9 +202,10 @@ function Dashboard() {
     api.functions.recoveries.getFeesSummary,
     connection ? { monthStartMs } : "skip",
   );
+  const emailQuotaNowMs = useMemo(() => Date.now(), []);
   const emailQuota = useQuery(
     api.functions.recoveries.getEmailQuotaStatus,
-    connection ? { monthStartMs } : "skip",
+    connection ? { nowMs: emailQuotaNowMs } : "skip",
   );
   const webhookSetup = useQuery(
     api.functions.lemonSqueezy.getWebhookSetup,

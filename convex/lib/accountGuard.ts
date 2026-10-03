@@ -293,10 +293,55 @@ export function emailOveragePacks(sent: number, plan: Plan): number {
   return Math.ceil(over / emailOveragePackSize(plan));
 }
 
-/** Fee is owed only if recovery lands within the attribution window after Day-0. */
+/**
+ * Fee is owed only when Day-0 exists and recoveredAt is on or after that
+ * send, with the gap still inside ATTRIBUTION_WINDOW_DAYS (inclusive).
+ * No Day-0, a timestamp before the send, or a gap past 30 days: no fee.
+ */
 export function isWithinAttributionWindow(
-  day0SentAt: number,
+  day0SentAt: number | null | undefined,
   recoveredAt: number,
 ): boolean {
-  return recoveredAt - day0SentAt <= ATTRIBUTION_WINDOW_MS;
+  if (day0SentAt == null) return false;
+  const gap = recoveredAt - day0SentAt;
+  return gap >= 0 && gap <= ATTRIBUTION_WINDOW_MS;
+}
+
+/** Activity copy for a recovery. Pre-Day-0 is not "past the window". */
+export function recoveryActivityDetail(
+  amountLabel: string,
+  day0SentAt: number | null | undefined,
+  recoveredAt: number,
+): string {
+  if (day0SentAt == null || recoveredAt < day0SentAt) {
+    return `${amountLabel} · Lemon Squeezy recovered before our sequence`;
+  }
+  if (isWithinAttributionWindow(day0SentAt, recoveredAt)) {
+    return `${amountLabel} · Recovered after our sequence started`;
+  }
+  return `${amountLabel} · Recovered after the ${ATTRIBUTION_WINDOW_DAYS}-day attribution window`;
+}
+
+export type EmailSentMeterRow = {
+  occurredAt: number;
+  deletedAt?: number | null;
+};
+
+/**
+ * Live recovery-email sends in [monthStartMs, monthEndExclusiveMs).
+ * Deleted rows do not shrink the count; rows outside the month do not count.
+ */
+export function countLiveEmailSendsInMonth(
+  rows: ReadonlyArray<EmailSentMeterRow>,
+  monthStartMs: number,
+  monthEndExclusiveMs: number,
+): number {
+  let sent = 0;
+  for (const row of rows) {
+    if (row.deletedAt != null) continue;
+    if (row.occurredAt < monthStartMs) continue;
+    if (row.occurredAt >= monthEndExclusiveMs) continue;
+    sent += 1;
+  }
+  return sent;
 }
