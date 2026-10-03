@@ -3,7 +3,7 @@ import { defineConfig } from "astro/config";
 import react from "@astrojs/react";
 import clerk from "@clerk/astro";
 import tailwindcss from "@tailwindcss/vite";
-import node from "@astrojs/node";
+import vercel from "@astrojs/vercel";
 
 export default defineConfig({
   integrations: [react(), clerk()],
@@ -24,8 +24,6 @@ export default defineConfig({
     port: 4321,
     host: true,
   },
-  adapter: node({
-    mode: "standalone",
-  }),
+  adapter: vercel(),
   output: "server",
 });
