@@ -13,6 +13,8 @@ import {
   writeAuditLog,
   normalizeRole,
   assertCanActOnTarget,
+  assertCurrentStoreOwnerMayBeReclaimed,
+  reclaimLiveConnectionMaySoftDelete,
   canBanAccounts,
   requireActionReason,
   isReversibleAuditAction,
@@ -718,11 +720,44 @@ export const reclaimStore = mutation({
     for (const binding of liveBindings) {
       if (binding.userId === args.toUserId) continue;
       const otherConn = await ctx.db.get(binding.connectionId);
-      if (otherConn && !isSoftDeleted(otherConn)) {
-        await softDeleteConnectionAsAdmin(ctx, otherConn);
-      } else {
+      if (!otherConn || isSoftDeleted(otherConn)) {
         await ctx.db.delete(binding._id);
+        continue;
       }
+
+      const currentOwner = await ctx.db.get(binding.userId);
+      const connOwner =
+        otherConn.userId === binding.userId
+          ? currentOwner
+          : await ctx.db.get(otherConn.userId);
+      const liveDecision = reclaimLiveConnectionMaySoftDelete({
+        bindingOwner: currentOwner,
+        connectionOwner: connOwner,
+      });
+      if (!liveDecision.allow) {
+        switch (liveDecision.reason) {
+          case "missing_owner":
+            throw new Error("Current store owner not found");
+          case "privileged_owner":
+            throw new Error(
+              "Cannot reclaim a store from a Staff or Admin account.",
+            );
+          default: {
+            const _never: never = liveDecision.reason;
+            throw new Error(_never);
+          }
+        }
+      }
+      if (currentOwner) {
+        assertCanActOnTarget(actor, currentOwner);
+        assertCurrentStoreOwnerMayBeReclaimed(currentOwner);
+      }
+      if (connOwner) {
+        assertCanActOnTarget(actor, connOwner);
+        assertCurrentStoreOwnerMayBeReclaimed(connOwner);
+      }
+
+      await softDeleteConnectionAsAdmin(ctx, otherConn);
     }
 
     let connection = await ctx.db
