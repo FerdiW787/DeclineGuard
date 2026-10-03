@@ -28,7 +28,9 @@ import {
   dodoIngestPeriodKey,
   dodoUsagePeriodKey,
   dodoUsageReclaimDeltaCents,
+  dodoUsageReclaimFailureSnapshot,
   existingClaimBlocksNewCharge,
+  shouldUnlinkFeesAfterDodoUsageFailure,
   previousUtcPeriodKey,
   unpaidDodoUsageClaimMayReclaim,
   utcPeriodKey,
@@ -69,6 +71,7 @@ import {
   extractDodoUserRefs,
   feeCentsToUsageUsd,
   invoiceMatchesUsageCharge,
+  upsertDodoUsageCredit,
   usageCreditAppliesToInvoice,
   isDodoTestBillingAllowed,
   isDodoUpdatePaymentMethod,
@@ -889,8 +892,53 @@ assert(
       paidAt: februaryRenewalAt,
       lsCheckoutId: null,
     }) &&
-    dodoUsageReclaimDeltaCents(400, 900) === 500,
+    dodoUsageReclaimDeltaCents(400, 900) === 500 &&
+    shouldUnlinkFeesAfterDodoUsageFailure({
+      reclaimed: true,
+      priorIngestedCents: 10000,
+    }) === false &&
+    shouldUnlinkFeesAfterDodoUsageFailure({
+      reclaimed: false,
+      priorIngestedCents: 0,
+    }) === true,
   "only scheduled month-close stamps the previous month and may recompute a partial force-run",
+);
+const failedDelta = dodoUsageReclaimFailureSnapshot({
+  priorIngestedCents: 10000,
+  attemptedTotalCents: 14000,
+});
+assert(
+  failedDelta.totalCents === 10000 &&
+    failedDelta.ingestedCents === 10000 &&
+    failedDelta.monthClosed === false &&
+    failedDelta.looksMeteredAtAttempted === false &&
+    !invoiceMatchesUsageCharge({
+      status: "created",
+      periodKey: "2026-01",
+      coveredPeriodKey: "2026-01",
+      dodoUsageSubmittedAt: midJanForceRunAt,
+      monthClosed: false,
+    }) &&
+    unpaidDodoUsageClaimMayReclaim({
+      scheduledMonthClose: true,
+      status: "created",
+      billingProvider: "dodo",
+      dodoUsageSubmittedAt: midJanForceRunAt,
+      paidAt: null,
+      lsCheckoutId: null,
+    }),
+  "failed delta POST leaves the prior metered amount; charge cannot close a partial force-run",
+);
+assert(
+  upsertDodoUsageCredit(
+    [{ periodKey: "2026-01", paidAt: day1FebChargeAt, paymentId: "pay_feb1" }],
+    { periodKey: "2026-02", paidAt: februaryRenewalAt, paymentId: "pay_mar" },
+  ).some((credit) => credit.periodKey === "2026-01") &&
+    upsertDodoUsageCredit(
+      [{ periodKey: "2026-01", paidAt: day1FebChargeAt }],
+      { periodKey: "2026-01", paidAt: februaryRenewalAt },
+    ).filter((credit) => credit.periodKey === "2026-01").length === 1,
+  "a later webhook must not drop a pending credit for another period",
 );
 assert(
   parseIsoMsStrict(null) === null &&
@@ -960,6 +1008,7 @@ assert(
     periodKey: "2026-01",
     coveredPeriodKey: proRenewal.settle ? proRenewal.coveredPeriodKey : "",
     dodoUsageSubmittedAt: janUsageSubmittedAt,
+    monthClosed: true,
   }),
   "January usage ingested after signup is on the February Pro charge",
 );
@@ -987,6 +1036,7 @@ assert(
     periodKey: "2026-01",
     coveredPeriodKey: day1Charge.settle ? day1Charge.coveredPeriodKey : "",
     dodoUsageSubmittedAt: day1FebIngestAt,
+    monthClosed: true,
   }),
   "January usage submitted after the 00:30 charge is still the row that charge collected",
 );
@@ -994,6 +1044,7 @@ assert(
   usageCreditAppliesToInvoice({
     invoicePeriodKey: "2026-01",
     invoiceStatus: "created",
+    monthClosed: true,
     creditPeriodKey: "2026-01",
     creditPaidAt: day1FebChargeAt,
   }),
@@ -1001,8 +1052,19 @@ assert(
 );
 assert(
   !usageCreditAppliesToInvoice({
+    invoicePeriodKey: "2026-01",
+    invoiceStatus: "created",
+    monthClosed: false,
+    creditPeriodKey: "2026-01",
+    creditPaidAt: day1FebChargeAt,
+  }),
+  "credit must not mark a partial force-run paid before the scheduled close meters",
+);
+assert(
+  !usageCreditAppliesToInvoice({
     invoicePeriodKey: "2026-02",
     invoiceStatus: "created",
+    monthClosed: true,
     creditPeriodKey: "2026-01",
     creditPaidAt: day1FebChargeAt,
   }),
@@ -1202,6 +1264,16 @@ assert(
     }),
   }) === "addon",
   "nested cart addons are addons",
+);
+assert(
+  dodoUsageChargeKind({
+    payment: proRenewalPayment({
+      product_cart: [{ product_id: "prod_pro", quantity: 1 }],
+      addons: [{ addon_id: "addon_1", quantity: 1 }],
+    }),
+    expectedProProductId: "prod_pro",
+  }) === "addon",
+  "payment addons[] is an addon even when the cart only lists the Pro product",
 );
 assert(
   dodoUsageChargeKind({
@@ -1411,15 +1483,25 @@ assert(
     settleFn.includes('.eq("periodKey", coveredPeriodKey)') &&
     feeBillingSrc.includes("unpaidDodoUsageClaimMayReclaim") &&
     feeBillingSrc.includes("dodoUsageIngestedCents") &&
+    feeBillingSrc.includes("rollbackDodoUsageReclaim") &&
+    feeBillingSrc.includes("dodoUsageMonthClosed") &&
+    settleFn.includes("upsertDodoUsageCredit") &&
     !settleFn.includes(".take(24)") &&
     !settleFn.includes(".first()"),
   "settle matches the covered period instead of scanning oldest 24",
+);
+const viaDodoSrc = feeActionsSrc.slice(
+  feeActionsSrc.indexOf("async function invoiceMerchantViaDodo"),
+  feeActionsSrc.indexOf("export const runMonthlyFeeInvoices"),
 );
 assert(
   feeActionsSrc.includes("dodoIngestPeriodKey({ nowMs, scheduledMonthClose })") &&
     feeActionsSrc.includes("invoiceMerchantViaDodo") &&
     feeActionsSrc.includes("reclaimUnpaidDodoUsage: scheduledMonthClose") &&
     feeActionsSrc.includes("scheduledMonthClose: boolean") &&
+    viaDodoSrc.indexOf("dodoFeePathDecision") <
+      viaDodoSrc.indexOf("claimBillingPeriod") &&
+    viaDodoSrc.includes("rollbackDodoUsageReclaim") &&
     !feeActionsSrc.includes("dodoUsagePeriodKey(nowMs),"),
   "scheduled Dodo ingest uses the closed month and may reclaim a force-run row",
 );

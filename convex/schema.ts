@@ -85,6 +85,15 @@ export default defineSchema({
     dodoUsageCreditPeriodKey: v.optional(v.string()),
     dodoUsageCreditPaidAt: v.optional(v.number()),
     dodoUsageCreditPaymentId: v.optional(v.string()),
+    dodoUsageCredits: v.optional(
+      v.array(
+        v.object({
+          periodKey: v.string(),
+          paidAt: v.number(),
+          paymentId: v.optional(v.string()),
+        }),
+      ),
+    ),
     dodoCheckoutNonce: v.optional(v.string()),
     dodoCheckoutNonceExpiresAt: v.optional(v.number()),
     /** Extra monthly declines from paid $0.99 +10 packs (sum of credited units). */
@@ -375,6 +384,10 @@ export default defineSchema({
     dodoUsageSubmittedAt: v.optional(v.number()),
     /** Cents last accepted by Dodo ingest. Scheduled close deltas from this. */
     dodoUsageIngestedCents: v.optional(v.number()),
+    /** Fees already accepted on the meter. Reclaim rollback restores these. */
+    dodoUsageMeteredFeeIds: v.optional(v.array(v.id("recoveryFees"))),
+    /** Set only after the scheduled close successfully meters this period. */
+    dodoUsageMonthClosed: v.optional(v.boolean()),
     lastError: v.optional(v.string()),
     createdAt: v.number(),
     createdLsAt: v.optional(v.number()),

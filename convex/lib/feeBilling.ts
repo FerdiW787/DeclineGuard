@@ -74,6 +74,33 @@ export function dodoUsageReclaimDeltaCents(
   return Math.max(0, Math.round(nextTotalCents) - Math.round(priorIngestedCents));
 }
 
+/** Already-metered reclaim rows must not unlink or re-ingest accepted cents. */
+export function shouldUnlinkFeesAfterDodoUsageFailure(args: {
+  reclaimed: boolean;
+  priorIngestedCents: number;
+}): boolean {
+  return !(args.reclaimed && args.priorIngestedCents > 0);
+}
+
+/** After a failed delta POST, keep only the previously accepted meter amount. */
+export function dodoUsageReclaimFailureSnapshot(args: {
+  priorIngestedCents: number;
+  attemptedTotalCents: number;
+}): {
+  totalCents: number;
+  ingestedCents: number;
+  monthClosed: boolean;
+  looksMeteredAtAttempted: boolean;
+} {
+  const prior = Math.max(0, Math.round(args.priorIngestedCents));
+  return {
+    totalCents: prior,
+    ingestedCents: prior,
+    monthClosed: false,
+    looksMeteredAtAttempted: false,
+  };
+}
+
 /** Idempotency key: one LS charge per merchant per UTC month. */
 export function feeInvoiceClaimKey(
   userId: Id<"users">,

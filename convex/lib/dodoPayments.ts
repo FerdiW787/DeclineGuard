@@ -294,6 +294,7 @@ export function dodoPaymentProductIds(data: Record<string, unknown>): string[] {
 }
 
 export function paymentCartHasAddon(data: Record<string, unknown>): boolean {
+  if (Array.isArray(data.addons) && data.addons.length > 0) return true;
   const cart = data.product_cart;
   if (!Array.isArray(cart)) return false;
   for (const item of cart) {
@@ -493,20 +494,80 @@ export function invoiceMatchesUsageCharge(args: {
   periodKey: string;
   coveredPeriodKey: string;
   dodoUsageSubmittedAt: number | null | undefined;
+  monthClosed?: boolean;
 }): boolean {
   if (args.status !== "created") return false;
   if (args.dodoUsageSubmittedAt == null) return false;
+  if (args.monthClosed !== true) return false;
   return args.periodKey === args.coveredPeriodKey;
 }
 
-/** Charge-first credit applies when ingest later stamps the same period. */
+export type DodoUsageCredit = {
+  periodKey: string;
+  paidAt: number;
+  paymentId?: string;
+};
+
+export function readDodoUsageCredits(user: {
+  dodoUsageCredits?: DodoUsageCredit[] | null;
+  dodoUsageCreditPeriodKey?: string | null;
+  dodoUsageCreditPaidAt?: number | null;
+  dodoUsageCreditPaymentId?: string | null;
+}): DodoUsageCredit[] {
+  if (user.dodoUsageCredits && user.dodoUsageCredits.length > 0) {
+    return user.dodoUsageCredits;
+  }
+  const periodKey = user.dodoUsageCreditPeriodKey?.trim() ?? "";
+  if (periodKey && user.dodoUsageCreditPaidAt != null) {
+    return [
+      {
+        periodKey,
+        paidAt: user.dodoUsageCreditPaidAt,
+        ...(user.dodoUsageCreditPaymentId
+          ? { paymentId: user.dodoUsageCreditPaymentId }
+          : {}),
+      },
+    ];
+  }
+  return [];
+}
+
+export function upsertDodoUsageCredit(
+  existing: DodoUsageCredit[] | undefined,
+  next: DodoUsageCredit,
+): DodoUsageCredit[] {
+  return [
+    ...readDodoUsageCredits({ dodoUsageCredits: existing }).filter(
+      (credit) => credit.periodKey !== next.periodKey,
+    ),
+    next,
+  ];
+}
+
+export function creditForPeriod(
+  credits: DodoUsageCredit[],
+  periodKey: string,
+): DodoUsageCredit | null {
+  return credits.find((credit) => credit.periodKey === periodKey) ?? null;
+}
+
+export function removeCreditForPeriod(
+  credits: DodoUsageCredit[],
+  periodKey: string,
+): DodoUsageCredit[] {
+  return credits.filter((credit) => credit.periodKey !== periodKey);
+}
+
+/** Charge-first credit applies after the scheduled close meters that period. */
 export function usageCreditAppliesToInvoice(args: {
   invoicePeriodKey: string;
   invoiceStatus: string;
+  monthClosed?: boolean;
   creditPeriodKey: string | null | undefined;
   creditPaidAt: number | null | undefined;
 }): boolean {
   if (args.invoiceStatus === "paid") return false;
+  if (args.monthClosed !== true) return false;
   if (args.creditPaidAt == null || !Number.isFinite(args.creditPaidAt)) {
     return false;
   }
