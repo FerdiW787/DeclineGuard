@@ -61,6 +61,12 @@ export function utcMonthStartMs(nowMs: number): number {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
 }
 
+/** Exclusive end of the UTC calendar month that contains `monthStartMs`. */
+export function utcNextMonthStartMs(monthStartMs: number): number {
+  const d = new Date(monthStartMs);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
+}
+
 /**
  * Prefer Dodo `product_cart` quantity over checkout metadata.
  * Metadata is attacker-controlled; cart qty is what was charged.

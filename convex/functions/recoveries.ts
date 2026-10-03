@@ -26,6 +26,7 @@ import {
   includedRecoveryEmails,
   emailOveragePacks,
   EMAIL_OVERAGE_PACK_PRICE_USD,
+  countLiveEmailSendsInMonth,
 } from "../lib/accountGuard";
 import { planValidator, recoveryActionValidator } from "../schema";
 import {
@@ -35,6 +36,7 @@ import {
 import {
   quotaHeldAfterLazyRelease,
   utcMonthStartMs,
+  utcNextMonthStartMs,
 } from "../lib/declineCapacity";
 import {
   releaseHeldAndSchedule,
@@ -994,9 +996,10 @@ export const markPaymentRecovered = internalMutation({
     });
 
     const amountLabel = formatMoney(args.amountCents, args.currency);
-    const attributed =
-      open.day0SentAt != null &&
-      isWithinAttributionWindow(open.day0SentAt, args.recoveredAt);
+    const attributed = isWithinAttributionWindow(
+      open.day0SentAt,
+      args.recoveredAt,
+    );
     const recoveryDetail =
       open.day0SentAt == null
         ? `${amountLabel} · Lemon Squeezy recovered before our sequence`
@@ -1019,8 +1022,7 @@ export const markPaymentRecovered = internalMutation({
 
     // Plan-aware recovery fee ledger:
     // - Skip test-mode recoveries
-    // - Skip if no recovery email was ever sent (day0SentAt null = LS recovered on its own)
-    // - Skip if recovered after the attribution window
+    // - Skip if no Day-0 send, recoveredAt before Day-0, or gap past 30 days
     // - Fee rate: Free = 10%, Pro = 4%
     // - Idempotent via by_failure index
     if (!open.testMode && attributed) {
@@ -1428,8 +1430,6 @@ export const getRecoverySummary = query({
   },
 });
 
-const EMAIL_QUOTA_SCAN_LIMIT = 2000;
-
 /** Monthly recovery-email quota (soft overage — never blocks a sequence). */
 export const getEmailQuotaStatus = query({
   args: { monthStartMs: v.number() },
@@ -1461,21 +1461,25 @@ export const getEmailQuotaStatus = query({
 
     const plan = resolvePlan(user);
     const included = includedRecoveryEmails(plan);
-    const rows = (
-      await ctx.db
-        .query("activityEvents")
-        .withIndex("by_user_type_occurred", (q) =>
-          q.eq("userId", user._id).eq("type", "email_sent"),
-        )
-        .order("desc")
-        .take(EMAIL_QUOTA_SCAN_LIMIT)
-    ).filter((row) => row.deletedAt == null);
-
-    let sent = 0;
-    for (const row of rows) {
-      if (row.occurredAt < args.monthStartMs) break;
-      sent += 1;
-    }
+    const monthEndMs = utcNextMonthStartMs(args.monthStartMs);
+    // Month-bounded index range. Do not take a newest-N slice then drop
+    // deletes — deleted rows would hide live sends in the same month.
+    // eslint-disable-next-line @convex-dev/no-query-collect
+    const rows = await ctx.db
+      .query("activityEvents")
+      .withIndex("by_user_type_occurred", (q) =>
+        q
+          .eq("userId", user._id)
+          .eq("type", "email_sent")
+          .gte("occurredAt", args.monthStartMs)
+          .lt("occurredAt", monthEndMs),
+      )
+      .collect();
+    const sent = countLiveEmailSendsInMonth(
+      rows,
+      args.monthStartMs,
+      monthEndMs,
+    );
 
     const remaining = Math.max(0, included - sent);
     const overageEmails = Math.max(0, sent - included);
