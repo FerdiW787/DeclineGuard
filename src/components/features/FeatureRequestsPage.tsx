@@ -30,10 +30,8 @@ import {
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import BrandLogo from "@/components/BrandLogo";
-import { useClerkClient } from "@/components/auth/useClerkClient";
-import { PrimaryCta } from "@/components/homepage/CtaButton";
 import SegmentedControl from "@/components/dashboard/SegmentedControl";
+import { HomeNav } from "@/components/homepage/HomeNav";
 import { withConvexClerkProvider } from "@/lib/withConvexClerkProvider";
 import {
   readCachedTop,
@@ -45,23 +43,6 @@ import { getOrCreateAnonVoterKey } from "./featureVoter";
 import { useDebouncedVotes } from "./useDebouncedVotes";
 
 type Tab = FeatureTab;
-
-function FeatureLogOutButton() {
-  const { clerk, isLoaded } = useClerkClient();
-
-  return (
-    <button
-      type="button"
-      disabled={!isLoaded || !clerk}
-      onClick={() => {
-        void clerk?.signOut({ redirectUrl: "/" });
-      }}
-      className="rounded-md px-3 py-1.5 text-sm font-medium text-[#8a8a8e] transition hover:text-[#08090a] disabled:opacity-40"
-    >
-      Log out
-    </button>
-  );
-}
 
 function FeatureRequestsPageInner() {
   const { isSignedIn } = useAuth();
@@ -103,7 +84,6 @@ function FeatureRequestsPageInner() {
   } | null>(null);
   const [pulseId, setPulseId] = useState<Id<"featureRequests"> | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [navSolid, setNavSolid] = useState(false);
   const [hoveredVoteId, setHoveredVoteId] = useState<
     Id<"featureRequests"> | null
   >(null);
@@ -121,13 +101,6 @@ function FeatureRequestsPageInner() {
       void ensureUser({});
     }
   }, [isSignedIn, ensureUser]);
-
-  useEffect(() => {
-    const onScroll = () => setNavSolid(window.scrollY > 12);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
 
   const voterKeyForMutations =
     currentUser != null ? `u:${currentUser._id}` : anonKey;
@@ -304,63 +277,13 @@ function FeatureRequestsPageInner() {
 
   return (
     <div className="ln-surface min-h-dvh bg-[#f7f8f8] text-[#08090a]">
-      <header className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-4 md:px-6 md:pt-5">
-        <div
-          className={`flex w-full max-w-5xl items-center justify-between gap-3 px-2.5 py-2 transition-[background-color,border-color,backdrop-filter] duration-200 sm:gap-4 sm:px-3 ${
-            navSolid
-              ? "rounded-none border-b border-black/[0.08] bg-[#f7f8f8]/90 backdrop-blur-xl"
-              : "border border-transparent bg-transparent"
-          }`}
-        >
-          <BrandLogo size="sm" className="pl-1.5 sm:pl-2" />
+      <HomeNav
+        homeAnchors={false}
+        current="requests"
+        signInHref="/a/sign-in?redirect=/features"
+      />
 
-          <nav className="hidden items-center gap-0.5 text-sm font-medium md:flex">
-            <a href="/" className="rounded-md px-3 py-1.5 text-[#8a8a8e] hover:text-[#08090a]">
-              Home
-            </a>
-            <a
-              href="/#how"
-              className="rounded-md px-3 py-1.5 text-[#8a8a8e] hover:text-[#08090a]"
-            >
-              How it works
-            </a>
-            <a
-              href="/pricing"
-              className="rounded-md px-3 py-1.5 text-[#8a8a8e] hover:text-[#08090a]"
-            >
-              Pricing
-            </a>
-            <a
-              href="/features"
-              className="rounded-md px-3 py-1.5 text-[#8a8a8e] hover:text-[#08090a]"
-            >
-              Requests
-            </a>
-          </nav>
-
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <SignedOut>
-              <a
-                href="/a/sign-in?redirect=/features"
-                className="hidden rounded-md px-3 py-1.5 text-sm font-medium text-[#8a8a8e] hover:text-[#08090a] sm:inline"
-              >
-                Sign in
-              </a>
-              <PrimaryCta href="/a/sign-up" size="sm">
-                Claim spot
-              </PrimaryCta>
-            </SignedOut>
-            <SignedIn>
-              <FeatureLogOutButton />
-              <PrimaryCta href="/a/dashboard" size="sm">
-                Dashboard
-              </PrimaryCta>
-            </SignedIn>
-          </div>
-        </div>
-      </header>
-
-      <div className="mx-auto grid min-h-dvh max-w-6xl pt-24 lg:grid-cols-2">
+      <div className="mx-auto grid min-h-dvh max-w-6xl pt-28 lg:grid-cols-2">
         {/* Left — form (top-aligned) */}
         <section
           ref={leftRef}
@@ -375,7 +298,7 @@ function FeatureRequestsPageInner() {
             </h1>
             <p
               data-fr-enter
-              className="mt-3 text-[15px] leading-relaxed text-[#8a8a8e]"
+              className="mt-3 text-[15px] leading-relaxed text-[#8a8f98]"
             >
               Suggest what DeclineGuard should build next. Everyone can vote —
               click once to support, again to take it back.
@@ -388,7 +311,7 @@ function FeatureRequestsPageInner() {
                 className="mt-8 space-y-4"
               >
                 <label className="block">
-                  <span className="text-[12px] font-medium text-[#8a8a8e]">
+                  <span className="text-[12px] font-medium text-[#8a8f98]">
                     Title
                   </span>
                   <input
@@ -401,7 +324,7 @@ function FeatureRequestsPageInner() {
                   />
                 </label>
                 <label className="block">
-                  <span className="text-[12px] font-medium text-[#8a8a8e]">
+                  <span className="text-[12px] font-medium text-[#8a8f98]">
                     Why it matters
                   </span>
                   <textarea
@@ -439,7 +362,7 @@ function FeatureRequestsPageInner() {
 
             <SignedOut>
               <div data-fr-enter className="mt-8 space-y-4">
-                <p className="rounded-xl border border-black/10 bg-white px-4 py-3 text-sm text-[#8a8a8e]">
+                <p className="rounded-xl border border-black/10 bg-white px-4 py-3 text-sm text-[#8a8f98]">
                   Sign in to suggest a feature. You can still vote on the right
                   without an account.
                 </p>
@@ -454,7 +377,7 @@ function FeatureRequestsPageInner() {
 
             <p
               data-fr-enter
-              className="mt-10 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-black/40"
+              className="mt-10 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[#8a8f98]"
             >
               <a href="/legal/privacy" className="hover:text-[#08090a]">
                 Privacy
@@ -475,7 +398,7 @@ function FeatureRequestsPageInner() {
                   ? "Request Features"
                   : "Request Features Added"}
               </h2>
-              <p className="mt-0.5 text-[13px] text-[#8a8a8e]">
+              <p className="mt-0.5 text-[13px] text-[#8a8f98]">
                 Vote to push what matters up the list.
               </p>
             </div>
@@ -632,7 +555,7 @@ function FeatureRequestsPageInner() {
                             )
                           ) : null}
                         </div>
-                        <p className="mt-1 whitespace-pre-wrap text-[13.5px] leading-relaxed text-[#8a8a8e]">
+                        <p className="mt-1 whitespace-pre-wrap text-[13.5px] leading-relaxed text-[#8a8f98]">
                           {item.body}
                         </p>
                         <div className="mt-2 flex flex-wrap items-end justify-between gap-2">
@@ -747,7 +670,7 @@ function FeatureRequestsPageInner() {
               >
                 Delete this request?
               </h2>
-              <p className="mt-2 text-sm leading-relaxed text-[#8a8a8e]">
+              <p className="mt-2 text-sm leading-relaxed text-[#8a8f98]">
                 <span className="font-medium text-black/80">
                   “{deleteTarget.title}”
                 </span>{" "}
@@ -759,7 +682,7 @@ function FeatureRequestsPageInner() {
                   type="button"
                   disabled={deleteBusy}
                   onClick={() => setDeleteTarget(null)}
-                  className="cursor-pointer rounded-xl px-3.5 py-2 text-sm font-medium text-[#8a8a8e] hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="cursor-pointer rounded-xl px-3.5 py-2 text-sm font-medium text-[#8a8f98] hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Keep it
                 </button>

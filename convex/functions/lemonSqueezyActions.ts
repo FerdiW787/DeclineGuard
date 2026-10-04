@@ -5,6 +5,16 @@ import { action, internalAction, type ActionCtx } from "../_generated/server";
 import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { getPlatformBillingConfig } from "../lib/billingPlan";
+import {
+  isActiveSubscriptionStatus,
+  otherMorBlocksCheckout,
+} from "../lib/billingProvider";
+import {
+  createDodoCheckoutSession,
+  createDodoCustomerPortal,
+  getDodoPaymentsConfig,
+} from "../lib/dodoPayments";
+import { generateMerchantWebhookSecret } from "../lib/lemonWebhookAuth";
 import { apiKeyLast4, decryptApiKey, encryptApiKey } from "../lib/lsCrypto";
 import { allowAppHttpsUrl, allowHttpsUrl } from "../lib/safeUrl";
 
@@ -89,18 +99,34 @@ function normalizeWebhookUrl(url: string): string {
   return url.trim().replace(/\/+$/, "").toLowerCase();
 }
 
-function webhookCallbackConfig(): { callbackUrl: string; signingSecret: string } {
-  const secret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET?.trim();
+function webhookCallbackUrl(): string {
   const site = process.env.CONVEX_SITE_URL?.trim().replace(/\/$/, "");
-  if (!secret || !site) {
+  if (!site) {
     throw new Error(
-      "Webhook is not configured on the server (missing LEMONSQUEEZY_WEBHOOK_SECRET or CONVEX_SITE_URL).",
+      "Webhook is not configured on the server (missing CONVEX_SITE_URL).",
     );
   }
-  return {
-    callbackUrl: `${site}/lemonsqueezy`,
-    signingSecret: secret,
-  };
+  return `${site}/lemonsqueezy`;
+}
+
+async function merchantWebhookSigningSecret(args: {
+  existingCipher: string | null;
+}): Promise<{ signingSecret: string; cipher: string; created: boolean }> {
+  if (args.existingCipher) {
+    try {
+      const signingSecret = await decryptApiKey(args.existingCipher);
+      if (signingSecret) {
+        return { signingSecret, cipher: args.existingCipher, created: false };
+      }
+    } catch {
+      // Rotate: stored cipher cannot be decrypted (key change).
+    }
+  }
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  const signingSecret = generateMerchantWebhookSecret(bytes);
+  const cipher = await encryptApiKey(signingSecret);
+  return { signingSecret, cipher, created: true };
 }
 
 type ListedWebhook = {
@@ -410,7 +436,18 @@ export const installStoreWebhook = action({
       );
     }
 
-    const { callbackUrl, signingSecret } = webhookCallbackConfig();
+    const callbackUrl = webhookCallbackUrl();
+    const { signingSecret, cipher, created: secretCreated } =
+      await merchantWebhookSigningSecret({
+        existingCipher: secret.webhookSecretCipher,
+      });
+    if (secretCreated) {
+      await ctx.runMutation(internal.functions.lemonSqueezy.saveWebhookSecretCipher, {
+        connectionId: secret._id,
+        clerkUserId,
+        webhookSecretCipher: cipher,
+      });
+    }
     const targetUrl = normalizeWebhookUrl(callbackUrl);
     const events = [...REQUIRED_WEBHOOK_EVENTS];
 
@@ -537,7 +574,25 @@ export const sendWebhookTestPing = action({
     );
     if (!secret) throw new Error("No Lemon Squeezy connection");
 
-    const { callbackUrl, signingSecret } = webhookCallbackConfig();
+    if (!secret.webhookSecretCipher) {
+      throw new Error(
+        "Install the Lemon Squeezy webhook first so we can sign the test ping with this store’s secret.",
+      );
+    }
+    let signingSecret: string;
+    try {
+      signingSecret = await decryptApiKey(secret.webhookSecretCipher);
+    } catch {
+      throw new Error(
+        "Could not decrypt this store’s webhook secret. Refresh the webhook from Settings.",
+      );
+    }
+    if (!signingSecret) {
+      throw new Error(
+        "Install the Lemon Squeezy webhook first so we can sign the test ping with this store’s secret.",
+      );
+    }
+    const callbackUrl = webhookCallbackUrl();
     await signAndPostWebhookPing({
       storeId: secret.storeId,
       callbackUrl,
@@ -912,11 +967,21 @@ export const createProCheckout = action({
         "This account is frozen. Contact DeclineGuard support to restore access before upgrading.",
       );
     }
-    if (
-      viewer.plan === "pro" &&
-      (viewer.lsSubscriptionStatus ?? "").toLowerCase() === "active"
-    ) {
+    if (viewer.hasActivePro) {
       throw new Error("You already have an active Pro subscription.");
+    }
+    if (
+      otherMorBlocksCheckout({
+        target: viewer.billingProvider,
+        lsActive: isActiveSubscriptionStatus(viewer.lsSubscriptionStatus),
+        dodoActive: isActiveSubscriptionStatus(viewer.dodoSubscriptionStatus),
+      })
+    ) {
+      throw new Error(
+        viewer.billingProvider === "dodo"
+          ? "Cancel the active Lemon Squeezy Pro subscription before starting Dodo checkout."
+          : "Cancel the active Dodo Pro subscription before starting Lemon Squeezy checkout.",
+      );
     }
 
     await ctx.runMutation(internal.functions.rateLimit.consume, {
@@ -924,6 +989,39 @@ export const createProCheckout = action({
       limit: 5,
       windowMs: 60_000,
     });
+
+    if (viewer.billingProvider === "dodo") {
+      const dodo = getDodoPaymentsConfig();
+      if (!dodo) {
+        throw new Error(
+          "Pro checkout is not configured. Set DODO_PAYMENTS_API_KEY and DODO_PAYMENTS_PRO_PRODUCT_ID.",
+        );
+      }
+      const checkoutNonce = crypto.randomUUID();
+      await ctx.runMutation(
+        internal.functions.dodoBilling.reserveDodoCheckoutNonce,
+        { nonce: checkoutNonce },
+      );
+      const session = await createDodoCheckoutSession(dodo, {
+        kind: "pro",
+        productId: dodo.proProductId,
+        quantity: 1,
+        returnUrl: allowAppHttpsUrl(args.returnUrl),
+        email: identity.email ?? undefined,
+        name: identity.name ?? undefined,
+        metadata: {
+          convex_user_id: viewer._id,
+          clerk_user_id: identity.subject,
+          checkout_nonce: checkoutNonce,
+          billing_kind: "pro",
+        },
+      });
+      const dodoUrl = allowHttpsUrl(session.checkoutUrl);
+      if (!dodoUrl) {
+        throw new Error("Dodo Payments returned an invalid checkout URL");
+      }
+      return { checkoutUrl: dodoUrl };
+    }
 
     const config = getPlatformBillingConfig();
     const apiKey = config?.apiKey ?? process.env.LEMONSQUEEZY_API_KEY?.trim();
@@ -990,3 +1088,92 @@ export const createProCheckout = action({
     return { checkoutUrl };
   },
 });
+
+/**
+ * Customer portal URL for the viewer's current MoR.
+ * Jules contract: `{ portalUrl }` — same shape as checkout.
+ */
+export const createBillingPortal = action({
+  args: {
+    returnUrl: v.optional(v.string()),
+  },
+  returns: v.object({
+    portalUrl: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    await ctx.runMutation(api.functions.user.ensureCurrentUser, {});
+    const viewer = await ctx.runQuery(
+      internal.functions.billing.getViewerForCheckout,
+      {},
+    );
+    if (viewer.accountStatus === "disabled") {
+      throw new Error("This account is disabled. Contact DeclineGuard support.");
+    }
+    if (viewer.accountStatus === "frozen") {
+      throw new Error(
+        "This account is frozen. Contact DeclineGuard support to restore access.",
+      );
+    }
+
+    if (viewer.billingProvider === "dodo" && viewer.dodoCustomerId) {
+      const dodo = getDodoPaymentsConfig();
+      if (!dodo) {
+        throw new Error(
+          "Billing portal is not configured. Set DODO_PAYMENTS_API_KEY.",
+        );
+      }
+      const session = await createDodoCustomerPortal(dodo, {
+        customerId: viewer.dodoCustomerId,
+        returnUrl: allowAppHttpsUrl(args.returnUrl),
+      });
+      const portalUrl = allowHttpsUrl(session.portalUrl);
+      if (!portalUrl) {
+        throw new Error("Dodo Payments returned an invalid portal URL");
+      }
+      return { portalUrl };
+    }
+
+    const lsPortal = await lemonPortalUrl(viewer.lsSubscriptionId);
+    if (lsPortal) return { portalUrl: lsPortal };
+
+    throw new Error(
+      viewer.billingProvider === "dodo"
+        ? "No Dodo customer yet — and no Lemon Squeezy portal is on file."
+        : "No Lemon Squeezy subscription is on file for this account.",
+    );
+  },
+});
+
+async function lemonPortalUrl(
+  lsSubscriptionId: string | null,
+): Promise<string | null> {
+  const config = getPlatformBillingConfig();
+  const apiKey = config?.apiKey ?? process.env.LEMONSQUEEZY_API_KEY?.trim();
+  if (!config || !apiKey || !lsSubscriptionId) return null;
+
+  const json = await lsFetch(apiKey, `/subscriptions/${lsSubscriptionId}`);
+  const data = json.data;
+  const attrs =
+    data &&
+    typeof data === "object" &&
+    !Array.isArray(data) &&
+    "attributes" in data &&
+    data.attributes &&
+    typeof data.attributes === "object"
+      ? (data.attributes as Record<string, unknown>)
+      : null;
+  const urls =
+    attrs?.urls && typeof attrs.urls === "object"
+      ? (attrs.urls as Record<string, unknown>)
+      : null;
+  const raw =
+    typeof urls?.customer_portal === "string"
+      ? urls.customer_portal
+      : typeof urls?.update_payment_method === "string"
+        ? urls.update_payment_method
+        : null;
+  return allowHttpsUrl(raw);
+}

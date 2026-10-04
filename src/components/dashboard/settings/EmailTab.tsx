@@ -53,11 +53,7 @@ export function EmailTab({
       <SettingsCard>
         <SettingsRow
           title="From address"
-          description={
-            emailSetup.hasApiKey
-              ? "Production sending needs a verified domain in Resend."
-              : "RESEND_API_KEY is not set — emails will not send."
-          }
+          description="Production sending needs a verified domain in Resend."
         >
           <div className="text-right">
             <p className="max-w-[16rem] truncate text-[13px] font-medium text-[#08090a]">

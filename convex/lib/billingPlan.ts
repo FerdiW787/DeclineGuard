@@ -117,6 +117,27 @@ export function canPromoteWithoutCatalogIds(args: {
   return args.knownSub || args.checkoutNonceOk;
 }
 
+/**
+ * A checkoutNonce source must pass checkoutNonceMatches before Pro.
+ * A catalog variant match must not skip the 7-day TTL.
+ */
+export function checkoutNonceSourceMayPromote(args: {
+  userResolvedBy: "lsSubscriptionId" | "checkoutNonce" | "bodyUserId" | "none";
+  nextPlan: "pro" | "free" | null;
+  checkoutNonceOk: boolean;
+  /** Accepted so a catalog match cannot be used to skip the nonce TTL. */
+  catalogOk: boolean;
+}): { allow: boolean; reason: string } {
+  if (args.nextPlan !== "pro" || args.userResolvedBy !== "checkoutNonce") {
+    return { allow: true, reason: "ok" };
+  }
+  // catalogOk is an input so a variant match cannot skip this TTL check.
+  if (!args.checkoutNonceOk) {
+    return { allow: false, reason: "checkout_nonce_expired" };
+  }
+  return { allow: true, reason: "ok" };
+}
+
 /** Prefer payload status; fall back from the event name when LS omits it. */
 export function statusFromBillingEvent(
   eventName: string,

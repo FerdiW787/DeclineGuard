@@ -31,10 +31,6 @@ import {
   toEmailCopyOverrides,
   type EmailCustomizationValues,
 } from "./EmailCustomizePanel";
-import AdminDestinationGate, {
-  adminNeedsDestinationChoice,
-  rememberMerchantDashboardChoice,
-} from "./AdminDestinationGate";
 import DashboardBoot from "./DashboardBoot";
 import LsSetupFlow from "./LsSetupFlow";
 import OverviewHub from "./OverviewHub";
@@ -50,6 +46,11 @@ import MerchantSupport, {
 import SettingsModule from "./settings/SettingsModule";
 import type { SettingsTabId } from "./settings/settingsTypes";
 import { PLANS } from "@/lib/pricing";
+import { utcCalendarMonthStartMs } from "@/lib/utcMonth";
+import {
+  useEmailThemeQuery,
+  usePersistEmailTheme,
+} from "@/lib/useEmailThemeApi";
 
 type DayRow = {
   date: string;
@@ -180,6 +181,8 @@ function Dashboard() {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth() - 1, 1).getTime();
   }, []);
+  // Invoice / fee month is UTC. Do not send browser-local midnight to getFeesSummary.
+  const feeMonthStartMs = useMemo(() => utcCalendarMonthStartMs(), []);
   const chartDayWindows = useMemo(() => buildChartDayWindows(30), []);
   const chartSinceMs = chartDayWindows[0]?.startMs ?? monthStartMs;
   const openFailures = useQuery(
@@ -198,13 +201,14 @@ function Dashboard() {
     api.functions.recoveries.getRecoverySummary,
     connection ? { monthStartMs, priorMonthStartMs } : "skip",
   );
+  const emailQuotaNowMs = useMemo(() => Date.now(), []);
   const feesSummary = useQuery(
     api.functions.recoveries.getFeesSummary,
-    connection ? { monthStartMs } : "skip",
+    connection ? { nowMs: feeMonthStartMs } : "skip",
   );
   const emailQuota = useQuery(
     api.functions.recoveries.getEmailQuotaStatus,
-    connection ? { monthStartMs } : "skip",
+    connection ? { nowMs: emailQuotaNowMs } : "skip",
   );
   const webhookSetup = useQuery(
     api.functions.lemonSqueezy.getWebhookSetup,
@@ -223,13 +227,11 @@ function Dashboard() {
     connection ? {} : "skip",
   );
   const ensureCurrentUser = useMutation(api.functions.user.ensureCurrentUser);
-  const createProCheckout = useAction(
-    api.functions.lemonSqueezyActions.createProCheckout,
-  );
   const currentUser = useQuery(api.functions.user.getCurrentUser);
-  const plan = currentUser?.plan ?? "free";
-  const recoveryFeePercent =
-    currentUser?.recoveryFeePercent ?? PLANS[plan].recoveryFeePercent;
+  // Fee % on Overview / Billing is only getFeesSummary (merchant, incl. takeover).
+  // Never getCurrentUser / PLANS — those are the signed-in viewer or a second rate.
+  const plan = feesSummary?.plan ?? currentUser?.plan ?? "free";
+  const recoveryFeePercent = feesSummary?.recoveryFeePercent;
   const planTier = PLANS[plan].name;
   const unreadHelpCount = useQuery(
     api.functions.support.countUnreadThreads,
@@ -249,6 +251,8 @@ function Dashboard() {
   const saveEmailCustomizations = useMutation(
     api.functions.recoverySettings.saveEmailCustomizations,
   );
+  const persistEmailTheme = usePersistEmailTheme();
+  const emailTheme = useEmailThemeQuery();
   const uploadEmailImage = useEmailHeaderImageUpload();
 
   const brandImportComplete =
@@ -346,8 +350,6 @@ function Dashboard() {
   /** First visit with no store — never show the boot splash */
   const [skipBoot, setSkipBoot] = useState(false);
   const [showShell, setShowShell] = useState(false);
-  /** Admin picked merchant dashboard for this browser session */
-  const [adminMerchantChosen, setAdminMerchantChosen] = useState(false);
   const displayCurrency =
     recoverySummary?.displayCurrency ??
     recoverySummary?.recoveredCurrency ??
@@ -495,7 +497,7 @@ function Dashboard() {
   // No store → setup only (no splash). Already connected → splash, then dashboard.
   // ?onboardingPreview=1 forces the setup UI with mocked steps (no API writes).
   useEffect(() => {
-    if (!isLoaded || !isSignedIn || connectionLoading) return;
+    if (!isLoaded || !isSignedIn) return;
 
     if (onboardingPreview) {
       setLsSetupOpen(true);
@@ -504,9 +506,18 @@ function Dashboard() {
       return;
     }
 
+    if (connectionLoading) {
+      if (!skipBoot && !bootDone && !bootActive) {
+        setBootActive(true);
+      }
+      return;
+    }
+
     if (!lsConnected) {
       setLsSetupOpen(true);
       setSkipBoot(true);
+      setBootActive(false);
+      setBootDone(true);
       return;
     }
 
@@ -533,6 +544,7 @@ function Dashboard() {
   const billingQueryHandledRef = useRef(false);
   useEffect(() => {
     if (typeof window === "undefined" || !isSignedIn) return;
+    if (connectionLoading) return;
     if (billingQueryHandledRef.current) return;
     const params = new URLSearchParams(window.location.search);
     const wantBilling = params.get("billing") === "1";
@@ -547,28 +559,12 @@ function Dashboard() {
     }${window.location.hash}`;
     window.history.replaceState({}, "", next);
 
-    if (wantBilling && lsConnected) {
+    // Deep links open Billing. Do not auto-start checkout — Pricing / Billing
+    // CTAs remain the intentional Pro checkout path.
+    if (lsConnected) {
       openSettings("billing");
     }
-    if (!wantUpgrade) return;
-
-    void (async () => {
-      try {
-        await ensureCurrentUser({});
-        const { checkoutUrl } = await createProCheckout({
-          returnUrl: `${window.location.origin}/a/dashboard?billing=1`,
-        });
-        window.location.assign(checkoutUrl);
-      } catch {
-        if (lsConnected) openSettings("billing");
-      }
-    })();
-  }, [
-    isSignedIn,
-    lsConnected,
-    ensureCurrentUser,
-    createProCheckout,
-  ]);
+  }, [isSignedIn, lsConnected, connectionLoading]);
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -717,45 +713,6 @@ function Dashboard() {
       <div className="flex min-h-screen items-center justify-center bg-white text-sm text-muted-foreground">
         Redirecting…
       </div>
-    );
-  }
-
-  // Admins get a destination chooser; wait for role + takeover before boot.
-  if (isLoaded && isSignedIn && currentUser === undefined) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#f7f8f8] text-sm text-[#8a8f98]">
-        Loading…
-      </div>
-    );
-  }
-
-  if (
-    currentUser?.role === "admin" &&
-    !adminMerchantChosen &&
-    activeTakeover === undefined
-  ) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#f7f8f8] text-sm text-[#8a8f98]">
-        Loading…
-      </div>
-    );
-  }
-
-  if (
-    !adminMerchantChosen &&
-    adminNeedsDestinationChoice({
-      role: currentUser?.role,
-      activeTakeover,
-      currentUserId: currentUser?._id,
-    })
-  ) {
-    return (
-      <AdminDestinationGate
-        onChooseMerchant={() => {
-          rememberMerchantDashboardChoice();
-          setAdminMerchantChosen(true);
-        }}
-      />
     );
   }
 
@@ -1232,7 +1189,6 @@ function Dashboard() {
                           ? {
                               fromAddress: emailSetup.fromAddress,
                               isProduction: emailSetup.isProduction,
-                              hasApiKey: emailSetup.hasApiKey,
                             }
                           : emailSetup
                       }
@@ -1456,6 +1412,15 @@ function Dashboard() {
                     openFailures={openFailures}
                     fromAddressHint={emailSetup?.fromAddress ?? null}
                     brandDomain={recoverySettings?.brandDomain ?? null}
+                    onPersistTheme={persistEmailTheme}
+                    serverTheme={
+                      emailTheme
+                        ? {
+                            stylingMode: emailTheme.stylingMode,
+                            layoutPresetId: emailTheme.layoutPresetId,
+                          }
+                        : null
+                    }
                     onGoToSequences={() => requestNav("sequences")}
                     onDirtyChange={setCustomizationsDirty}
                     onFocusModeChange={setEmailFocusMode}
@@ -1528,7 +1493,6 @@ function Dashboard() {
           planTier={planTier}
           planId={plan}
           lsSubscriptionStatus={currentUser?.lsSubscriptionStatus ?? null}
-          recoveryFeePercent={recoveryFeePercent}
           webhookSetup={webhookSetup}
           webhookStatus={webhookStatus}
           feesSummary={feesSummary}

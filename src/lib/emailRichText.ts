@@ -59,18 +59,114 @@ export function normalizeLinkUrl(raw: string): string | null {
   return allowHttpsUrl(withProto);
 }
 
+const EVENT_HANDLER_ATTR_RE =
+  /\bon[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
+
+function attrsFromTagRest(rest: string | undefined): string {
+  return (rest ?? "")
+    .replace(/^\/*/, "")
+    .replace(/\/\s*$/, "")
+    .replace(EVENT_HANDLER_ATTR_RE, "");
+}
+
+/** Open `<span>` with hex color only — never raw attr passthrough. */
+function rebuildOpenSpan(attrs: string): string {
+  const quoted =
+    attrs.match(/style\s*=\s*"([^"]*)"/i)?.[1] ??
+    attrs.match(/style\s*=\s*'([^']*)'/i)?.[1] ??
+    "";
+  const color = faceFromStyleText(quoted).color;
+  if (color && isHexColor(color)) {
+    return `<span style="color:${normalizeHex(color)}">`;
+  }
+  return "<span>";
+}
+
+/** Drop on* attributes; never re-emit raw attrs (slash-glue would become `<ahref>`). */
+export function stripEventHandlerAttrs(html: string): string {
+  return html.replace(
+    /<([a-zA-Z][\w:-]*)((?:[\s/][^>]*)?)>/g,
+    (_full, tag: string, rest: string | undefined) => {
+      const name = tag.toLowerCase();
+      const cleaned = attrsFromTagRest(rest);
+      switch (name) {
+        case "a":
+          // Bare `<a>` if href is rejected so the closed-pair pass can unwrap
+          // inner. Returning "" here leaves an orphan `</a>`.
+          return rebuildOpenAnchor(cleaned) || "<a>";
+        case "span":
+          return rebuildOpenSpan(cleaned);
+        case "br":
+          return "<br />";
+        case "strong":
+        case "b":
+          return "<strong>";
+        case "em":
+        case "i":
+          return "<em>";
+        case "u":
+          return "<u>";
+        default:
+          return `<${name}>`;
+      }
+    },
+  );
+}
+
+function hrefFromAttrs(attrs: string): string {
+  const match = attrs.match(
+    /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i,
+  );
+  return (match?.[1] ?? match?.[2] ?? match?.[3] ?? "").trim();
+}
+
+/** Clean dangling `<a …>` — never return the raw open tag. */
+function rebuildOpenAnchor(attrs: string): string {
+  const raw = hrefFromAttrs(attrs);
+  if (isPaymentUpdateHref(raw)) return `<a href="${raw}">`;
+  const href = allowHttpsUrl(raw);
+  return href ? `<a href="${escapeHtml(href)}">` : "";
+}
+
+function rewriteAnchors(
+  html: string,
+  replace: (attrs: string, inner: string) => string,
+): string {
+  let current = html;
+  for (let i = 0; i < 4; i += 1) {
+    const next = current.replace(
+      /<a\b([^>]*)>([\s\S]*?)<\/a>/gi,
+      (_full, attrs: string, inner: string) => replace(attrs, inner),
+    );
+    if (next === current) break;
+    current = next;
+  }
+  return current.replace(/<a\b([^>]*)>/gi, (_open, attrs: string) =>
+    rebuildOpenAnchor(attrs),
+  );
+}
+
+function hrefFromRaw(raw: string): string | null {
+  if (isPaymentUpdateHref(raw)) return PAYMENT_UPDATE_HREF;
+  return allowHttpsUrl(raw);
+}
+
 /** Inline link color + underline so email clients keep the style. */
 export function styleEmailAnchors(html: string, linkColor: string): string {
   const color = linkColor.trim() || "#2563eb";
-  return ensurePaymentLinkSpacing(html).replace(/<a\b([^>]*)>/gi, (full, attrs: string) => {
-    const hrefMatch = attrs.match(/\bhref\s*=\s*"([^"]*)"/i);
-    const raw = hrefMatch?.[1] ?? "";
-    const href = isPaymentUpdateHref(raw)
-      ? PAYMENT_UPDATE_HREF
-      : allowHttpsUrl(raw);
-    if (!href) return full;
-    return `<a href="${escapeHtml(href)}" style="color:${color};text-decoration:underline">`;
-  });
+  const rewritten = rewriteAnchors(
+    stripEventHandlerAttrs(ensurePaymentLinkSpacing(html)),
+    (attrs, inner) => {
+      const href = hrefFromRaw(hrefFromAttrs(attrs));
+      if (!href) return inner;
+      return `<a href="${escapeHtml(href)}">${inner}</a>`;
+    },
+  );
+  const style = `color:${escapeHtml(color)};text-decoration:underline`;
+  return rewritten.replace(
+    /<a href="((?:https:[^"]+)|#update-payment|#billing)">/gi,
+    `<a href="$1" style="${style}">`,
+  );
 }
 
 export function stripTrailingBreaks(html: string): string {
@@ -105,33 +201,47 @@ export function richTextToPlain(text: string): string {
 
 /** Keep only email-safe tags from a contentEditable dump. */
 export function sanitizeEditorHtml(html: string): string {
+  // String sanitizer is the SSR / preview contract — do not rely on
+  // document.serializeSafe alone (jsdom, Astro SSR, and Node have no DOM).
+  const fromString = stripTrailingBreaks(
+    sanitizeEditorHtmlString(html).replace(/&nbsp;/g, " "),
+  );
   if (typeof document === "undefined") {
-    return stripTrailingBreaks(
-      sanitizeEditorHtmlString(html).replace(/&nbsp;/g, " "),
-    );
+    return fromString;
   }
   const host = document.createElement("div");
-  host.innerHTML = html;
+  host.innerHTML = fromString;
   return stripTrailingBreaks(
     serializeSafe(host, true).replace(/&nbsp;/g, " "),
   );
 }
 
-function sanitizeEditorHtmlString(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, "<br />")
-    .replace(/<\/?(?:b|strong)>/gi, (m) =>
+/** String/SSR sanitizer — used by preview when `document` is unavailable. */
+export function sanitizeEditorHtmlString(html: string): string {
+  return stripEventHandlerAttrs(html)
+    .replace(/<br(?:[\s/][^>]*)?>/gi, "<br />")
+    .replace(/<\/?(?:b|strong)(?:[\s/][^>]*)?>/gi, (m) =>
       m.startsWith("</") ? "</strong>" : "<strong>",
     )
-    .replace(/<\/?(?:i|em)>/gi, (m) => (m.startsWith("</") ? "</em>" : "<em>"))
-    .replace(/<\/?u>/gi, (m) => m.toLowerCase())
+    .replace(/<\/?(?:i|em)(?:[\s/][^>]*)?>/gi, (m) =>
+      m.startsWith("</") ? "</em>" : "<em>",
+    )
+    .replace(/<u(?:[\s/][^>]*)?>/gi, "<u>")
+    .replace(/<\/u>/gi, "</u>")
     .replace(/<span\b([^>]*)>([\s\S]*?)<\/span>/gi, (_, attrs: string, inner: string) => {
-      const style = attrs.match(/style\s*=\s*"([^"]*)"/i)?.[1] ?? "";
+      const style =
+        attrs.match(/style\s*=\s*"([^"]*)"/i)?.[1] ??
+        attrs.match(/style\s*=\s*'([^']*)'/i)?.[1] ??
+        "";
       return wrapWithFace(inner, faceFromStyleText(style));
     })
-    .replace(
-      /<a\s+[^>]*href="((?:https:[^"]+)|#update-payment|#billing)"[^>]*>/gi,
-      '<a href="$1">',
+    .replace(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi, (_full, attrs: string, inner: string) => {
+      const href = hrefFromRaw(hrefFromAttrs(attrs));
+      if (!href) return inner;
+      return `<a href="${escapeHtml(href)}">${inner}</a>`;
+    })
+    .replace(/<a\b([^>]*)>/gi, (_open, attrs: string) =>
+      rebuildOpenAnchor(attrs),
     )
     .replace(/<(?!\/?(?:strong|em|u|span|br|a)\b)[^>]+>/gi, "");
 }

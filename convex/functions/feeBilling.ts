@@ -16,12 +16,28 @@ import {
   writeAuditLog,
 } from "../lib/admin";
 import {
+  claimingAcceptedDodoUsageMayFinish,
+  dodoUsageReclaimFailureSnapshot,
   existingClaimBlocksNewCharge,
   feeInvoiceClaimKey,
   orderCoversClaimedCents,
+  PERSIST_AFTER_ACCEPT_ERROR,
+  unpaidDodoUsageClaimMayReclaim,
 } from "../lib/feeBilling";
 import { allowHttpsUrl } from "../lib/safeUrl";
 import { resolveProductUserOrNull } from "../lib/accountGuard";
+import {
+  creditForPeriod,
+  dodoUsageMerchantMatch,
+  getDodoPaymentsConfig,
+  invoiceMatchesUsageCharge,
+  pickUniqueDodoCustomerUser,
+  readDodoUsageCredits,
+  removeCreditForPeriod,
+  shouldIgnoreDodoTestEvent,
+  upsertDodoUsageCredit,
+  usageCreditAppliesToInvoice,
+} from "../lib/dodoPayments";
 
 /**
  * Caps per-merchant owed-fee load when claiming a period.
@@ -71,6 +87,18 @@ function isBillableFee(fee: Doc<"recoveryFees">): boolean {
     !fee.testMode &&
     fee.billingInvoiceId == null &&
     fee.feeCents > 0
+  );
+}
+
+function isBillableFeeOnInvoice(
+  fee: Doc<"recoveryFees">,
+  invoiceId: Id<"billingInvoices">,
+): boolean {
+  return (
+    fee.status === "owed" &&
+    !fee.testMode &&
+    fee.feeCents > 0 &&
+    (fee.billingInvoiceId == null || fee.billingInvoiceId === invoiceId)
   );
 }
 
@@ -181,12 +209,16 @@ export const claimBillingPeriod = internalMutation({
     periodKey: v.string(),
     storeCurrency: v.string(),
     nowMs: v.number(),
+    reclaimUnpaidDodoUsage: v.optional(v.boolean()),
   },
   returns: v.object({
     claimed: v.boolean(),
     skippedZero: v.boolean(),
     currencyMismatch: v.boolean(),
     currencyMixed: v.boolean(),
+    reclaimed: v.boolean(),
+    priorIngestedCents: v.number(),
+    priorFeeIds: v.array(v.id("recoveryFees")),
     reason: v.union(v.string(), v.null()),
     invoiceId: v.union(v.id("billingInvoices"), v.null()),
     totalCents: v.number(),
@@ -199,6 +231,9 @@ export const claimBillingPeriod = internalMutation({
       skippedZero: false,
       currencyMismatch: false,
       currencyMixed: false,
+      reclaimed: false,
+      priorIngestedCents: 0,
+      priorFeeIds: [] as Id<"recoveryFees">[],
       reason: null as string | null,
       invoiceId: null as Id<"billingInvoices"> | null,
       totalCents: 0,
@@ -208,14 +243,39 @@ export const claimBillingPeriod = internalMutation({
 
     const claimKey = feeInvoiceClaimKey(args.userId, args.periodKey);
     const existingWinner = await winnerForClaimKey(ctx, claimKey);
+    const mayReclaim =
+      existingWinner != null &&
+      unpaidDodoUsageClaimMayReclaim({
+        scheduledMonthClose: args.reclaimUnpaidDodoUsage === true,
+        status: existingWinner.status,
+        billingProvider: existingWinner.billingProvider,
+        dodoUsageSubmittedAt: existingWinner.dodoUsageSubmittedAt,
+        dodoUsageEventId: existingWinner.dodoUsageEventId,
+        dodoUsageIngestedCents: existingWinner.dodoUsageIngestedCents,
+        paidAt: existingWinner.paidAt,
+        lsCheckoutId: existingWinner.lsCheckoutId,
+      });
+    const priorIngestedCents = mayReclaim && existingWinner
+      ? (existingWinner.dodoUsageIngestedCents ??
+        (existingWinner.dodoUsageSubmittedAt != null ||
+        Boolean(existingWinner.dodoUsageEventId?.trim())
+          ? existingWinner.totalCents
+          : 0))
+      : 0;
+    const priorFeeIds =
+      mayReclaim && existingWinner
+        ? (existingWinner.dodoUsageMeteredFeeIds ?? existingWinner.feeIds)
+        : [];
 
     if (
       existingWinner &&
       existingClaimBlocksNewCharge(
         existingWinner.status,
         existingWinner.feeIds.length,
-        existingWinner.lsCheckoutId != null,
-      )
+        existingWinner.lsCheckoutId != null ||
+          existingWinner.dodoCheckoutId != null,
+      ) &&
+      !mayReclaim
     ) {
       return {
         ...none,
@@ -227,7 +287,17 @@ export const claimBillingPeriod = internalMutation({
       };
     }
 
-    const billable = await loadBillableFeesForUser(ctx, args.userId);
+    const billable =
+      mayReclaim && existingWinner
+        ? (await ctx.db
+            .query("recoveryFees")
+            .withIndex("by_user_status", (q) =>
+              q.eq("userId", args.userId).eq("status", "owed"),
+            )
+            .take(FEE_INVOICE_SCAN_LIMIT)).filter((fee) =>
+            isBillableFeeOnInvoice(fee, existingWinner._id),
+          )
+        : await loadBillableFeesForUser(ctx, args.userId);
     if (billable.length === 0) {
       if (existingWinner?.status === "failed" || existingWinner?.status === "claiming") {
         return { ...none, skippedZero: true, invoiceId: existingWinner._id, reason: "zero_owed" };
@@ -285,16 +355,33 @@ export const claimBillingPeriod = internalMutation({
     }
 
     let invoiceId: Id<"billingInvoices">;
-    if (existingWinner && existingWinner.status === "failed") {
+    if (mayReclaim && existingWinner) {
+      invoiceId = existingWinner._id;
+      await ctx.db.patch(invoiceId, {
+        currency,
+        feeIds: [],
+        totalCents,
+        lastError: undefined,
+        createdAt: args.nowMs,
+      });
+    } else if (existingWinner && existingWinner.status === "failed") {
       invoiceId = existingWinner._id;
       await ctx.db.patch(invoiceId, {
         currency,
         feeIds: [],
         totalCents,
         status: "claiming",
+        billingProvider: undefined,
         lsCheckoutId: undefined,
         lsCheckoutUrl: undefined,
         lsOrderId: undefined,
+        dodoCheckoutId: undefined,
+        dodoPaymentId: undefined,
+        dodoUsageEventId: undefined,
+        dodoUsageSubmittedAt: undefined,
+        dodoUsageIngestedCents: undefined,
+        dodoUsageMeteredFeeIds: undefined,
+        dodoUsageMonthClosed: undefined,
         lastError: undefined,
         createdAt: args.nowMs,
         createdLsAt: undefined,
@@ -304,7 +391,8 @@ export const claimBillingPeriod = internalMutation({
       existingWinner &&
       existingWinner.status === "claiming" &&
       existingWinner.feeIds.length === 0 &&
-      existingWinner.lsCheckoutId == null
+      existingWinner.lsCheckoutId == null &&
+      existingWinner.dodoCheckoutId == null
     ) {
       invoiceId = existingWinner._id;
       await ctx.db.patch(invoiceId, {
@@ -343,7 +431,11 @@ export const claimBillingPeriod = internalMutation({
     const feeIds: Id<"recoveryFees">[] = [];
     for (const fee of fees) {
       const fresh = await ctx.db.get(fee._id);
-      if (!fresh || !isBillableFee(fresh)) continue;
+      if (!fresh) continue;
+      const stillBillable = mayReclaim
+        ? isBillableFeeOnInvoice(fresh, invoiceId)
+        : isBillableFee(fresh);
+      if (!stillBillable) continue;
       await ctx.db.patch(fee._id, { billingInvoiceId: invoiceId });
       feeIds.push(fee._id);
     }
@@ -371,7 +463,9 @@ export const claimBillingPeriod = internalMutation({
     await ctx.db.patch(invoiceId, {
       feeIds,
       totalCents: linkedTotal,
-      status: "claiming",
+      status: mayReclaim && existingWinner?.status === "created"
+        ? "created"
+        : "claiming",
     });
 
     return {
@@ -379,6 +473,9 @@ export const claimBillingPeriod = internalMutation({
       skippedZero: false,
       currencyMismatch: false,
       currencyMixed: false,
+      reclaimed: mayReclaim,
+      priorIngestedCents,
+      priorFeeIds,
       reason: null,
       invoiceId,
       totalCents: linkedTotal,
@@ -411,6 +508,7 @@ export const attachLsCheckout = internalMutation({
     const safeUrl = allowHttpsUrl(args.lsCheckoutUrl);
     await ctx.db.patch(args.invoiceId, {
       status: "created",
+      billingProvider: "lemon",
       lsCheckoutId: args.lsCheckoutId,
       lsCheckoutUrl: safeUrl ?? undefined,
       expiresAt: args.expiresAt,
@@ -418,6 +516,414 @@ export const attachLsCheckout = internalMutation({
       lastError: safeUrl ? undefined : "missing_checkout_url",
     });
     return true;
+  },
+});
+
+export const attachDodoCheckout = internalMutation({
+  args: {
+    invoiceId: v.id("billingInvoices"),
+    dodoCheckoutId: v.string(),
+    checkoutUrl: v.optional(v.string()),
+    expiresAt: v.optional(v.number()),
+    nowMs: v.number(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.invoiceId);
+    if (!invoice) return false;
+    if (invoice.status === "paid") return false;
+    if (
+      invoice.dodoCheckoutId != null &&
+      invoice.dodoCheckoutId !== args.dodoCheckoutId
+    ) {
+      return false;
+    }
+
+    const safeUrl = allowHttpsUrl(args.checkoutUrl);
+    await ctx.db.patch(args.invoiceId, {
+      status: "created",
+      billingProvider: "dodo",
+      dodoCheckoutId: args.dodoCheckoutId,
+      // Pay URL field is provider-agnostic for merchant/staff lists.
+      lsCheckoutUrl: safeUrl ?? invoice.lsCheckoutUrl,
+      expiresAt: args.expiresAt,
+      createdLsAt: args.nowMs,
+      lastError: safeUrl ? undefined : "missing_checkout_url",
+    });
+    return true;
+  },
+});
+
+async function markUsageInvoicePaid(
+  ctx: MutationCtx,
+  args: {
+    invoice: Doc<"billingInvoices">;
+    paidAt: number;
+    dodoPaymentId?: string;
+    coveredPeriodKey: string;
+  },
+): Promise<void> {
+  for (const feeId of args.invoice.feeIds) {
+    const fee = await ctx.db.get(feeId);
+    if (!fee) continue;
+    if (fee.status !== "owed") continue;
+    await ctx.db.patch(feeId, { status: "invoiced" });
+  }
+  await ctx.db.patch(args.invoice._id, {
+    status: "paid",
+    dodoPaymentId: args.dodoPaymentId ?? args.invoice.dodoPaymentId,
+    paidAt: args.paidAt,
+    lastError: undefined,
+  });
+  await writeAuditLog(ctx, {
+    actorUserId: null,
+    targetUserId: args.invoice.userId,
+    action: "fee_invoice:paid",
+    metadata: {
+      invoiceId: args.invoice._id,
+      claimKey: args.invoice.claimKey,
+      path: "dodo_usage_subscription",
+      dodoPaymentId: args.dodoPaymentId ?? null,
+      coveredPeriodKey: args.coveredPeriodKey,
+      totalCents: args.invoice.totalCents,
+    },
+  });
+}
+
+async function writeDodoUsageAcceptedSnapshot(
+  ctx: MutationCtx,
+  args: {
+    invoice: Doc<"billingInvoices">;
+    dodoUsageEventId?: string;
+    nowMs: number;
+    monthClosed?: boolean;
+    ingestedCents?: number;
+    lastError?: string;
+  },
+): Promise<void> {
+  const monthClosed =
+    args.monthClosed === true || args.invoice.dodoUsageMonthClosed === true;
+  const ingested =
+    args.ingestedCents != null
+      ? Math.max(0, Math.round(args.ingestedCents))
+      : args.invoice.totalCents;
+  await ctx.db.patch(args.invoice._id, {
+    status: "created",
+    billingProvider: "dodo",
+    dodoUsageEventId: args.dodoUsageEventId ?? args.invoice.dodoUsageEventId,
+    dodoUsageSubmittedAt: args.nowMs,
+    dodoUsageIngestedCents: ingested,
+    dodoUsageMeteredFeeIds: args.invoice.feeIds,
+    dodoUsageMonthClosed: monthClosed ? true : args.invoice.dodoUsageMonthClosed,
+    lastError: args.lastError?.slice(0, 500),
+  });
+}
+
+async function applyMatchingUsageCredit(
+  ctx: MutationCtx,
+  invoiceId: Id<"billingInvoices">,
+): Promise<void> {
+  const invoice = await ctx.db.get(invoiceId);
+  if (!invoice || invoice.status === "paid") return;
+  const user = await ctx.db.get(invoice.userId);
+  if (!user) return;
+  const config = getDodoPaymentsConfig();
+  const credits = readDodoUsageCredits(user);
+  const credit = creditForPeriod(credits, invoice.periodKey);
+  if (
+    !credit ||
+    !usageCreditAppliesToInvoice({
+      invoicePeriodKey: invoice.periodKey,
+      invoiceStatus: invoice.status,
+      monthClosed: invoice.dodoUsageMonthClosed === true,
+      creditPeriodKey: credit.periodKey,
+      creditPaidAt: credit.paidAt,
+      merchantProSubscriptionId: user.dodoSubscriptionId ?? null,
+      merchantProductId: user.dodoProductId ?? null,
+      expectedProProductId: config?.proProductId ?? null,
+      merchantOnDemand: user.dodoOnDemand === true,
+    })
+  ) {
+    return;
+  }
+  await markUsageInvoicePaid(ctx, {
+    invoice,
+    paidAt: credit.paidAt,
+    dodoPaymentId: credit.paymentId,
+    coveredPeriodKey: invoice.periodKey,
+  });
+  const remaining = removeCreditForPeriod(credits, invoice.periodKey);
+  await ctx.db.patch(user._id, {
+    dodoUsageCredits: remaining,
+    dodoUsageCreditPeriodKey: remaining[0]?.periodKey,
+    dodoUsageCreditPaidAt: remaining[0]?.paidAt,
+    dodoUsageCreditPaymentId: remaining[0]?.paymentId,
+  });
+}
+
+export const attachDodoUsageSubmitted = internalMutation({
+  args: {
+    invoiceId: v.id("billingInvoices"),
+    dodoUsageEventId: v.optional(v.string()),
+    nowMs: v.number(),
+    monthClosed: v.optional(v.boolean()),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.invoiceId);
+    if (!invoice) return false;
+    if (invoice.status === "paid") return false;
+
+    await writeDodoUsageAcceptedSnapshot(ctx, {
+      invoice,
+      dodoUsageEventId: args.dodoUsageEventId,
+      nowMs: args.nowMs,
+      monthClosed: args.monthClosed,
+    });
+
+    await applyMatchingUsageCredit(ctx, args.invoiceId);
+    return true;
+  },
+});
+
+export const persistDodoUsageAccepted = internalMutation({
+  args: {
+    invoiceId: v.id("billingInvoices"),
+    dodoUsageEventId: v.optional(v.string()),
+    nowMs: v.number(),
+    monthClosed: v.optional(v.boolean()),
+    ingestedCents: v.optional(v.number()),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.invoiceId);
+    if (!invoice) return false;
+    if (invoice.status === "paid") return false;
+    await writeDodoUsageAcceptedSnapshot(ctx, {
+      invoice,
+      dodoUsageEventId: args.dodoUsageEventId,
+      nowMs: args.nowMs,
+      monthClosed: args.monthClosed,
+      ingestedCents: args.ingestedCents,
+    });
+    await applyMatchingUsageCredit(ctx, args.invoiceId);
+    return true;
+  },
+});
+
+export const markDodoUsageAcceptedPending = internalMutation({
+  args: {
+    invoiceId: v.id("billingInvoices"),
+    dodoUsageEventId: v.string(),
+    ingestedCents: v.number(),
+    nowMs: v.number(),
+    monthClosed: v.optional(v.boolean()),
+    error: v.string(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.invoiceId);
+    if (!invoice) return false;
+    if (invoice.status === "paid") return false;
+    await writeDodoUsageAcceptedSnapshot(ctx, {
+      invoice,
+      dodoUsageEventId: args.dodoUsageEventId,
+      nowMs: args.nowMs,
+      monthClosed: args.monthClosed,
+      ingestedCents: args.ingestedCents,
+      lastError: args.error,
+    });
+    await applyMatchingUsageCredit(ctx, args.invoiceId);
+    return true;
+  },
+});
+
+export const stampDodoUsageAcceptedEvent = internalMutation({
+  args: {
+    invoiceId: v.id("billingInvoices"),
+    dodoUsageEventId: v.string(),
+    ingestedCents: v.number(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.invoiceId);
+    if (!invoice) return false;
+    if (invoice.status === "paid") return false;
+    await ctx.db.patch(args.invoiceId, {
+      dodoUsageEventId: args.dodoUsageEventId,
+      dodoUsageIngestedCents: Math.max(0, Math.round(args.ingestedCents)),
+      lastError: PERSIST_AFTER_ACCEPT_ERROR,
+    });
+    return true;
+  },
+});
+
+export const listClaimingAcceptedDodoUsagePage = internalQuery({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: v.object({
+    page: v.array(
+      v.object({
+        _id: v.id("billingInvoices"),
+        userId: v.id("users"),
+        periodKey: v.string(),
+        dodoUsageEventId: v.union(v.string(), v.null()),
+      }),
+    ),
+    isDone: v.boolean(),
+    continueCursor: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    const result = await ctx.db
+      .query("billingInvoices")
+      .withIndex("by_lastError", (q) =>
+        q.eq("lastError", PERSIST_AFTER_ACCEPT_ERROR),
+      )
+      .paginate(args.paginationOpts);
+    return {
+      page: result.page
+        .filter((row) =>
+          claimingAcceptedDodoUsageMayFinish({
+            status: row.status,
+            dodoUsageEventId: row.dodoUsageEventId,
+            dodoUsageIngestedCents: row.dodoUsageIngestedCents,
+            dodoUsageMonthClosed: row.dodoUsageMonthClosed,
+            paidAt: row.paidAt,
+            lastError: row.lastError,
+          }),
+        )
+        .map((row) => ({
+          _id: row._id,
+          userId: row.userId,
+          periodKey: row.periodKey,
+          dodoUsageEventId: row.dodoUsageEventId ?? null,
+        })),
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
+  },
+});
+
+export const settleDodoUsageFeeInvoices = internalMutation({
+  args: {
+    userId: v.optional(v.id("users")),
+    dodoCustomerId: v.optional(v.string()),
+    dodoSubscriptionId: v.optional(v.string()),
+    dodoPaymentId: v.optional(v.string()),
+    paidAt: v.number(),
+    coveredPeriodKey: v.string(),
+    testMode: v.boolean(),
+  },
+  returns: v.object({
+    settled: v.number(),
+    reason: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    if (shouldIgnoreDodoTestEvent(args.testMode)) {
+      return { settled: 0, reason: "test_mode_ignored" };
+    }
+    const coveredPeriodKey = args.coveredPeriodKey.trim();
+    if (!coveredPeriodKey) {
+      return { settled: 0, reason: "missing_covered_period" };
+    }
+
+    let userId = args.userId ?? null;
+    if (!userId && args.dodoSubscriptionId) {
+      const bySub = await ctx.db
+        .query("users")
+        .withIndex("by_dodoSubscriptionId", (q) =>
+          q.eq("dodoSubscriptionId", args.dodoSubscriptionId),
+        )
+        .unique();
+      userId = bySub?._id ?? null;
+    }
+    if (!userId && args.dodoCustomerId) {
+      const byCustomer = await ctx.db
+        .query("users")
+        .withIndex("by_dodoCustomerId", (q) =>
+          q.eq("dodoCustomerId", args.dodoCustomerId),
+        )
+        .collect();
+      const picked = pickUniqueDodoCustomerUser({
+        users: byCustomer,
+        dodoSubscriptionId: args.dodoSubscriptionId,
+      });
+      userId = picked?._id ?? null;
+    }
+    if (!userId) {
+      return { settled: 0, reason: "user_not_found" };
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      return { settled: 0, reason: "user_not_found" };
+    }
+    const config = getDodoPaymentsConfig();
+    const merchant = dodoUsageMerchantMatch({
+      paymentSubscriptionId: args.dodoSubscriptionId ?? null,
+      merchantProSubscriptionId: user.dodoSubscriptionId ?? null,
+      merchantProductId: user.dodoProductId ?? null,
+      expectedProProductId: config?.proProductId ?? null,
+      merchantOnDemand: user.dodoOnDemand === true,
+    });
+    if (!merchant.ok) {
+      return { settled: 0, reason: merchant.reason };
+    }
+
+    const rows = await ctx.db
+      .query("billingInvoices")
+      .withIndex("by_user_period", (q) =>
+        q.eq("userId", userId).eq("periodKey", coveredPeriodKey),
+      )
+      .collect();
+
+    let settled = 0;
+    for (const invoice of rows) {
+      if (
+        !invoiceMatchesUsageCharge({
+          status: invoice.status,
+          periodKey: invoice.periodKey,
+          coveredPeriodKey,
+          dodoUsageSubmittedAt: invoice.dodoUsageSubmittedAt,
+          monthClosed: invoice.dodoUsageMonthClosed === true,
+        })
+      ) {
+        continue;
+      }
+
+      await markUsageInvoicePaid(ctx, {
+        invoice,
+        paidAt: args.paidAt,
+        dodoPaymentId: args.dodoPaymentId,
+        coveredPeriodKey,
+      });
+      settled += 1;
+    }
+
+    if (settled > 0) {
+      const credits = readDodoUsageCredits(user);
+      const remaining = removeCreditForPeriod(credits, coveredPeriodKey);
+      await ctx.db.patch(user._id, {
+        dodoUsageCredits: remaining,
+        dodoUsageCreditPeriodKey: remaining[0]?.periodKey,
+        dodoUsageCreditPaidAt: remaining[0]?.paidAt,
+        dodoUsageCreditPaymentId: remaining[0]?.paymentId,
+      });
+      return { settled, reason: "ok" };
+    }
+
+    const credits = upsertDodoUsageCredit(readDodoUsageCredits(user), {
+      periodKey: coveredPeriodKey,
+      paidAt: args.paidAt,
+      ...(args.dodoPaymentId ? { paymentId: args.dodoPaymentId } : {}),
+    });
+    const latest = creditForPeriod(credits, coveredPeriodKey);
+    await ctx.db.patch(user._id, {
+      dodoUsageCredits: credits,
+      dodoUsageCreditPeriodKey: latest?.periodKey,
+      dodoUsageCreditPaidAt: latest?.paidAt,
+      dodoUsageCreditPaymentId: latest?.paymentId,
+    });
+    return { settled: 0, reason: "credited" };
   },
 });
 
@@ -432,6 +938,33 @@ export const recordCheckoutEmailSent = internalMutation({
     if (!invoice) return null;
     await ctx.db.patch(args.invoiceId, { checkoutEmailSentAt: args.nowMs });
     return null;
+  },
+});
+
+export const getInvoiceProvider = internalQuery({
+  args: { invoiceId: v.id("billingInvoices") },
+  returns: v.union(
+    v.object({
+      billingProvider: v.union(v.literal("lemon"), v.literal("dodo"), v.null()),
+      userId: v.id("users"),
+      claimKey: v.string(),
+      totalCents: v.number(),
+      lsOrderId: v.union(v.string(), v.null()),
+      lsCheckoutId: v.union(v.string(), v.null()),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.invoiceId);
+    if (!row) return null;
+    return {
+      billingProvider: row.billingProvider ?? null,
+      userId: row.userId,
+      claimKey: row.claimKey,
+      totalCents: row.totalCents,
+      lsOrderId: row.lsOrderId ?? null,
+      lsCheckoutId: row.lsCheckoutId ?? null,
+    };
   },
 });
 
@@ -461,6 +994,87 @@ export const getInvoiceCheckoutFields = internalQuery({
       lsCheckoutUrl: allowHttpsUrl(row.lsCheckoutUrl),
       expiresAt: row.expiresAt ?? null,
     };
+  },
+});
+
+export const rollbackDodoUsageReclaim = internalMutation({
+  args: {
+    invoiceId: v.id("billingInvoices"),
+    priorIngestedCents: v.number(),
+    priorFeeIds: v.array(v.id("recoveryFees")),
+    error: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.invoiceId);
+    if (!invoice) return null;
+    if (invoice.status === "paid") return null;
+
+    const keep = new Set(args.priorFeeIds);
+    const extra = invoice.feeIds.filter((feeId) => !keep.has(feeId));
+    await unlinkFeesFromInvoice(ctx, invoice._id, extra);
+
+    const snapshot = dodoUsageReclaimFailureSnapshot({
+      priorIngestedCents: args.priorIngestedCents,
+      attemptedTotalCents: invoice.totalCents,
+    });
+    await ctx.db.patch(args.invoiceId, {
+      feeIds: args.priorFeeIds,
+      totalCents: snapshot.totalCents,
+      status: "created",
+      dodoUsageIngestedCents: snapshot.ingestedCents,
+      dodoUsageMeteredFeeIds: args.priorFeeIds,
+      dodoUsageMonthClosed: snapshot.monthClosed ? true : undefined,
+      lastError: args.error.slice(0, 500),
+    });
+    try {
+      await applyMatchingUsageCredit(ctx, args.invoiceId);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "credit_apply_failed";
+      console.error(
+        `Dodo usage credit apply failed after reclaim rollback for ${args.invoiceId}:`,
+        message,
+      );
+    }
+    return null;
+  },
+});
+
+export const markDodoUsageAcceptedCentsSettleable = internalMutation({
+  args: {
+    userId: v.id("users"),
+    periodKey: v.string(),
+  },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("billingInvoices")
+      .withIndex("by_user_period", (q) =>
+        q.eq("userId", args.userId).eq("periodKey", args.periodKey),
+      )
+      .collect();
+
+    let marked = 0;
+    for (const invoice of rows) {
+      if (invoice.status === "paid") continue;
+      if (invoice.dodoUsageSubmittedAt == null) continue;
+      if (invoice.billingProvider === "lemon") continue;
+      await ctx.db.patch(invoice._id, {
+        dodoUsageMonthClosed: true,
+      });
+      try {
+        await applyMatchingUsageCredit(ctx, invoice._id);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "credit_apply_failed";
+        console.error(
+          `Dodo usage credit apply failed after skipped close for ${invoice._id}:`,
+          message,
+        );
+      }
+      marked += 1;
+    }
+    return marked;
   },
 });
 
@@ -533,9 +1147,31 @@ export const findBillingInvoiceForPaidOrder = internalQuery({
     billingInvoiceId: v.optional(v.string()),
     lsCheckoutId: v.optional(v.string()),
     lsOrderId: v.optional(v.string()),
+    dodoCheckoutId: v.optional(v.string()),
+    dodoPaymentId: v.optional(v.string()),
   },
   returns: v.union(v.id("billingInvoices"), v.null()),
   handler: async (ctx, args) => {
+    // Lemon paid path: order id / checkout id first so a webhook body
+    // claim key cannot steal a real order for a different invoice.
+    if (args.lsOrderId) {
+      const byOrder = await ctx.db
+        .query("billingInvoices")
+        .withIndex("by_lsOrderId", (q) => q.eq("lsOrderId", args.lsOrderId))
+        .first();
+      if (byOrder) return byOrder._id;
+    }
+
+    if (args.lsCheckoutId) {
+      const byCheckout = await ctx.db
+        .query("billingInvoices")
+        .withIndex("by_lsCheckoutId", (q) =>
+          q.eq("lsCheckoutId", args.lsCheckoutId),
+        )
+        .first();
+      if (byCheckout) return byCheckout._id;
+    }
+
     if (args.claimKey) {
       const byClaim = await winnerForClaimKey(ctx, args.claimKey);
       if (byClaim) return byClaim._id;
@@ -552,22 +1188,24 @@ export const findBillingInvoiceForPaidOrder = internalQuery({
       }
     }
 
-    if (args.lsCheckoutId) {
-      const byCheckout = await ctx.db
+    if (args.dodoCheckoutId) {
+      const byDodoCheckout = await ctx.db
         .query("billingInvoices")
-        .withIndex("by_lsCheckoutId", (q) =>
-          q.eq("lsCheckoutId", args.lsCheckoutId),
+        .withIndex("by_dodoCheckoutId", (q) =>
+          q.eq("dodoCheckoutId", args.dodoCheckoutId),
         )
         .first();
-      if (byCheckout) return byCheckout._id;
+      if (byDodoCheckout) return byDodoCheckout._id;
     }
 
-    if (args.lsOrderId) {
-      const byOrder = await ctx.db
+    if (args.dodoPaymentId) {
+      const byDodoPayment = await ctx.db
         .query("billingInvoices")
-        .withIndex("by_lsOrderId", (q) => q.eq("lsOrderId", args.lsOrderId))
+        .withIndex("by_dodoPaymentId", (q) =>
+          q.eq("dodoPaymentId", args.dodoPaymentId),
+        )
         .first();
-      if (byOrder) return byOrder._id;
+      if (byDodoPayment) return byDodoPayment._id;
     }
 
     return null;
@@ -585,6 +1223,8 @@ export const markBillingInvoicePaid = internalMutation({
     invoiceId: v.id("billingInvoices"),
     lsOrderId: v.string(),
     lsCheckoutId: v.optional(v.string()),
+    dodoPaymentId: v.optional(v.string()),
+    dodoCheckoutId: v.optional(v.string()),
     orderStatus: v.string(),
     subtotalCents: v.number(),
     totalCents: v.number(),
@@ -615,6 +1255,32 @@ export const markBillingInvoicePaid = internalMutation({
         reason: null,
         feeCount: invoice.feeIds.length,
       };
+    }
+
+    if (args.lsOrderId) {
+      const other = await ctx.db
+        .query("billingInvoices")
+        .withIndex("by_lsOrderId", (q) => q.eq("lsOrderId", args.lsOrderId))
+        .first();
+      if (other && other._id !== invoice._id) {
+        await writeAuditLog(ctx, {
+          actorUserId: null,
+          targetUserId: invoice.userId,
+          action: "fee_invoice:order_already_used",
+          metadata: {
+            invoiceId: invoice._id,
+            lsOrderId: args.lsOrderId,
+            otherInvoiceId: other._id,
+            claimKey: invoice.claimKey,
+          },
+        });
+        return {
+          marked: false,
+          alreadyPaid: false,
+          reason: "order_already_used",
+          feeCount: invoice.feeIds.length,
+        };
+      }
     }
 
     if (args.testMode) {
@@ -698,6 +1364,8 @@ export const markBillingInvoicePaid = internalMutation({
       status: "paid",
       lsOrderId: args.lsOrderId,
       lsCheckoutId: args.lsCheckoutId ?? invoice.lsCheckoutId,
+      dodoPaymentId: args.dodoPaymentId ?? invoice.dodoPaymentId,
+      dodoCheckoutId: args.dodoCheckoutId ?? invoice.dodoCheckoutId,
       paidAt: args.paidAt,
       lastError: undefined,
     });

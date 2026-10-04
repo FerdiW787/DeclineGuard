@@ -627,7 +627,6 @@ export const getDashboardSimulation = query({
           isProduction: v.boolean(),
           replyToEmail: v.union(v.string(), v.null()),
           fromName: v.union(v.string(), v.null()),
-          hasApiKey: v.boolean(),
         }),
         v.null(),
       ),
@@ -663,7 +662,7 @@ export const getDashboardSimulation = query({
         )
         .order("desc")
         .take(SIM_SCAN)
-    ).filter((row) => row.deletedAt == null);
+    ).filter((row) => row.deletedAt == null && row.quotaHeld !== true);
 
     const openFailures = openRows.slice(0, 100).map((row) => ({
       _id: row._id,
@@ -827,7 +826,6 @@ export const getDashboardSimulation = query({
       isProduction: boolean;
       replyToEmail: string | null;
       fromName: string | null;
-      hasApiKey: boolean;
     } | null = null;
     if (connection) {
       const displayName =
@@ -838,7 +836,6 @@ export const getDashboardSimulation = query({
         isProduction: isProductionFromAddress(fromAddress),
         replyToEmail: settings?.replyToEmail ?? null,
         fromName: settings?.fromName ?? null,
-        hasApiKey: Boolean(process.env.RESEND_API_KEY?.trim()),
       };
     }
 

@@ -1,3 +1,4 @@
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import {
   internalMutation,
@@ -21,12 +22,27 @@ import {
   recoveryFeeRate,
   recoveryFeePercent,
   isWithinAttributionWindow,
-  ATTRIBUTION_WINDOW_DAYS,
+  recoveryActivityDetail,
   includedRecoveryEmails,
   emailOveragePacks,
   EMAIL_OVERAGE_PACK_PRICE_USD,
+  countLiveEmailSendsInMonth,
 } from "../lib/accountGuard";
 import { planValidator, recoveryActionValidator } from "../schema";
+import {
+  assignKitForNewSequence,
+  recordKitRecovery,
+} from "../lib/kitExperiment";
+import {
+  quotaHeldAfterLazyRelease,
+  utcMonthStartMs,
+  emailMeterMonthBounds,
+  sumCentsInUtcMonth,
+} from "../lib/declineCapacity";
+import {
+  releaseHeldAndSchedule,
+  shouldHoldInsert,
+} from "../lib/declineHoldQueue";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -329,6 +345,8 @@ export const upsertFailedPayment = internalMutation({
     failureId: v.id("failedPayments"),
     attemptIndex: v.number(),
     recoveryAction: recoveryActionValidator,
+    quotaHeld: v.boolean(),
+    releaseScheduledEmail: v.boolean(),
   }),
   handler: async (ctx, args) => {
     const open = await ctx.db
@@ -343,11 +361,31 @@ export const upsertFailedPayment = internalMutation({
 
     let failureId: Id<"failedPayments">;
     let attemptIndex: number;
+    let quotaHeld = false;
+
+    const owner = await ctx.db.get(args.userId);
+    const scheduledFromRelease = new Set<string>();
+    if (owner) {
+      const released = await releaseHeldAndSchedule(ctx, {
+        userId: owner._id,
+        plan: resolvePlan(owner),
+        packExtra: owner.declinePackExtra,
+        nowMs: Date.now(),
+      });
+      for (const id of released.scheduledFailureIds) {
+        scheduledFromRelease.add(id);
+      }
+    }
 
     if (open) {
-      // Increment attempt index for each new failure webhook on the same open failure
+      // Increment attempt index for each new failure webhook on the same open failure.
+      // In-flight sequences are never flipped to held.
       attemptIndex = (open.attemptIndex ?? 1) + 1;
       const recoveryAction = computeRecoveryAction(attemptIndex);
+      const afterRelease = await ctx.db.get(open._id);
+      quotaHeld = quotaHeldAfterLazyRelease({
+        rowStillHeld: afterRelease?.quotaHeld,
+      });
 
       await ctx.db.patch(open._id, {
         userId: args.userId,
@@ -371,7 +409,14 @@ export const upsertFailedPayment = internalMutation({
       // First failure for this subscription — attempt 1 → wait
       attemptIndex = 1;
       const recoveryAction = computeRecoveryAction(attemptIndex);
+      if (owner) {
+        quotaHeld = await shouldHoldInsert(ctx, owner, {
+          testMode: args.testMode,
+          nowMs: Date.now(),
+        });
+      }
 
+      const assignedKitId = await assignKitForNewSequence(ctx, args.userId);
       failureId = await ctx.db.insert("failedPayments", {
         userId: args.userId,
         connectionId: args.connectionId,
@@ -391,6 +436,8 @@ export const upsertFailedPayment = internalMutation({
         testMode: args.testMode,
         attemptIndex,
         recoveryAction,
+        assignedKitId,
+        quotaHeld,
       });
     }
 
@@ -411,7 +458,69 @@ export const upsertFailedPayment = internalMutation({
       occurredAt: args.failedAt,
     });
 
-    return { failureId, attemptIndex, recoveryAction };
+    return {
+      failureId,
+      attemptIndex,
+      recoveryAction,
+      quotaHeld,
+      releaseScheduledEmail: scheduledFromRelease.has(failureId),
+    };
+  },
+});
+
+export const listHeldDeclineUserPage = internalQuery({
+  args: {
+    nowMs: v.number(),
+    paginationOpts: paginationOptsValidator,
+  },
+  returns: v.object({
+    userIds: v.array(v.id("users")),
+    isDone: v.boolean(),
+    continueCursor: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    const monthStart = utcMonthStartMs(args.nowMs);
+    const page = await ctx.db
+      .query("failedPayments")
+      .withIndex("by_quotaHeld_failedAt", (q) => q.eq("quotaHeld", true))
+      .paginate(args.paginationOpts);
+    const userIds: Array<Id<"users">> = [];
+    const seen = new Set<string>();
+    for (const row of page.page) {
+      if (row.deletedAt != null || row.status !== "open") continue;
+      if (seen.has(row.userId)) continue;
+      seen.add(row.userId);
+      const user = await ctx.db.get(row.userId);
+      if (!user) continue;
+      if (user.declineHoldReleasedMonthStart === monthStart) continue;
+      userIds.push(row.userId);
+    }
+    return {
+      userIds,
+      isDone: page.isDone,
+      continueCursor: page.continueCursor,
+    };
+  },
+});
+
+export const releaseHeldDeclinesForUser = internalMutation({
+  args: {
+    userId: v.id("users"),
+    nowMs: v.number(),
+    force: v.optional(v.boolean()),
+  },
+  returns: v.object({ released: v.number() }),
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) return { released: 0 };
+    const { released } = await releaseHeldAndSchedule(ctx, {
+      userId: user._id,
+      plan: resolvePlan(user),
+      packExtra: user.declinePackExtra,
+      nowMs: args.nowMs,
+      force: args.force,
+    });
+    return { released: released.length };
   },
 });
 
@@ -442,12 +551,14 @@ export const getFailureEmailPayload = internalQuery({
       day0SentAt: v.union(v.number(), v.null()),
       day2SentAt: v.union(v.number(), v.null()),
       day5SentAt: v.union(v.number(), v.null()),
+      assignedKitId: v.union(v.string(), v.null()),
     }),
     v.null(),
   ),
   handler: async (ctx, args) => {
     const failure = await ctx.db.get(args.failureId);
     if (!failure || failure.deletedAt != null) return null;
+    if (failure.quotaHeld === true) return null;
 
     const owner = await ctx.db.get(failure.userId);
     if (!owner) return null;
@@ -481,6 +592,7 @@ export const getFailureEmailPayload = internalQuery({
       day0SentAt: failure.day0SentAt ?? null,
       day2SentAt: failure.day2SentAt ?? null,
       day5SentAt: failure.day5SentAt ?? null,
+      assignedKitId: failure.assignedKitId ?? null,
     };
   },
 });
@@ -885,15 +997,15 @@ export const markPaymentRecovered = internalMutation({
     });
 
     const amountLabel = formatMoney(args.amountCents, args.currency);
-    const attributed =
-      open.day0SentAt != null &&
-      isWithinAttributionWindow(open.day0SentAt, args.recoveredAt);
-    const recoveryDetail =
-      open.day0SentAt == null
-        ? `${amountLabel} · Lemon Squeezy recovered before our sequence`
-        : attributed
-          ? `${amountLabel} · Recovered after our sequence started`
-          : `${amountLabel} · Recovered after the ${ATTRIBUTION_WINDOW_DAYS}-day attribution window`;
+    const attributed = isWithinAttributionWindow(
+      open.day0SentAt,
+      args.recoveredAt,
+    );
+    const recoveryDetail = recoveryActivityDetail(
+      amountLabel,
+      open.day0SentAt,
+      args.recoveredAt,
+    );
 
     await ctx.db.insert("activityEvents", {
       userId: args.userId,
@@ -910,11 +1022,11 @@ export const markPaymentRecovered = internalMutation({
 
     // Plan-aware recovery fee ledger:
     // - Skip test-mode recoveries
-    // - Skip if no recovery email was ever sent (day0SentAt null = LS recovered on its own)
-    // - Skip if recovered after the attribution window
+    // - Skip if no Day-0 send, recoveredAt before Day-0, or gap past 30 days
     // - Fee rate: Free = 10%, Pro = 4%
     // - Idempotent via by_failure index
     if (!open.testMode && attributed) {
+      await recordKitRecovery(ctx, args.userId, open.assignedKitId);
       const existingFee = await ctx.db
         .query("recoveryFees")
         .withIndex("by_failure", (q) => q.eq("failureId", open._id))
@@ -1215,7 +1327,7 @@ export const getRecoverySummary = query({
         )
         .order("desc")
         .take(SUMMARY_SCAN_LIMIT)
-    ).filter((row) => row.deletedAt == null);
+    ).filter((row) => row.deletedAt == null && row.quotaHeld !== true);
 
     const openMoney = primaryCurrencyTotals(openRows);
     let cohortOpenCount = 0;
@@ -1318,11 +1430,9 @@ export const getRecoverySummary = query({
   },
 });
 
-const EMAIL_QUOTA_SCAN_LIMIT = 2000;
-
 /** Monthly recovery-email quota (soft overage — never blocks a sequence). */
 export const getEmailQuotaStatus = query({
-  args: { monthStartMs: v.number() },
+  args: { nowMs: v.number() },
   returns: v.object({
     plan: planValidator,
     sent: v.number(),
@@ -1351,21 +1461,21 @@ export const getEmailQuotaStatus = query({
 
     const plan = resolvePlan(user);
     const included = includedRecoveryEmails(plan);
-    const rows = (
-      await ctx.db
-        .query("activityEvents")
-        .withIndex("by_user_type_occurred", (q) =>
-          q.eq("userId", user._id).eq("type", "email_sent"),
-        )
-        .order("desc")
-        .take(EMAIL_QUOTA_SCAN_LIMIT)
-    ).filter((row) => row.deletedAt == null);
-
-    let sent = 0;
-    for (const row of rows) {
-      if (row.occurredAt < args.monthStartMs) break;
-      sent += 1;
-    }
+    const { startMs, endMs } = emailMeterMonthBounds(args.nowMs);
+    // UTC month from nowMs. Do not take a newest-N slice then drop deletes,
+    // and do not treat a client local midnight as a UTC month start.
+    // eslint-disable-next-line @convex-dev/no-query-collect
+    const rows = await ctx.db
+      .query("activityEvents")
+      .withIndex("by_user_type_occurred", (q) =>
+        q
+          .eq("userId", user._id)
+          .eq("type", "email_sent")
+          .gte("occurredAt", startMs)
+          .lt("occurredAt", endMs),
+      )
+      .collect();
+    const sent = countLiveEmailSendsInMonth(rows, startMs, endMs);
 
     const remaining = Math.max(0, included - sent);
     const overageEmails = Math.max(0, sent - included);
@@ -1420,9 +1530,12 @@ export const listOpenFailures = query({
         q.eq("userId", user._id).eq("status", "open"),
       )
       .order("desc")
-      .take(limit);
+      .take(800);
 
-    return rows.filter((row) => row.deletedAt == null).map(mapOpenFailure);
+    return rows
+      .filter((row) => row.deletedAt == null && row.quotaHeld !== true)
+      .slice(0, limit)
+      .map(mapOpenFailure);
   },
 });
 
@@ -1806,9 +1919,81 @@ export const listActivityCustomerEmails = query({
   },
 });
 
+type FeesSummary = {
+  owedThisMonthCents: number;
+  owedAllTimeCents: number;
+  owedCount: number;
+  currency: string | null;
+  currencyMixed: boolean;
+  plan: "free" | "pro";
+  recoveryFeePercent: number;
+};
+
+const emptyFeesSummary = (): FeesSummary => ({
+  owedThisMonthCents: 0,
+  owedAllTimeCents: 0,
+  owedCount: 0,
+  currency: null,
+  currencyMixed: false,
+  plan: "free",
+  recoveryFeePercent: recoveryFeePercent("free"),
+});
+
+/** Server UTC month from nowMs. Does not take a client monthStartMs. */
+async function feesSummaryForUser(
+  ctx: QueryCtx,
+  user: Doc<"users">,
+  nowMs: number,
+): Promise<FeesSummary> {
+  const plan = resolvePlan(user);
+
+  const rows = await ctx.db
+    .query("recoveryFees")
+    .withIndex("by_user_recoveredAt", (q) => q.eq("userId", user._id))
+    .order("desc")
+    .take(SUMMARY_SCAN_LIMIT);
+
+  const owed = rows.filter((r) => r.status === "owed" && !r.testMode);
+  let owedAllTimeCents = 0;
+  const byCurrency = new Map<string, number>();
+
+  for (const row of owed) {
+    owedAllTimeCents += row.feeCents;
+    const code = row.currency.trim().toUpperCase() || "USD";
+    byCurrency.set(code, (byCurrency.get(code) ?? 0) + row.feeCents);
+  }
+  const owedThisMonthCents = sumCentsInUtcMonth(
+    owed.map((row) => ({ atMs: row.recoveredAt, cents: row.feeCents })),
+    nowMs,
+  );
+
+  let currency: string | null = null;
+  let max = 0;
+  for (const [code, total] of byCurrency) {
+    if (total > max) {
+      max = total;
+      currency = code;
+    }
+  }
+
+  return {
+    owedThisMonthCents,
+    owedAllTimeCents,
+    owedCount: owed.length,
+    currency,
+    currencyMixed: byCurrency.size > 1,
+    plan,
+    recoveryFeePercent: recoveryFeePercent(plan),
+  };
+}
+
 /** Fee ledger summary for Overview / Settings (product user, including takeover). */
 export const getFeesSummary = query({
-  args: { monthStartMs: v.number() },
+  args: {
+    nowMs: v.number(),
+    /** Staff live snapshot: this merchant, never the signed-in viewer. */
+    merchantUserId: v.optional(v.id("users")),
+  },
   returns: v.object({
     owedThisMonthCents: v.number(),
     owedAllTimeCents: v.number(),
@@ -1819,57 +2004,17 @@ export const getFeesSummary = query({
     recoveryFeePercent: v.number(),
   }),
   handler: async (ctx, args) => {
-    const empty = {
-      owedThisMonthCents: 0,
-      owedAllTimeCents: 0,
-      owedCount: 0,
-      currency: null as string | null,
-      currencyMixed: false,
-      plan: "free" as const,
-      recoveryFeePercent: recoveryFeePercent("free"),
-    };
+    if (args.merchantUserId !== undefined) {
+      const actor = await requireStaff(ctx);
+      const merchant = await ctx.db.get(args.merchantUserId);
+      if (!merchant) throw new Error("User not found");
+      assertCanActOnTarget(actor, merchant);
+      return await feesSummaryForUser(ctx, merchant, args.nowMs);
+    }
+
     const user = await requireUser(ctx);
-    if (!user) return empty;
-    const plan = resolvePlan(user);
-
-    const rows = await ctx.db
-      .query("recoveryFees")
-      .withIndex("by_user_recoveredAt", (q) => q.eq("userId", user._id))
-      .order("desc")
-      .take(SUMMARY_SCAN_LIMIT);
-
-    const owed = rows.filter((r) => r.status === "owed" && !r.testMode);
-    let owedThisMonthCents = 0;
-    let owedAllTimeCents = 0;
-    const byCurrency = new Map<string, number>();
-
-    for (const row of owed) {
-      owedAllTimeCents += row.feeCents;
-      if (row.recoveredAt >= args.monthStartMs) {
-        owedThisMonthCents += row.feeCents;
-      }
-      const code = row.currency.trim().toUpperCase() || "USD";
-      byCurrency.set(code, (byCurrency.get(code) ?? 0) + row.feeCents);
-    }
-
-    let currency: string | null = null;
-    let max = 0;
-    for (const [code, total] of byCurrency) {
-      if (total > max) {
-        max = total;
-        currency = code;
-      }
-    }
-
-    return {
-      owedThisMonthCents,
-      owedAllTimeCents,
-      owedCount: owed.length,
-      currency,
-      currencyMixed: byCurrency.size > 1,
-      plan,
-      recoveryFeePercent: recoveryFeePercent(plan),
-    };
+    if (!user) return emptyFeesSummary();
+    return await feesSummaryForUser(ctx, user, args.nowMs);
   },
 });
 

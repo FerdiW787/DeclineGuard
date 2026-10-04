@@ -15,6 +15,20 @@ import {
 } from "@/lib/emailFonts";
 import { DEFAULT_EMAIL_COPY } from "@/lib/recoveryEmailCopy";
 import EmailPreviewBody from "./EmailPreviewBody";
+import EmailLayoutStudio from "./email-layouts/EmailLayoutStudio";
+import {
+  configuredTokensFromSettings,
+  type EmailThemeTokens,
+} from "@/lib/emailTheme";
+import {
+  loadEmailLayoutDraft,
+  persistEmailLayoutSettings,
+} from "@/lib/emailLayoutDraft";
+import {
+  useEmailThemeQuery,
+  useImportBrandFromStorefront,
+  usePersistEmailTheme,
+} from "@/lib/useEmailThemeApi";
 import { applyClerkDisplayName } from "@/components/auth/clerkDisplayName";
 import {
   AuthBrandMark,
@@ -82,7 +96,14 @@ function brandScanErrorMessage(err: unknown): string {
 
 type BrandPhase = "idle" | "scanning" | "ready" | "saving";
 
-type Step = "welcome" | "link" | "webhook" | "verifying" | "brand" | "done";
+type Step =
+  | "welcome"
+  | "link"
+  | "webhook"
+  | "verifying"
+  | "brand"
+  | "layout"
+  | "done";
 
 type Props = {
   open: boolean;
@@ -109,7 +130,7 @@ const DEFAULT_BRAND = "#0c0c0c";
 const DEFAULT_TEMPLATE = "gentle" as const;
 const VERIFY_TIMEOUT_MS = 75_000;
 
-const FLOW_STEPS = ["welcome", "link", "webhook", "brand"] as const;
+const FLOW_STEPS = ["welcome", "link", "webhook", "brand", "layout"] as const;
 
 function flowStepIndex(step: Step): number {
   if (step === "done") return FLOW_STEPS.length;
@@ -128,11 +149,14 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
   const saveRecoverySettings = useMutation(
     api.functions.recoverySettings.saveSettings,
   );
-  const importBrand = useAction(
-    api.functions.brandImportActions.importBrandFromDomain,
-  );
+  const importBrand = useImportBrandFromStorefront();
+  const persistEmailTheme = usePersistEmailTheme();
+  const emailTheme = useEmailThemeQuery();
   const completeBrandImport = useMutation(
     api.functions.recoverySettings.completeBrandImport,
+  );
+  const saveEmailColors = useMutation(
+    api.functions.recoverySettings.saveEmailColors,
   );
   const overlayRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -164,6 +188,9 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
   const [brandDomain, setBrandDomain] = useState("");
   const [brandError, setBrandError] = useState("");
   const [brandKit, setBrandKit] = useState<BrandKit | null>(null);
+  const [layoutConfigured, setLayoutConfigured] = useState<
+    Partial<EmailThemeTokens>
+  >({});
 
   const completedRef = useRef(false);
   const revealedRef = useRef(false);
@@ -187,7 +214,7 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
 
   const connection = useQuery(
     api.functions.lemonSqueezy.getConnection,
-    open && !preview && step === "brand" ? {} : "skip",
+    open && !preview && (step === "brand" || step === "layout") ? {} : "skip",
   );
 
   // Reset when opened
@@ -216,6 +243,7 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
     setBrandDomain("");
     setBrandError("");
     setBrandKit(null);
+    setLayoutConfigured({});
     gsap.set(overlayRef.current, { yPercent: 0, clearProps: "transform" });
   }, [open]);
 
@@ -444,9 +472,24 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
     setBrandPhase("saving");
     setBrandError("");
     try {
+      const configured = configuredTokensFromSettings({
+        brandColor: brandKit.brandColor,
+        secondaryColor: brandKit.secondaryColor,
+        mutedTextColor: brandKit.mutedTextColor,
+        emailBackgroundColor: brandKit.emailBackgroundColor,
+        emailTextColor: brandKit.emailTextColor,
+        pageBackgroundColor: brandKit.pageBackgroundColor,
+        pageTextColor: brandKit.pageTextColor,
+        linkColor: brandKit.linkColor,
+        ctaBackgroundColor: brandKit.ctaBackgroundColor,
+        ctaTextColor: brandKit.ctaTextColor,
+        ctaBorderRadiusPx: brandKit.ctaBorderRadiusPx,
+        emailFont: brandKit.emailFont,
+      });
       if (preview) {
         await delay(500);
-        setStep("done");
+        setLayoutConfigured(configured);
+        setStep("layout");
         return;
       }
       await completeBrandImport({
@@ -468,7 +511,8 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
         fontFamilyRaw: brandKit.fontFamilyRaw ?? undefined,
         brandCaptureMethod: brandKit.captureMethod,
       });
-      setStep("done");
+      setLayoutConfigured(configured);
+      setStep("layout");
     } catch (err) {
       setBrandError(
         err instanceof Error ? err.message : "Couldn’t save email branding",
@@ -476,6 +520,36 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
       setBrandPhase("ready");
     }
   }, [brandKit, brandPhase, completeBrandImport, preview]);
+
+  const finishLayout = useCallback(async () => {
+    const draft = loadEmailLayoutDraft();
+    persistEmailLayoutSettings({
+      draft,
+      configured: layoutConfigured,
+    });
+    if (!preview) {
+      await persistEmailTheme({
+        stylingMode: draft.stylingMode,
+      });
+    }
+    if (
+      !preview &&
+      layoutConfigured.brandColor &&
+      /^#([0-9a-fA-F]{6})$/.test(layoutConfigured.brandColor)
+    ) {
+      try {
+        await saveEmailColors({
+          brandColor: layoutConfigured.brandColor,
+          secondaryColor:
+            layoutConfigured.mutedTextColor ||
+            layoutConfigured.brandColor,
+        });
+      } catch {
+        /* layout stays in FE draft; colors can be finished in Customizations */
+      }
+    }
+    setStep("done");
+  }, [layoutConfigured, persistEmailTheme, preview, saveEmailColors]);
 
   const failVerifyBackToWebhook = useCallback(() => {
     if (verifyFailHandledRef.current) return;
@@ -620,10 +694,14 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
             : "Add your domain",
       body:
         brandPhase === "ready" || brandPhase === "saving"
-          ? "Confirm the kit — you can tweak anything later in Customizations."
+          ? "Confirm the kit — next you’ll pick a layout for Day 0, Day 2, and Day 5."
           : brandPhase === "scanning"
             ? `Capturing ${brandDomain.trim() || "your site"} and shaping Day 0.`
             : "We’ll match colors, CTA, and fonts from your marketing site.",
+    },
+    layout: {
+      title: "Choose a recovery layout",
+      body: "One layout styles Day 0, Day 2, and Day 5. You can change this later.",
     },
   };
 
@@ -646,10 +724,12 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
       <div className="flex h-full flex-col items-center justify-center overflow-y-auto px-5 py-16">
         <div
           className={`w-full text-center ${
-            step === "brand" &&
-            (brandPhase === "ready" || brandPhase === "saving")
-              ? "max-w-[26rem]"
-              : "max-w-[20.5rem]"
+            step === "layout"
+              ? "max-w-[44rem]"
+              : step === "brand" &&
+                  (brandPhase === "ready" || brandPhase === "saving")
+                ? "max-w-[26rem]"
+                : "max-w-[20.5rem]"
           }`}
         >
           {step === "done" ? (
@@ -1246,12 +1326,69 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                                   Saving…
                                 </>
                               ) : (
-                                "Use this & finish"
+                                "Continue"
                               )}
                             </button>
                           </div>
                         </>
                       ) : null}
+                    </div>
+                  ) : null}
+
+                  {step === "layout" ? (
+                    <div className="mt-8 space-y-4 text-left">
+                      <EmailLayoutStudio
+                        variant="onboarding"
+                        storeName={
+                          brandKit?.fromName ||
+                          storeName.trim() ||
+                          "Your store"
+                        }
+                        storeLogoUrl={
+                          brandKit?.storeLogoUrl ??
+                          connection?.storeAvatarUrl ??
+                          null
+                        }
+                        configured={layoutConfigured}
+                        onPersistTheme={persistEmailTheme}
+                        serverTheme={
+                          emailTheme
+                            ? {
+                                stylingMode: emailTheme.stylingMode,
+                                layoutPresetId: emailTheme.layoutPresetId,
+                              }
+                            : null
+                        }
+                        onConfiguredChange={(patch) =>
+                          setLayoutConfigured((prev) => ({
+                            ...prev,
+                            ...patch,
+                          }))
+                        }
+                        emailFont={brandKit?.emailFont}
+                        footerSupport={
+                          brandKit?.domain
+                            ? `support@${brandKit.domain}`
+                            : undefined
+                        }
+                        showDeclineGuardBadge={false}
+                      />
+                      <div className="flex items-center justify-end gap-4 pt-1">
+                        <button
+                          type="button"
+                          className="text-[13px] font-medium text-[#8a8f98] transition hover:text-[#08090a]"
+                          onClick={() => setStep("brand")}
+                        >
+                          Back
+                        </button>
+                        <button
+                          type="button"
+                          className={authBtnPrimary}
+                          onClick={() => void finishLayout()}
+                        >
+                          Finish
+                        </button>
+                      </div>
                     </div>
                   ) : null}
                 </div>

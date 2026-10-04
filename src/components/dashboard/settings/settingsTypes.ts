@@ -44,7 +44,6 @@ export type SettingsEmailSetup = {
   isProduction: boolean;
   replyToEmail: string | null;
   fromName: string | null;
-  hasApiKey: boolean;
 } | null;
 
 export type SettingsModuleProps = {
@@ -58,7 +57,6 @@ export type SettingsModuleProps = {
   planTier?: string;
   planId?: "free" | "pro";
   lsSubscriptionStatus?: string | null;
-  recoveryFeePercent?: number;
   webhookSetup: SettingsWebhookSetup | undefined;
   webhookStatus?: SettingsWebhookStatus | undefined;
   feesSummary?: SettingsFeesSummary | undefined;

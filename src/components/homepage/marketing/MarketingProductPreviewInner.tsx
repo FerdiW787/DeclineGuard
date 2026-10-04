@@ -93,6 +93,7 @@ export function MarketingProductPreviewInner({
             recoveryRateLabel={marketingOverviewLabels.recoveryRateLabel}
             feesOwedLabel={marketingOverviewLabels.feesOwedLabel}
             youKeepLabel={live.youKeepLabel}
+            recoveryFeePercent={10}
             openFailures={marketingOpenFailures}
             recentActivity={marketingActivity}
             brandColor={marketingStore.brandColor}
@@ -113,7 +114,6 @@ export function MarketingProductPreviewInner({
             emailSetup={{
               fromAddress: marketingStore.fromAddressHint,
               isProduction: true,
-              hasApiKey: true,
             }}
             chartsReady
             kpiLive={live.kpiLive}

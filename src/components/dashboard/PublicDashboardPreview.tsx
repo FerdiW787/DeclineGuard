@@ -219,6 +219,7 @@ export default function PublicDashboardPreview() {
                 recoveryRateLabel="81%"
                 feesOwedLabel="€389"
                 youKeepLabel="€3,502"
+                recoveryFeePercent={10}
                 openFailures={previewOpenFailures}
                 recentActivity={marketingActivity}
                 brandColor="#0c0c0c"
@@ -239,7 +240,6 @@ export default function PublicDashboardPreview() {
                 emailSetup={{
                   fromAddress: "Amonen <noreply@declineguard.com>",
                   isProduction: true,
-                  hasApiKey: true,
                 }}
                 chartsReady
                 onNavigate={() => undefined}
@@ -282,7 +282,6 @@ export default function PublicDashboardPreview() {
           isProduction: true,
           replyToEmail: "hello@amonen.com",
           fromName: "Amonen",
-          hasApiKey: true,
         }}
         brandColor="#c6fe1e"
         allowDisconnect={false}

@@ -8,6 +8,12 @@ import {
   buildRecoveryEmail,
   type RecoveryTemplateId,
 } from "../lib/recoveryEmailTemplate";
+import {
+  requireLayoutKit,
+  recoveryColorsFromTheme,
+  resolveSendTheme,
+  type LayoutPresetId,
+} from "../lib/emailTheme";
 import { resolveFromAddress } from "../lib/recoveryEmailFrom";
 import { isResendQuotaError, parseResendError } from "../lib/resendErrors";
 
@@ -42,10 +48,16 @@ export const sendStep = internalAction({
   args: {
     previewId: v.id("previewSequences"),
     step: previewStepValidator,
+    layoutKit: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await runPreviewStep(ctx, args.previewId, args.step);
+    await runPreviewStep(
+      ctx,
+      args.previewId,
+      args.step,
+      requireLayoutKit(args.layoutKit),
+    );
     return null;
   },
 });
@@ -54,6 +66,7 @@ async function runPreviewStep(
   ctx: ActionCtx,
   previewId: Id<"previewSequences">,
   step: PreviewStep,
+  layoutKit: LayoutPresetId,
 ) {
   const claim = await ctx.runMutation(
     internal.functions.previewSequence.claimStep,
@@ -90,8 +103,8 @@ async function runPreviewStep(
   );
 
   const templateId = STEP_TEMPLATE[step];
-  const primaryColor = settings?.brandColor ?? "#0c0c0c";
-  const secondaryColor = settings?.secondaryColor ?? "#6b6b70";
+  const theme = resolveSendTheme(layoutKit, settings);
+  const colors = recoveryColorsFromTheme(theme.tokens);
   const amountLabel = formatMoney(
     PREVIEW_SAMPLE.amountCents,
     PREVIEW_SAMPLE.currency,
@@ -104,8 +117,9 @@ async function runPreviewStep(
 
   const email = buildRecoveryEmail({
     templateId,
-    primaryColor,
-    secondaryColor,
+    layoutPresetId: theme.layoutPresetId,
+    primaryColor: colors.primaryColor,
+    secondaryColor: colors.secondaryColor,
     storeName: payload.storeName,
     storeLogoUrl: payload.storeAvatarUrl,
     customerName: PREVIEW_SAMPLE.customerName,
@@ -122,15 +136,16 @@ async function runPreviewStep(
     },
     showDeclineGuardBadge: true,
     copyOverrides: settings?.emailCopy ?? null,
-    emailFont: settings?.emailFont,
-    ctaBackgroundColor: settings?.ctaBackgroundColor,
-    ctaTextColor: settings?.ctaTextColor,
-    ctaBorderRadiusPx: settings?.ctaBorderRadiusPx,
-    emailBackgroundColor:
-      settings?.pageBackgroundColor ?? settings?.emailBackgroundColor,
-    emailTextColor: settings?.pageTextColor ?? settings?.emailTextColor,
-    linkColor: settings?.linkColor,
-    fontFamilyRaw: settings?.fontFamilyRaw,
+    emailFont: colors.emailFont,
+    ctaBackgroundColor: colors.ctaBackgroundColor,
+    ctaTextColor: colors.ctaTextColor,
+    ctaBorderRadiusPx: colors.ctaBorderRadiusPx,
+    emailBackgroundColor: colors.emailBackgroundColor,
+    emailTextColor: colors.emailTextColor,
+    pageBackgroundColor: colors.pageBackgroundColor,
+    pageTextColor: colors.pageTextColor,
+    linkColor: colors.linkColor,
+    fontFamilyRaw: colors.fontFamilyRaw,
   });
 
   const displayName =
@@ -192,6 +207,7 @@ async function runPreviewStep(
   await ctx.runMutation(internal.functions.previewSequence.recordStepSent, {
     previewId,
     step,
+    layoutKit,
   });
 }
 

@@ -13,12 +13,18 @@ import {
   writeAuditLog,
   normalizeRole,
   assertCanActOnTarget,
+  assertCurrentStoreOwnerMayBeReclaimed,
+  reclaimLiveConnectionMaySoftDelete,
   canBanAccounts,
   requireActionReason,
   isReversibleAuditAction,
 } from "../lib/admin";
 import { accountStatusOf, isSoftDeleted, resolvePlan } from "../lib/accountGuard";
-import { planValidator } from "../schema";
+import { billingProviderValidator, planValidator } from "../schema";
+import {
+  canPinBillingProvider,
+  parseBillingProvider,
+} from "../lib/billingProvider";
 
 const accountStatusValidator = v.union(
   v.literal("active"),
@@ -714,11 +720,44 @@ export const reclaimStore = mutation({
     for (const binding of liveBindings) {
       if (binding.userId === args.toUserId) continue;
       const otherConn = await ctx.db.get(binding.connectionId);
-      if (otherConn && !isSoftDeleted(otherConn)) {
-        await softDeleteConnectionAsAdmin(ctx, otherConn);
-      } else {
+      if (!otherConn || isSoftDeleted(otherConn)) {
         await ctx.db.delete(binding._id);
+        continue;
       }
+
+      const currentOwner = await ctx.db.get(binding.userId);
+      const connOwner =
+        otherConn.userId === binding.userId
+          ? currentOwner
+          : await ctx.db.get(otherConn.userId);
+      const liveDecision = reclaimLiveConnectionMaySoftDelete({
+        bindingOwner: currentOwner,
+        connectionOwner: connOwner,
+      });
+      if (!liveDecision.allow) {
+        switch (liveDecision.reason) {
+          case "missing_owner":
+            throw new Error("Current store owner not found");
+          case "privileged_owner":
+            throw new Error(
+              "Cannot reclaim a store from a Staff or Admin account.",
+            );
+          default: {
+            const _never: never = liveDecision.reason;
+            throw new Error(_never);
+          }
+        }
+      }
+      if (currentOwner) {
+        assertCanActOnTarget(actor, currentOwner);
+        assertCurrentStoreOwnerMayBeReclaimed(currentOwner);
+      }
+      if (connOwner) {
+        assertCanActOnTarget(actor, connOwner);
+        assertCurrentStoreOwnerMayBeReclaimed(connOwner);
+      }
+
+      await softDeleteConnectionAsAdmin(ctx, otherConn);
     }
 
     let connection = await ctx.db
@@ -1025,6 +1064,68 @@ export const setUserPlan = mutation({
         priorPlan,
         lsSubscriptionId: user.lsSubscriptionId ?? null,
         lsSubscriptionStatus: user.lsSubscriptionStatus ?? null,
+      },
+    });
+    return null;
+  },
+});
+
+/**
+ * Staff/admin: pin a merchant to lemon or dodo.
+ * Existing Lemon Pro stays lemon until this is set to dodo (after they
+ * cancel LS or complete a Dodo checkout). Dodo has no subscription import.
+ */
+export const adminSetBillingProvider = mutation({
+  args: {
+    userId: v.id("users"),
+    billingProvider: billingProviderValidator,
+    reason: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const actor = await requireStaff(ctx);
+    const user = await ctx.db.get(args.userId);
+    if (!user) throw new Error("User not found");
+    assertCanActOnTarget(actor, user);
+
+    const reason = requireActionReason(args.reason);
+    const next = parseBillingProvider(args.billingProvider);
+    if (!next) throw new Error("Invalid billing provider");
+    const prior = user.billingProvider ?? null;
+    if (prior === next) return null;
+
+    const pin = canPinBillingProvider({
+      next,
+      lsStatus: user.lsSubscriptionStatus,
+      dodoStatus: user.dodoSubscriptionStatus,
+    });
+    if (!pin.ok) {
+      switch (pin.reason) {
+        case "ls_subscription_active":
+          throw new Error(
+            "Cannot pin Dodo while Lemon Squeezy Pro is still active. Cancel or expire the LS subscription first.",
+          );
+        case "dodo_subscription_active":
+          throw new Error(
+            "Cannot pin Lemon Squeezy while Dodo Pro is still active. Cancel the Dodo subscription first.",
+          );
+        default: {
+          const _never: never = pin.reason;
+          throw new Error(_never);
+        }
+      }
+    }
+
+    await ctx.db.patch(args.userId, { billingProvider: next });
+    await writeAuditLog(ctx, {
+      actorUserId: actor._id,
+      targetUserId: user._id,
+      action: `billing_provider:${next}`,
+      reason,
+      metadata: {
+        priorProvider: prior,
+        lsSubscriptionId: user.lsSubscriptionId ?? null,
+        dodoSubscriptionId: user.dodoSubscriptionId ?? null,
       },
     });
     return null;

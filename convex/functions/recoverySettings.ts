@@ -19,16 +19,50 @@ import {
 } from "../lib/accountGuard";
 import { emailCopyValidator } from "../lib/emailBlockValidators";
 import {
+  persistTextBlockHtml,
+  persistTextCopySlot,
+} from "../lib/emailBlocks";
+import {
   DEFAULT_EMAIL_FONT,
   emailFontValidator,
   normalizeEmailFont,
 } from "../lib/emailFonts";
-import { validateDomainInput } from "../lib/brandImport/domain";
+import {
+  lemonStorefrontDomain,
+  validateDomainInput,
+} from "../lib/brandImport/domain";
 import {
   evaluateBrandImportQuota,
   type BrandImportQuota,
 } from "../lib/brandImport/brandKit";
-import { requireStaff } from "../lib/admin";
+import {
+  NEW_MERCHANT_THEME_DEFAULTS,
+  RECOVERY_SEQUENCE_STEPS,
+  configuredTokensFromSettings,
+  inferStylingMode,
+  listLayoutPresets,
+  normalizeLayoutPresetId,
+  recoveryColorsFromTheme,
+  recoverySequenceStepValidator,
+  resolveRecoveryEmailTheme,
+  resolveTheme,
+  resolveThemeFromSettings,
+  catalogSummaryValidator,
+  emailThemeTokensValidator,
+  isRecoverySequenceStep,
+  resolvedEmailThemeValidator,
+  stylingModeValidator,
+} from "../lib/emailTheme";
+import { buildRecoveryEmail } from "../lib/recoveryEmailTemplate";
+import {
+  requireActionReason,
+  requireStaff,
+  writeAuditLog,
+} from "../lib/admin";
+import {
+  resetKitExperimentForUser,
+  resolveSendKit,
+} from "../lib/kitExperiment";
 import { consumeRateLimit } from "../lib/rateLimit";
 import { assertStorageOwnedByUser } from "../lib/storageOwnership";
 
@@ -72,6 +106,9 @@ const settingsValidator = v.object({
   brandCaptureMethod: v.union(brandCaptureMethodValidator, v.null()),
   lastBrandImportAt: v.union(v.number(), v.null()),
   brandImportBonusCredits: v.number(),
+  stylingMode: stylingModeValidator,
+  layoutPresetId: v.string(),
+  kitExperimentStatus: v.union(v.literal("active"), v.literal("won")),
   updatedAt: v.number(),
 });
 
@@ -149,6 +186,7 @@ type EmailBlockInput = {
   italic?: boolean;
   underline?: boolean;
   align?: string;
+  copySlot?: string;
   src?: string;
   alt?: string;
   width?: number;
@@ -221,6 +259,13 @@ function normalizeHttpsUrl(value: string | undefined, max = 2000): string {
   }
 }
 
+/** Internal/admin seed path — public save strips blocks and does not call this. */
+export function normalizeEmailBlockForSeed(
+  block: EmailBlockInput,
+): EmailBlockInput | null {
+  return normalizeBlock(block);
+}
+
 function normalizeBlock(block: EmailBlockInput): EmailBlockInput | null {
   const id = clampText(block.id, 80);
   if (!id) return null;
@@ -231,15 +276,7 @@ function normalizeBlock(block: EmailBlockInput): EmailBlockInput | null {
 
   switch (block.type) {
     case "text": {
-      const html = (clampText(block.html, 4000) ?? "")
-        .replace(
-          /(\S)(<a\b[^>]*href="(?:#update-payment|#billing)")/gi,
-          "$1 $2",
-        )
-        .replace(
-          /(<a\b[^>]*href="(?:#update-payment|#billing)"[^>]*>[\s\S]*?<\/a>)(\S)/gi,
-          "$1 $2",
-        );
+      const html = persistTextBlockHtml(clampText(block.html, 4000) ?? "");
       const color =
         block.color === "muted" || block.color === "link"
           ? block.color
@@ -248,6 +285,7 @@ function normalizeBlock(block: EmailBlockInput): EmailBlockInput | null {
       const hexColor = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)
         ? hex
         : undefined;
+      const copySlot = persistTextCopySlot(block.copySlot);
       return {
         id,
         type: "text",
@@ -259,6 +297,7 @@ function normalizeBlock(block: EmailBlockInput): EmailBlockInput | null {
         italic: block.italic === true ? true : undefined,
         underline: block.underline === true ? true : undefined,
         align,
+        ...(copySlot ? { copySlot } : {}),
         marginTop,
         marginBottom,
       };
@@ -391,13 +430,6 @@ function normalizeEditableCopy(
     typeof input.shellRadius === "number"
       ? clampNumber(input.shellRadius, 0, 48)
       : undefined;
-  const blocks = Array.isArray(input.blocks)
-    ? input.blocks
-        .slice(0, 40)
-        .map(normalizeBlock)
-        .filter((b): b is EmailBlockInput => b != null)
-    : undefined;
-
   if (
     !subject &&
     !headline &&
@@ -409,8 +441,7 @@ function normalizeEditableCopy(
     !shellBorderColor &&
     shellBorder === undefined &&
     shellBorderWidth === undefined &&
-    shellRadius === undefined &&
-    (!blocks || blocks.length === 0)
+    shellRadius === undefined
   ) {
     return undefined;
   }
@@ -419,7 +450,6 @@ function normalizeEditableCopy(
     ...(headline ? { headline } : {}),
     ...(body ? { body } : {}),
     ...(cta ? { cta } : {}),
-    ...(blocks && blocks.length > 0 ? { blocks } : {}),
     ...(linkColor ? { linkColor } : {}),
     ...(emailPadding !== undefined ? { emailPadding } : {}),
     ...(shellBackground ? { shellBackground } : {}),
@@ -479,6 +509,10 @@ function mapSettings(row: Doc<"recoverySettings">) {
     brandCaptureMethod: row.brandCaptureMethod ?? null,
     lastBrandImportAt: row.lastBrandImportAt ?? null,
     brandImportBonusCredits: Math.max(0, row.brandImportBonusCredits ?? 0),
+    stylingMode: inferStylingMode(row),
+    layoutPresetId: normalizeLayoutPresetId(row.layoutPresetId),
+    kitExperimentStatus:
+      row.kitExperimentStatus === "won" ? ("won" as const) : ("active" as const),
     updatedAt: row.updatedAt,
   };
 }
@@ -524,7 +558,6 @@ export const getEmailSetup = query({
       isProduction: v.boolean(),
       replyToEmail: v.union(v.string(), v.null()),
       fromName: v.union(v.string(), v.null()),
-      hasApiKey: v.boolean(),
     }),
     v.null(),
   ),
@@ -557,7 +590,6 @@ export const getEmailSetup = query({
       isProduction: isProductionFromAddress(fromAddress),
       replyToEmail: activeSettings?.replyToEmail ?? null,
       fromName: activeSettings?.fromName ?? null,
-      hasApiKey: Boolean(process.env.RESEND_API_KEY?.trim()),
     };
   },
 });
@@ -607,6 +639,7 @@ export const saveSettings = mutation({
         secondaryColor: "#6b6b70",
         templateId: args.templateId,
         ...senderPatch,
+        ...NEW_MERCHANT_THEME_DEFAULTS,
         updatedAt: now,
       });
     }
@@ -646,6 +679,7 @@ export const saveSenderSettings = mutation({
         templateId: "gentle",
         fromName,
         replyToEmail,
+        ...NEW_MERCHANT_THEME_DEFAULTS,
         updatedAt: now,
       });
     }
@@ -686,6 +720,7 @@ export const saveEmailColors = mutation({
         mutedTextColor: secondaryColor,
         templateId: "gentle",
         emailFont: DEFAULT_EMAIL_FONT,
+        ...NEW_MERCHANT_THEME_DEFAULTS,
         updatedAt: now,
       });
     }
@@ -786,6 +821,7 @@ export const saveEmailCustomizations = mutation({
         brandColor,
         secondaryColor,
         mutedTextColor: secondaryColor,
+        ...NEW_MERCHANT_THEME_DEFAULTS,
         updatedAt: now,
       };
       for (const [key, value] of Object.entries(optionalPatch)) {
@@ -877,6 +913,7 @@ export const grantBrandImportBonus = mutation({
         secondaryColor: "#6b6b70",
         templateId: "gentle",
         brandImportBonusCredits: add,
+        ...NEW_MERCHANT_THEME_DEFAULTS,
         updatedAt: now,
       });
       return { brandImportBonusCredits: add };
@@ -1006,6 +1043,7 @@ export const completeBrandImport = mutation({
       pageTextColor,
       emailBackgroundColor,
       emailTextColor,
+      stylingMode: "configured" as const,
       ...(fontFamilyRaw ? { fontFamilyRaw } : {}),
       updatedAt: now,
       ...(fromName ? { fromName } : {}),
@@ -1021,6 +1059,7 @@ export const completeBrandImport = mutation({
       await ctx.db.insert("recoverySettings", {
         userId: user._id,
         templateId: "gentle",
+        ...NEW_MERCHANT_THEME_DEFAULTS,
         ...patch,
       });
     }
@@ -1050,6 +1089,7 @@ export const getBrandImportContext = internalQuery({
       storeName: v.string(),
       storeLogoUrl: v.union(v.string(), v.null()),
       storeSlug: v.string(),
+      storefrontDomain: v.union(v.string(), v.null()),
     }),
     v.null(),
   ),
@@ -1071,7 +1111,328 @@ export const getBrandImportContext = internalQuery({
       storeName: connection.storeName,
       storeLogoUrl: connection.storeAvatarUrl ?? null,
       storeSlug: connection.storeSlug,
+      storefrontDomain: lemonStorefrontDomain(connection.storeSlug),
     };
+  },
+});
+
+const emailThemeSettingsValidator = v.object({
+  stylingMode: stylingModeValidator,
+  layoutPresetId: v.string(),
+  resolved: resolvedEmailThemeValidator,
+  catalog: catalogSummaryValidator,
+  recoverySequenceSteps: v.array(recoverySequenceStepValidator),
+  storefrontDomain: v.union(v.string(), v.null()),
+  crawlDomain: v.union(v.string(), v.null()),
+  brandDomain: v.union(v.string(), v.null()),
+  brandImportCompletedAt: v.union(v.number(), v.null()),
+  configuredTokens: emailThemeTokensValidator,
+  quota: brandImportQuotaValidator,
+});
+
+function themeSettingsPayload(
+  row: Doc<"recoverySettings"> | null,
+  storefrontDomain: string | null,
+  now: number,
+) {
+  const mapped = row ? mapSettings(row) : null;
+  const resolved = resolveThemeFromSettings(
+    mapped ?? {
+      stylingMode: NEW_MERCHANT_THEME_DEFAULTS.stylingMode,
+      layoutPresetId: NEW_MERCHANT_THEME_DEFAULTS.layoutPresetId,
+    },
+  );
+  const configured = resolveTheme({
+    stylingMode: "configured",
+    layoutPresetId: resolved.layoutPresetId,
+    configured: configuredTokensFromSettings(mapped),
+  });
+
+  return {
+    stylingMode: resolved.stylingMode,
+    layoutPresetId: resolved.layoutPresetId,
+    resolved,
+    catalog: listLayoutPresets(),
+    recoverySequenceSteps: [...RECOVERY_SEQUENCE_STEPS],
+    storefrontDomain,
+    crawlDomain: storefrontDomain,
+    brandDomain: mapped?.brandDomain ?? null,
+    brandImportCompletedAt: mapped?.brandImportCompletedAt ?? null,
+    configuredTokens: configured.tokens,
+    quota: quotaFromSettings(row, now),
+  };
+}
+
+async function storefrontDomainForUser(
+  ctx: QueryCtx | MutationCtx,
+  userId: Doc<"users">["_id"],
+): Promise<string | null> {
+  const connection = await ctx.db
+    .query("lemonConnections")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
+  if (!connection || isSoftDeleted(connection)) return null;
+  return lemonStorefrontDomain(connection.storeSlug);
+}
+
+/**
+ * Jules: current theme settings + resolved tokens + storefront crawl default.
+ * One global layout themes recovery Day 0 / Day 2 / Day 5.
+ */
+export const getEmailTheme = query({
+  args: {},
+  returns: v.union(emailThemeSettingsValidator, v.null()),
+  handler: async (ctx) => {
+    const user = await resolveProductUserOrNull(ctx);
+    if (!user) return null;
+
+    const row = await ctx.db
+      .query("recoverySettings")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+    const active = row && !isSoftDeleted(row) ? row : null;
+    const storefrontDomain = await storefrontDomainForUser(ctx, user._id);
+    return themeSettingsPayload(active, storefrontDomain, Date.now());
+  },
+});
+
+const recoveryEmailPreviewValidator = v.object({
+  step: recoverySequenceStepValidator,
+  templateId: v.union(
+    v.literal("gentle"),
+    v.literal("direct"),
+    v.literal("urgent"),
+  ),
+  stylingMode: stylingModeValidator,
+  layoutPresetId: v.string(),
+  tokens: emailThemeTokensValidator,
+  subject: v.string(),
+  html: v.string(),
+  text: v.string(),
+});
+
+async function recoveryPreviewContext(
+  ctx: QueryCtx,
+  userId: Doc<"users">["_id"],
+) {
+  const row = await ctx.db
+    .query("recoverySettings")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
+  const mapped = row && !isSoftDeleted(row) ? mapSettings(row) : null;
+  const connection = await ctx.db
+    .query("lemonConnections")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
+  const storeName =
+    connection && !isSoftDeleted(connection)
+      ? connection.storeName
+      : mapped?.fromName?.trim() || "Your store";
+  const storeLogoUrl =
+    connection && !isSoftDeleted(connection)
+      ? connection.storeAvatarUrl ?? null
+      : null;
+  const kitId = resolveSendKit({
+    experimentStatus: mapped?.kitExperimentStatus,
+    winnerKitId: mapped?.layoutPresetId,
+    assignedKitId: null,
+  });
+  const themeInput = {
+    stylingMode: "configured" as const,
+    layoutPresetId: kitId,
+    configured: configuredTokensFromSettings(mapped),
+  };
+  return {
+    mapped,
+    storeName,
+    storeLogoUrl,
+    themeInput,
+    supportEmail: mapped?.supportEmail ?? mapped?.replyToEmail ?? null,
+  };
+}
+
+function recoveryPreviewPayload(
+  step: (typeof RECOVERY_SEQUENCE_STEPS)[number],
+  preview: {
+    storeName: string;
+    storeLogoUrl: string | null;
+    supportEmail: string | null;
+    mapped: ReturnType<typeof mapSettings> | null;
+    themeInput: {
+      stylingMode?: string | null;
+      layoutPresetId?: string | null;
+      configured: ReturnType<typeof configuredTokensFromSettings>;
+    };
+  },
+) {
+  const theme = resolveRecoveryEmailTheme(step, {
+    ...preview.themeInput,
+    stylingMode: "configured",
+  });
+  const colors = recoveryColorsFromTheme(theme.tokens);
+  const built = buildRecoveryEmail({
+    templateId: theme.templateId,
+    layoutPresetId: theme.layoutPresetId,
+    primaryColor: colors.primaryColor,
+    secondaryColor: colors.secondaryColor,
+    storeName: preview.storeName,
+    storeLogoUrl: preview.storeLogoUrl,
+    customerName: "Maya",
+    customerEmail: "preview@merchant.test",
+    productName: "Pro Monthly",
+    amountLabel: "€29.00",
+    updatePaymentUrl: "https://app.lemonsqueezy.com/my-orders",
+    supportEmail: preview.supportEmail,
+    socials: {
+      x: preview.mapped?.socialX,
+      linkedin: preview.mapped?.socialLinkedin,
+      youtube: preview.mapped?.socialYoutube,
+      instagram: preview.mapped?.socialInstagram,
+    },
+    showDeclineGuardBadge: true,
+    copyOverrides: preview.mapped?.emailCopy ?? null,
+    emailFont: colors.emailFont,
+    ctaBackgroundColor: colors.ctaBackgroundColor,
+    ctaTextColor: colors.ctaTextColor,
+    ctaBorderRadiusPx: colors.ctaBorderRadiusPx,
+    emailBackgroundColor: colors.emailBackgroundColor,
+    emailTextColor: colors.emailTextColor,
+    pageBackgroundColor: colors.pageBackgroundColor,
+    pageTextColor: colors.pageTextColor,
+    linkColor: colors.linkColor,
+    fontFamilyRaw: colors.fontFamilyRaw,
+  });
+  return {
+    step: theme.step,
+    templateId: theme.templateId,
+    stylingMode: theme.stylingMode,
+    layoutPresetId: theme.layoutPresetId,
+    tokens: theme.tokens,
+    subject: built.subject,
+    html: built.html,
+    text: built.text,
+  };
+}
+
+/** Jules: themed recovery Day 0 / 2 / 5 preview (same path as send). */
+export const getRecoveryEmailTheme = query({
+  args: { step: recoverySequenceStepValidator },
+  returns: v.union(recoveryEmailPreviewValidator, v.null()),
+  handler: async (ctx, args) => {
+    if (!isRecoverySequenceStep(args.step)) {
+      throw new Error("Unknown recovery sequence step");
+    }
+    const user = await resolveProductUserOrNull(ctx);
+    if (!user) return null;
+    const previewCtx = await recoveryPreviewContext(ctx, user._id);
+    return recoveryPreviewPayload(args.step, previewCtx);
+  },
+});
+
+/** Jules: all three recovery steps, one global layout + resolveTheme tokens. */
+export const getRecoveryEmailPreviews = query({
+  args: {},
+  returns: v.union(v.array(recoveryEmailPreviewValidator), v.null()),
+  handler: async (ctx) => {
+    const user = await resolveProductUserOrNull(ctx);
+    if (!user) return null;
+    const previewCtx = await recoveryPreviewContext(ctx, user._id);
+    return RECOVERY_SEQUENCE_STEPS.map((step) =>
+      recoveryPreviewPayload(step, previewCtx),
+    );
+  },
+});
+
+async function ensureThemeSettingsRow(
+  ctx: MutationCtx,
+  userId: Doc<"users">["_id"],
+): Promise<Doc<"recoverySettings">> {
+  const existing = await ctx.db
+    .query("recoverySettings")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
+  if (existing && !isSoftDeleted(existing)) return existing;
+
+  const now = Date.now();
+  if (existing) {
+    await ctx.db.patch(existing._id, {
+      deletedAt: undefined,
+      deletedBy: undefined,
+      stylingMode: existing.stylingMode ?? NEW_MERCHANT_THEME_DEFAULTS.stylingMode,
+      layoutPresetId:
+        existing.layoutPresetId ?? NEW_MERCHANT_THEME_DEFAULTS.layoutPresetId,
+      updatedAt: now,
+    });
+    const restored = await ctx.db.get(existing._id);
+    if (!restored) throw new Error("Recovery settings not found");
+    return restored;
+  }
+
+  const id = await ctx.db.insert("recoverySettings", {
+    userId,
+    brandColor: "#0c0c0c",
+    secondaryColor: "#6b6b70",
+    templateId: "gentle",
+    ...NEW_MERCHANT_THEME_DEFAULTS,
+    updatedAt: now,
+  });
+  const created = await ctx.db.get(id);
+  if (!created) throw new Error("Recovery settings not found");
+  return created;
+}
+
+/** Jules: preset vs configured token source. Layout id is unchanged. */
+export const setStylingMode = mutation({
+  args: { stylingMode: stylingModeValidator },
+  returns: emailThemeSettingsValidator,
+  handler: async (ctx, args) => {
+    const user = await requireWriteUser(ctx, "email_theme");
+    const row = await ensureThemeSettingsRow(ctx, user._id);
+    const now = Date.now();
+    await ctx.db.patch(row._id, {
+      stylingMode: args.stylingMode,
+      updatedAt: now,
+    });
+    const next = await ctx.db.get(row._id);
+    if (!next) throw new Error("Recovery settings not found");
+    const storefrontDomain = await storefrontDomainForUser(ctx, user._id);
+    return themeSettingsPayload(next, storefrontDomain, now);
+  },
+});
+
+/**
+ * Merchants cannot pick templates. Public write is a no-op and returns
+ * the current winner / default kit from Auto A/B.
+ */
+export const setLayoutPresetId = mutation({
+  args: { layoutPresetId: v.string() },
+  returns: emailThemeSettingsValidator,
+  handler: async (ctx, _args) => {
+    const user = await requireWriteUser(ctx, "email_theme");
+    const row = await ensureThemeSettingsRow(ctx, user._id);
+    const storefrontDomain = await storefrontDomainForUser(ctx, user._id);
+    return themeSettingsPayload(row, storefrontDomain, Date.now());
+  },
+});
+
+/** Staff / admin: restart kit rotation for a merchant. */
+export const resetKitExperiment = mutation({
+  args: {
+    userId: v.id("users"),
+    reason: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const actor = await requireStaff(ctx);
+    const reason = requireActionReason(args.reason);
+    await resetKitExperimentForUser(ctx, args.userId);
+    await writeAuditLog(ctx, {
+      actorUserId: actor._id,
+      targetUserId: args.userId,
+      action: "kit_experiment:reset",
+      reason,
+    });
+    return null;
   },
 });
 

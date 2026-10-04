@@ -84,7 +84,184 @@ type BrandImportContext = {
   storeName: string;
   storeLogoUrl: string | null;
   storeSlug: string;
+  storefrontDomain: string | null;
 };
+
+async function loadBrandImportContext(
+  ctx: ActionCtx,
+  clerkUserId: string,
+): Promise<BrandImportContext> {
+  const context: BrandImportContext | null = await ctx.runQuery(
+    internal.functions.recoverySettings.getBrandImportContext,
+    { clerkUserId },
+  );
+  if (!context) {
+    throw new Error("Connect your Lemon Squeezy store first");
+  }
+  return context;
+}
+
+async function assertBrandImportQuota(
+  ctx: ActionCtx,
+  clerkUserId: string,
+): Promise<void> {
+  const quota = await ctx.runQuery(
+    internal.functions.recoverySettings.getBrandImportQuotaForClerkUser,
+    { clerkUserId },
+  );
+  if (!quota.canImport) {
+    const when = quota.nextImportAt
+      ? new Date(quota.nextImportAt).toLocaleDateString()
+      : "later this month";
+    throw new Error(
+      `You can re-import from your homepage once per month. Next free import: ${when}. Need an extra after a rebrand? Contact support.`,
+    );
+  }
+}
+
+async function scanBrandFromDomain(
+  ctx: ActionCtx,
+  clerkUserId: string,
+  domain: string,
+  context: BrandImportContext,
+): Promise<BrandImportResult> {
+  // Ladder: browser (15s) → CSS scrape → defaults (via merge).
+  // Run in parallel; browser null → CSS path; failed scans do not burn limits.
+  // Hard-cap browser so a stuck worker never blocks the CSS scrape path.
+  const [browserSettled, scrapeSettled] = await Promise.allSettled([
+    Promise.race([
+      captureBrandFromBrowser(domain),
+      new Promise<null>((resolve) => {
+        setTimeout(() => resolve(null), 16_000);
+      }),
+    ]),
+    Promise.race([
+      scrapeDomainBrand(domain),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(
+            new Error(
+              "That site took too long to scan. Try again in a moment.",
+            ),
+          );
+        }, 20_000);
+      }),
+    ]),
+  ]);
+
+  const browserKit =
+    browserSettled.status === "fulfilled" ? browserSettled.value : null;
+
+  if (scrapeSettled.status === "rejected" && !browserKit) {
+    throw scrapeSettled.reason instanceof Error
+      ? scrapeSettled.reason
+      : new Error("Could not scan that domain");
+  }
+
+  // Soft abuse guard after success only — monthly product quota is the real limit.
+  // Dev with BRAND_IMPORT_UNLIMITED skips this so you can iterate freely.
+  if (!isBrandImportUnlimited()) {
+    await ctx.runMutation(internal.functions.rateLimit.consume, {
+      key: `brand:scan:${clerkUserId}`,
+      limit: 60,
+      windowMs: 60 * 60 * 1000,
+    });
+  }
+
+  const scraped =
+    scrapeSettled.status === "fulfilled"
+      ? scrapeSettled.value
+      : {
+          themeColor: browserKit!.brandColor,
+          ogSiteName: null,
+          ogImage: null,
+          favicon: null,
+          fontFamily: browserKit!.fontFamilyRaw,
+          weightedColors: browserKit!.brandColor
+            ? [
+                {
+                  hex: browserKit!.brandColor,
+                  weight: 10,
+                  source: "browser",
+                },
+              ]
+            : [],
+          cssTexts: [],
+          html: "",
+          buttonStyle: {
+            backgroundColor: browserKit!.ctaBackgroundColor,
+            textColor: browserKit!.ctaTextColor,
+            borderRadiusPx: browserKit!.ctaBorderRadiusPx,
+            shape:
+              browserKit!.ctaBorderRadiusPx >= 40
+                ? ("pill" as const)
+                : ("rounded" as const),
+            source: "cta:browser",
+          },
+          emailBackgroundColor: browserKit!.pageBackgroundColor,
+          emailTextColor: browserKit!.pageTextColor,
+          pageIsDark: false,
+          tierUsed: "tier1" as const,
+          confidence: browserKit!.confidence,
+        };
+
+  const tokens = mergeBrandTokens({
+    domain,
+    scraped,
+    storeName: context.storeName,
+    storeLogoUrl: context.storeLogoUrl,
+    browserKit,
+  });
+
+  return {
+    domain,
+    brandColor: tokens.brandColor,
+    secondaryColor: tokens.secondaryColor,
+    mutedTextColor: tokens.mutedTextColor,
+    linkColor: tokens.linkColor,
+    pageBackgroundColor: tokens.pageBackgroundColor,
+    pageTextColor: tokens.pageTextColor,
+    emailFont: tokens.emailFont,
+    fontFamilyRaw: tokens.fontFamilyRaw,
+    fromName: tokens.fromName,
+    ctaBackgroundColor: tokens.ctaBackgroundColor,
+    ctaTextColor: tokens.ctaTextColor,
+    ctaBorderRadiusPx: tokens.ctaBorderRadiusPx,
+    ctaShape: tokens.ctaShape,
+    emailBackgroundColor: tokens.emailBackgroundColor,
+    emailTextColor: tokens.emailTextColor,
+    confidence: tokens.confidence,
+    tierUsed: tokens.tierUsed,
+    captureMethod: tokens.captureMethod,
+    storeName: context.storeName,
+    storeLogoUrl: context.storeLogoUrl,
+    sources: tokens.sources,
+  };
+}
+
+async function persistBrandImport(
+  ctx: ActionCtx,
+  result: BrandImportResult,
+): Promise<void> {
+  await ctx.runMutation(api.functions.recoverySettings.completeBrandImport, {
+    domain: result.domain,
+    brandColor: result.brandColor,
+    secondaryColor: result.secondaryColor,
+    emailFont: result.emailFont,
+    fromName: result.fromName,
+    ctaBackgroundColor: result.ctaBackgroundColor,
+    ctaTextColor: result.ctaTextColor,
+    ctaBorderRadiusPx: result.ctaBorderRadiusPx,
+    emailBackgroundColor: result.emailBackgroundColor,
+    emailTextColor: result.emailTextColor,
+    pageBackgroundColor: result.pageBackgroundColor,
+    pageTextColor: result.pageTextColor,
+    mutedTextColor: result.mutedTextColor,
+    linkColor: result.linkColor,
+    fontFamilyRaw: result.fontFamilyRaw ?? undefined,
+    brandCaptureMethod: result.captureMethod,
+  });
+}
 
 /** Scan a marketing domain + merge with Lemon Squeezy store identity. */
 export const importBrandFromDomain = action({
@@ -93,141 +270,43 @@ export const importBrandFromDomain = action({
   handler: async (ctx, args): Promise<BrandImportResult> => {
     await assertCallerActive(ctx);
     const clerkUserId = await productClerkUserId(ctx);
+    await assertBrandImportQuota(ctx, clerkUserId);
+    const { domain } = validateDomainInput(args.domain);
+    const context = await loadBrandImportContext(ctx, clerkUserId);
+    return await scanBrandFromDomain(ctx, clerkUserId, domain, context);
+  },
+});
 
-    const quota = await ctx.runQuery(
-      internal.functions.recoverySettings.getBrandImportQuotaForClerkUser,
-      { clerkUserId },
-    );
-    if (!quota.canImport) {
-      const when = quota.nextImportAt
-        ? new Date(quota.nextImportAt).toLocaleDateString()
-        : "later this month";
+/**
+ * Jules: crawl the connected Lemon storefront into configured BrandKit tokens.
+ * Optional `domain` override (paste later). Same quota/guards as brand import.
+ * Persists via completeBrandImport so configured mode can use the tokens.
+ */
+export const importBrandFromStorefront = action({
+  args: {
+    domain: v.optional(v.string()),
+  },
+  returns: brandImportResultValidator,
+  handler: async (ctx, args): Promise<BrandImportResult> => {
+    await assertCallerActive(ctx);
+    const clerkUserId = await productClerkUserId(ctx);
+    await assertBrandImportQuota(ctx, clerkUserId);
+    const context = await loadBrandImportContext(ctx, clerkUserId);
+
+    const rawDomain = args.domain?.trim() || context.storefrontDomain;
+    if (!rawDomain) {
       throw new Error(
-        `You can re-import from your homepage once per month. Next free import: ${when}. Need an extra after a rebrand? Contact support.`,
+        "No Lemon storefront URL on this store. Reconnect Lemon Squeezy or pass a domain override.",
       );
     }
-
-    const { domain } = validateDomainInput(args.domain);
-
-    const context: BrandImportContext | null = await ctx.runQuery(
-      internal.functions.recoverySettings.getBrandImportContext,
-      { clerkUserId },
+    const { domain } = validateDomainInput(rawDomain);
+    const result = await scanBrandFromDomain(
+      ctx,
+      clerkUserId,
+      domain,
+      context,
     );
-    if (!context) {
-      throw new Error("Connect your Lemon Squeezy store first");
-    }
-
-    // Ladder: browser (15s) → CSS scrape → defaults (via merge).
-    // Run in parallel; browser null → CSS path; failed scans do not burn limits.
-    // Hard-cap browser so a stuck worker never blocks the CSS scrape path.
-    const [browserSettled, scrapeSettled] = await Promise.allSettled([
-      Promise.race([
-        captureBrandFromBrowser(domain),
-        new Promise<null>((resolve) => {
-          setTimeout(() => resolve(null), 16_000);
-        }),
-      ]),
-      Promise.race([
-        scrapeDomainBrand(domain),
-        new Promise<never>((_, reject) => {
-          setTimeout(() => {
-            reject(
-              new Error(
-                "That site took too long to scan. Try again in a moment.",
-              ),
-            );
-          }, 20_000);
-        }),
-      ]),
-    ]);
-
-    const browserKit =
-      browserSettled.status === "fulfilled" ? browserSettled.value : null;
-
-    if (scrapeSettled.status === "rejected" && !browserKit) {
-      throw scrapeSettled.reason instanceof Error
-        ? scrapeSettled.reason
-        : new Error("Could not scan that domain");
-    }
-
-    // Soft abuse guard after success only — monthly product quota is the real limit.
-    // Dev with BRAND_IMPORT_UNLIMITED skips this so you can iterate freely.
-    if (!isBrandImportUnlimited()) {
-      await ctx.runMutation(internal.functions.rateLimit.consume, {
-        key: `brand:scan:${clerkUserId}`,
-        limit: 60,
-        windowMs: 60 * 60 * 1000,
-      });
-    }
-
-    const scraped =
-      scrapeSettled.status === "fulfilled"
-        ? scrapeSettled.value
-        : {
-            themeColor: browserKit!.brandColor,
-            ogSiteName: null,
-            ogImage: null,
-            favicon: null,
-            fontFamily: browserKit!.fontFamilyRaw,
-            weightedColors: browserKit!.brandColor
-              ? [
-                  {
-                    hex: browserKit!.brandColor,
-                    weight: 10,
-                    source: "browser",
-                  },
-                ]
-              : [],
-            cssTexts: [],
-            html: "",
-            buttonStyle: {
-              backgroundColor: browserKit!.ctaBackgroundColor,
-              textColor: browserKit!.ctaTextColor,
-              borderRadiusPx: browserKit!.ctaBorderRadiusPx,
-              shape:
-                browserKit!.ctaBorderRadiusPx >= 40
-                  ? ("pill" as const)
-                  : ("rounded" as const),
-              source: "cta:browser",
-            },
-            emailBackgroundColor: browserKit!.pageBackgroundColor,
-            emailTextColor: browserKit!.pageTextColor,
-            pageIsDark: false,
-            tierUsed: "tier1" as const,
-            confidence: browserKit!.confidence,
-          };
-
-    const tokens = mergeBrandTokens({
-      domain,
-      scraped,
-      storeName: context.storeName,
-      storeLogoUrl: context.storeLogoUrl,
-      browserKit,
-    });
-
-    return {
-      domain,
-      brandColor: tokens.brandColor,
-      secondaryColor: tokens.secondaryColor,
-      mutedTextColor: tokens.mutedTextColor,
-      linkColor: tokens.linkColor,
-      pageBackgroundColor: tokens.pageBackgroundColor,
-      pageTextColor: tokens.pageTextColor,
-      emailFont: tokens.emailFont,
-      fontFamilyRaw: tokens.fontFamilyRaw,
-      fromName: tokens.fromName,
-      ctaBackgroundColor: tokens.ctaBackgroundColor,
-      ctaTextColor: tokens.ctaTextColor,
-      ctaBorderRadiusPx: tokens.ctaBorderRadiusPx,
-      ctaShape: tokens.ctaShape,
-      emailBackgroundColor: tokens.emailBackgroundColor,
-      emailTextColor: tokens.emailTextColor,
-      confidence: tokens.confidence,
-      tierUsed: tokens.tierUsed,
-      captureMethod: tokens.captureMethod,
-      storeName: context.storeName,
-      storeLogoUrl: context.storeLogoUrl,
-      sources: tokens.sources,
-    };
+    await persistBrandImport(ctx, result);
+    return result;
   },
 });

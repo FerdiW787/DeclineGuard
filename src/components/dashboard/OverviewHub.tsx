@@ -33,7 +33,6 @@ type WebhookHealth = {
 type EmailHealth = {
   fromAddress: string;
   isProduction: boolean;
-  hasApiKey: boolean;
 };
 
 type Props = {
@@ -107,7 +106,7 @@ export default function OverviewHub({
   recoveryRateLabel,
   feesOwedLabel,
   youKeepLabel,
-  recoveryFeePercent = 10,
+  recoveryFeePercent,
   openFailures,
   emailIsProduction,
   chartRows,
@@ -200,13 +199,6 @@ export default function OverviewHub({
     }
     const setup = emailSetup;
     const isProd = setup?.isProduction ?? emailIsProduction;
-    if (setup && !setup.hasApiKey) {
-      return {
-        label: "No API key",
-        detail: "Resend key missing",
-        tone: "warn" as const,
-      };
-    }
     if (isProd === false) {
       return {
         label: "Test mode",
@@ -366,8 +358,12 @@ export default function OverviewHub({
               }
               hint={
                 recoveredThisMonthCents > 0
-                  ? `${recoveryFeePercent}% fee · ${feesOwedLabel}`
-                  : `${recoveryFeePercent}% fee after we recover`
+                  ? recoveryFeePercent != null
+                    ? `${recoveryFeePercent}% fee · ${feesOwedLabel}`
+                    : feesOwedLabel
+                  : recoveryFeePercent != null
+                    ? `${recoveryFeePercent}% fee after we recover`
+                    : "Fee after we recover"
               }
             />
             <ScoreStat

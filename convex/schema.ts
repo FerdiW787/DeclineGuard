@@ -31,6 +31,12 @@ export const accountStatusValidator = v.union(
 /** Billing plan: free (10% recovery fee) or pro (4% recovery fee). */
 export const planValidator = v.union(v.literal("free"), v.literal("pro"));
 
+/** MoR for DeclineGuard charging this merchant. Unset = resolve from env + grandfather. */
+export const billingProviderValidator = v.union(
+  v.literal("lemon"),
+  v.literal("dodo"),
+);
+
 /** user = merchant; staff = help desk; admin = full control. `standard` is legacy user. */
 export const roleValidator = v.union(
   v.literal("user"),
@@ -50,9 +56,15 @@ export default defineSchema({
     frozenAt: v.optional(v.number()),
     frozenReason: v.optional(v.string()),
     /** Billing plan: free (10% fee) or pro (4% fee). Defaults to free if unset.
-     * Merchants cannot self-set this. Source of truth is the LS Pro webhook
-     * (or staff `setUserPlan` with audit). */
+     * Merchants cannot self-set this. Source of truth is the LS / Dodo Pro
+     * webhook (or staff `setUserPlan` with audit). */
     plan: v.optional(planValidator),
+    /**
+     * Soft MoR flag. Unset = resolveBillingProvider (env + grandfather).
+     * lemon: existing LS Pro until migrate-on-next-renewal / admin-assisted.
+     * dodo: Lemon platform checkout + fee paths no-op (no dual charge).
+     */
+    billingProvider: v.optional(billingProviderValidator),
     /** Lemon Squeezy subscription id for the DeclineGuard Pro plan. */
     lsSubscriptionId: v.optional(v.string()),
     /** Last LS subscription/invoice status applied to this user. */
@@ -60,9 +72,40 @@ export default defineSchema({
     /** One-time nonce from createProCheckout; proves a webhook is our checkout. */
     lsCheckoutNonce: v.optional(v.string()),
     lsCheckoutNonceExpiresAt: v.optional(v.number()),
+    /** Dodo Payments customer id (hosted checkout / portal / usage). */
+    dodoCustomerId: v.optional(v.string()),
+    /** Dodo Payments subscription id for DeclineGuard Pro. */
+    dodoSubscriptionId: v.optional(v.string()),
+    dodoSubscriptionStatus: v.optional(v.string()),
+    /** Last product_id from a Dodo subscription webhook (has product_id). */
+    dodoProductId: v.optional(v.string()),
+    /** Subscription.on_demand from Dodo. Payments do not carry this field. */
+    dodoOnDemand: v.optional(v.boolean()),
+    /** Pro charge that should close this period if ingest races after paidAt. */
+    dodoUsageCreditPeriodKey: v.optional(v.string()),
+    dodoUsageCreditPaidAt: v.optional(v.number()),
+    dodoUsageCreditPaymentId: v.optional(v.string()),
+    dodoUsageCredits: v.optional(
+      v.array(
+        v.object({
+          periodKey: v.string(),
+          paidAt: v.number(),
+          paymentId: v.optional(v.string()),
+        }),
+      ),
+    ),
+    dodoCheckoutNonce: v.optional(v.string()),
+    dodoCheckoutNonceExpiresAt: v.optional(v.number()),
+    /** Extra monthly declines from paid $0.99 +10 packs (sum of credited units). */
+    declinePackExtra: v.optional(v.number()),
+    /** UTC month start last used for hold-queue release (lazy + cron). */
+    declineHoldReleasedMonthStart: v.optional(v.number()),
   })
     .index("by_userId", ["userId"])
-    .index("by_lsSubscriptionId", ["lsSubscriptionId"]),
+    .index("by_lsSubscriptionId", ["lsSubscriptionId"])
+    .index("by_lsCheckoutNonce", ["lsCheckoutNonce"])
+    .index("by_dodoSubscriptionId", ["dodoSubscriptionId"])
+    .index("by_dodoCustomerId", ["dodoCustomerId"]),
 
   /** One Lemon Squeezy account connection per DeclineGuard user (pick active store) */
   lemonConnections: defineTable({
@@ -85,6 +128,12 @@ export default defineSchema({
     ),
     apiKeyCipher: v.string(),
     apiKeyLast4: v.string(),
+    /**
+     * Per-connection Lemon webhook signing secret (encrypted).
+     * Never the platform LEMONSQUEEZY_WEBHOOK_SECRET — Lemon does not
+     * return webhook secrets, so we generate and store our own.
+     */
+    webhookSecretCipher: v.optional(v.string()),
     testMode: v.boolean(),
     connectedAt: v.number(),
     /** Soft-delete archive (90-day restore window) */
@@ -138,6 +187,24 @@ export default defineSchema({
     .index("by_eventKey", ["eventKey"])
     .index("by_store_received", ["storeId", "receivedAt"]),
 
+  /** Idempotency log for Dodo Payments webhook deliveries (webhook-id). */
+  dodoWebhookEvents: defineTable({
+    eventKey: v.string(),
+    eventName: v.string(),
+    receivedAt: v.number(),
+  }).index("by_eventKey", ["eventKey"]),
+
+  /** Paid Dodo +10 decline packs. paymentId is the idempotency key. */
+  dodoPackPurchases: defineTable({
+    userId: v.id("users"),
+    paymentId: v.string(),
+    quantity: v.number(),
+    extraDeclines: v.number(),
+    creditedAt: v.number(),
+  })
+    .index("by_paymentId", ["paymentId"])
+    .index("by_user", ["userId"]),
+
   /** Open / recovered failed subscription renewals */
   failedPayments: defineTable({
     userId: v.id("users"),
@@ -180,6 +247,11 @@ export default defineSchema({
     day5SentAt: v.optional(v.number()),
     day2JobId: v.optional(v.id("_scheduled_functions")),
     day5JobId: v.optional(v.id("_scheduled_functions")),
+    /**
+     * Sticky Set A kit for this decline’s Day 0/2/5. Assigned on insert;
+     * ignored as a merchant control (Auto A/B or winner).
+     */
+    assignedKitId: v.optional(v.string()),
     /** Decline / billing reason from Lemon Squeezy when present */
     declineReason: v.optional(v.string()),
     /** Latest Resend delivery status for the most recent recovery email */
@@ -210,10 +282,20 @@ export default defineSchema({
         at: v.number(),
       }),
     ),
+    /**
+     * New decline held for monthly Free 50 / Pro 500 (+ pack extra) capacity.
+     * In-flight sequences are never flipped to held.
+     */
+    quotaHeld: v.optional(v.boolean()),
+    /** When a held row entered the live queue (consumes that UTC month's cap). */
+    quotaReleasedAt: v.optional(v.number()),
     deletedAt: v.optional(v.number()),
     deletedBy: v.optional(deletedByValidator),
   })
     .index("by_user_status_failedAt", ["userId", "status", "failedAt"])
+    .index("by_user_quotaHeld_failedAt", ["userId", "quotaHeld", "failedAt"])
+    .index("by_quotaHeld_failedAt", ["quotaHeld", "failedAt"])
+    .index("by_user_quotaReleasedAt", ["userId", "quotaReleasedAt"])
     .index("by_user_status_recoveredAt", ["userId", "status", "recoveredAt"])
     .index("by_user_failedAt", ["userId", "failedAt"])
     .index("by_store_subscription_status", [
@@ -222,7 +304,9 @@ export default defineSchema({
       "status",
     ])
     .index("by_invoice", ["subscriptionInvoiceId"])
-    .index("by_deletedAt", ["deletedAt"]),
+    .index("by_deletedAt", ["deletedAt"])
+    .index("by_status_recoveredAt", ["status", "recoveredAt"])
+    .index("by_assignedKitId_recoveredAt", ["assignedKitId", "recoveredAt"]),
 
   /** One row per Resend send (for deliverability webhooks) */
   emailSends: defineTable({
@@ -247,7 +331,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_resendMessageId", ["resendMessageId"])
-    .index("by_failure", ["failureId"]),
+    .index("by_failure", ["failureId"])
+    .index("by_sentAt", ["sentAt"]),
 
   /**
    * Recovery fee ledger (Free 10% / Pro 4%). Fees stay `owed` until the
@@ -294,10 +379,22 @@ export default defineSchema({
       v.literal("paid"),
       v.literal("failed"),
     ),
+    billingProvider: v.optional(billingProviderValidator),
     lsCheckoutId: v.optional(v.string()),
     /** HTTPS checkout URL only (sanitized via allowHttpsUrl). */
     lsCheckoutUrl: v.optional(v.string()),
     lsOrderId: v.optional(v.string()),
+    dodoCheckoutId: v.optional(v.string()),
+    dodoPaymentId: v.optional(v.string()),
+    /** Idempotent Dodo usage event id. Ingest ≠ paid. */
+    dodoUsageEventId: v.optional(v.string()),
+    dodoUsageSubmittedAt: v.optional(v.number()),
+    /** Cents last accepted by Dodo ingest. Scheduled close deltas from this. */
+    dodoUsageIngestedCents: v.optional(v.number()),
+    /** Fees already accepted on the meter. Reclaim rollback restores these. */
+    dodoUsageMeteredFeeIds: v.optional(v.array(v.id("recoveryFees"))),
+    /** Set only after the scheduled close successfully meters this period. */
+    dodoUsageMonthClosed: v.optional(v.boolean()),
     lastError: v.optional(v.string()),
     createdAt: v.number(),
     createdLsAt: v.optional(v.number()),
@@ -310,7 +407,11 @@ export default defineSchema({
     .index("by_user_period", ["userId", "periodKey"])
     .index("by_lsOrderId", ["lsOrderId"])
     .index("by_lsCheckoutId", ["lsCheckoutId"])
-    .index("by_status_createdAt", ["status", "createdAt"]),
+    .index("by_dodoCheckoutId", ["dodoCheckoutId"])
+    .index("by_dodoPaymentId", ["dodoPaymentId"])
+    .index("by_dodoUsageEventId", ["dodoUsageEventId"])
+    .index("by_status_createdAt", ["status", "createdAt"])
+    .index("by_lastError", ["lastError"]),
 
   /**
    * Merchant-triggered test drip: Email 1 → +30s → Email 2 → +30s → Email 3.
@@ -320,6 +421,8 @@ export default defineSchema({
     userId: v.id("users"),
     connectionId: v.id("lemonConnections"),
     toEmail: v.string(),
+    /** Chosen Set A kit (LAYOUT_PRESET_IDS). Required on new starts. */
+    layoutKit: v.optional(v.string()),
     status: v.union(
       v.literal("running"),
       v.literal("completed"),
@@ -403,6 +506,32 @@ export default defineSchema({
     brandCaptureMethod: v.optional(
       v.union(v.literal("browser"), v.literal("css"), v.literal("defaults")),
     ),
+    /**
+     * Token source for the 3 recovery emails (Day 0 / Day 2 / Day 5).
+     * preset = catalog tokens for layoutPresetId; configured = BrandKit fields.
+     * New merchants default to "preset".
+     */
+    stylingMode: v.optional(
+      v.union(v.literal("preset"), v.literal("configured")),
+    ),
+    /**
+     * Winner kit after Auto A/B (`kitExperimentStatus === "won"`).
+     * While `active`, send uses `failedPayments.assignedKitId` — this field
+     * is not a merchant picker. Catalog: poster-notice | amount-due |
+     * plain-letter | what-happened | quiet-column.
+     */
+    layoutPresetId: v.optional(v.string()),
+    /**
+     * Kit experiment: `active` rotates arms; `won` locks layoutPresetId.
+     * Unset is treated as `active`.
+     */
+    kitExperimentStatus: v.optional(
+      v.union(v.literal("active"), v.literal("won")),
+    ),
+    /** Next arm index into LAYOUT_PRESET_IDS (fair rotation). */
+    kitExperimentRotationIndex: v.optional(v.number()),
+    /** When the winning kit was promoted. */
+    kitExperimentWonAt: v.optional(v.number()),
     /** Rolling monthly rebrand quota — set on each successful import */
     lastBrandImportAt: v.optional(v.number()),
     /** Support-granted extra imports (big rebrand) */
@@ -411,6 +540,21 @@ export default defineSchema({
     deletedAt: v.optional(v.number()),
     deletedBy: v.optional(deletedByValidator),
   }).index("by_user", ["userId"]),
+
+  /**
+   * Per-merchant × kit Auto A/B counters.
+   * sequencesStarted increments on each new decline assignment while active.
+   * recoveries increment from markPaymentRecovered (attributed, non-test).
+   */
+  kitExperimentStats: defineTable({
+    userId: v.id("users"),
+    kitId: v.string(),
+    sequencesStarted: v.number(),
+    recoveries: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_kit", ["userId", "kitId"]),
 
   /** Timeline feed for the dashboard */
   activityEvents: defineTable({

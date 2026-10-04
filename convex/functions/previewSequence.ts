@@ -16,6 +16,7 @@ import {
   requireActiveUserForWrite,
 } from "../lib/accountGuard";
 import { consumeRateLimit } from "../lib/rateLimit";
+import { requireLayoutKit } from "../lib/emailTheme";
 
 /** Gap between preview emails (mirrors fast recovery drip, but 30s). */
 export const PREVIEW_GAP_MS = 30_000;
@@ -136,9 +137,10 @@ export const getLatest = query({
  * Cancels any still-running preview for this merchant first.
  */
 export const start = mutation({
-  args: {},
+  args: { layoutKit: v.string() },
   returns: v.id("previewSequences"),
-  handler: async (ctx) => {
+  handler: async (ctx, args) => {
+    const layoutKit = requireLayoutKit(args.layoutKit);
     const user = await requireActiveUserForWrite(ctx, "preview_sequence_start");
     // Preview is blocked while the product account is frozen (incl. takeover).
     if (accountStatusOf(user) === "frozen") {
@@ -200,6 +202,7 @@ export const start = mutation({
       userId: user._id,
       connectionId: connection._id,
       toEmail,
+      layoutKit,
       status: "running",
       startedAt: Date.now(),
     });
@@ -207,7 +210,7 @@ export const start = mutation({
     const step1JobId = await ctx.scheduler.runAfter(
       0,
       internal.functions.previewSequenceEmails.sendStep,
-      { previewId, step: "step1" },
+      { previewId, step: "step1", layoutKit },
     );
     await ctx.db.patch(previewId, { step1JobId });
 
@@ -333,11 +336,13 @@ export const recordStepSent = internalMutation({
   args: {
     previewId: v.id("previewSequences"),
     step: previewStepValidator,
+    layoutKit: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.previewId);
     if (!row || row.status !== "running") return null;
+    const layoutKit = requireLayoutKit(args.layoutKit);
 
     const now = Date.now();
     switch (args.step) {
@@ -346,7 +351,7 @@ export const recordStepSent = internalMutation({
         const step2JobId = await ctx.scheduler.runAfter(
           PREVIEW_GAP_MS,
           internal.functions.previewSequenceEmails.sendStep,
-          { previewId: args.previewId, step: "step2" },
+          { previewId: args.previewId, step: "step2", layoutKit },
         );
         await ctx.db.patch(args.previewId, {
           step1SentAt: now,
@@ -360,7 +365,7 @@ export const recordStepSent = internalMutation({
         const step3JobId = await ctx.scheduler.runAfter(
           PREVIEW_GAP_MS,
           internal.functions.previewSequenceEmails.sendStep,
-          { previewId: args.previewId, step: "step3" },
+          { previewId: args.previewId, step: "step3", layoutKit },
         );
         await ctx.db.patch(args.previewId, {
           step2SentAt: now,

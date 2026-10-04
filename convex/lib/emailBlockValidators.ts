@@ -17,6 +17,9 @@ const textBlock = v.object({
   italic: v.optional(v.boolean()),
   underline: v.optional(v.boolean()),
   align: blockAlign,
+  copySlot: v.optional(
+    v.union(v.literal("eyebrow"), v.literal("headline"), v.literal("body")),
+  ),
   marginTop: v.number(),
   marginBottom: v.number(),
 });

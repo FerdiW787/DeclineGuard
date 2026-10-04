@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type Size = "sm" | "md" | "lg";
 
@@ -12,7 +14,11 @@ type CtaProps = {
   type?: "button" | "submit" | "reset";
 };
 
-/** Primary CTA — black fill, yellow candy underlay on hover. */
+function toButtonSize(size: Size): "sm" | "lg" {
+  return size === "sm" ? "sm" : "lg";
+}
+
+/** Primary CTA — radix-nova default (token-driven primary). */
 export function PrimaryCta({
   children,
   href,
@@ -22,22 +28,28 @@ export function PrimaryCta({
   onClick,
   type = "button",
 }: CtaProps) {
-  const variant = size === "sm" ? "dg-btn-nav" : "dg-btn-primary";
-  const classes =
-    `dg-btn ${variant}${wide ? " dg-btn-wide" : ""}${className ? ` ${className}` : ""}`.trim();
+  const classes = cn(wide && "w-full", className);
 
   if (href) {
     return (
-      <a href={href} onClick={onClick} className={classes}>
-        {children}
-      </a>
+      <Button asChild variant="default" size={toButtonSize(size)} className={classes}>
+        <a href={href} onClick={onClick}>
+          {children}
+        </a>
+      </Button>
     );
   }
 
   return (
-    <button type={type} onClick={onClick} className={classes}>
+    <Button
+      type={type}
+      variant="default"
+      size={toButtonSize(size)}
+      className={classes}
+      onClick={onClick}
+    >
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -47,18 +59,15 @@ type SecondaryProps = {
   className?: string;
 };
 
-/** Secondary CTA — light outline, purple candy underlay on hover. */
+/** Secondary CTA — radix-nova outline. */
 export function SecondaryCta({
   children,
   href,
   className = "",
 }: SecondaryProps) {
   return (
-    <a
-      href={href}
-      className={`dg-btn dg-btn-secondary${className ? ` ${className}` : ""}`}
-    >
-      {children}
-    </a>
+    <Button asChild variant="outline" size="lg" className={className}>
+      <a href={href}>{children}</a>
+    </Button>
   );
 }

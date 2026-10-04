@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import gsap from "gsap";
 import {
   Check,
@@ -19,10 +19,19 @@ import {
   X,
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
-import EmailPreviewBody from "./EmailPreviewBody";
-import { DEFAULT_EMAIL_COPY } from "@/lib/recoveryEmailCopy";
+import EmailLayoutStudio from "./email-layouts/EmailLayoutStudio";
 import type { EmailFontId } from "@/lib/emailFonts";
 import { validateDomainInputClient } from "@/lib/brandDomain";
+import { configuredTokensFromSettings } from "@/lib/emailTheme";
+import {
+  loadEmailLayoutDraft,
+  persistEmailLayoutSettings,
+} from "@/lib/emailLayoutDraft";
+import {
+  useEmailThemeQuery,
+  useImportBrandFromStorefront,
+  usePersistEmailTheme,
+} from "@/lib/useEmailThemeApi";
 
 type ImportResult = {
   domain: string;
@@ -142,9 +151,9 @@ export default function BrandImportGate({
   onDismiss,
   onComplete,
 }: Props) {
-  const importBrand = useAction(
-    api.functions.brandImportActions.importBrandFromDomain,
-  );
+  const importBrand = useImportBrandFromStorefront();
+  const persistEmailTheme = usePersistEmailTheme();
+  const emailTheme = useEmailThemeQuery();
   const completeImport = useMutation(
     api.functions.recoverySettings.completeBrandImport,
   );
@@ -170,8 +179,6 @@ export default function BrandImportGate({
   const ContextIcon = context === "sequences" ? Workflow : Palette;
   const blocked = quota != null && !quota.canImport;
   const activePhase = phaseIndex(step);
-
-  const previewCopy = DEFAULT_EMAIL_COPY.gentle;
 
   const footerSupport = useMemo(
     () => `support@${result?.domain ?? "yourstore.com"}`,
@@ -311,12 +318,33 @@ export default function BrandImportGate({
         fontFamilyRaw: result.fontFamilyRaw ?? undefined,
         brandCaptureMethod: result.captureMethod,
       });
+      const draft = loadEmailLayoutDraft();
+      persistEmailLayoutSettings({
+        draft,
+        configured: configuredTokensFromSettings({
+          brandColor: result.brandColor,
+          secondaryColor: result.secondaryColor,
+          mutedTextColor: result.mutedTextColor,
+          emailBackgroundColor: result.emailBackgroundColor,
+          emailTextColor: result.emailTextColor,
+          pageBackgroundColor: result.pageBackgroundColor,
+          pageTextColor: result.pageTextColor,
+          linkColor: result.linkColor,
+          ctaBackgroundColor: result.ctaBackgroundColor,
+          ctaTextColor: result.ctaTextColor,
+          ctaBorderRadiusPx: result.ctaBorderRadiusPx,
+          emailFont: result.emailFont,
+        }),
+      });
+      await persistEmailTheme({
+        stylingMode: draft.stylingMode,
+      });
       onComplete?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save branding");
       setStep("preview");
     }
-  }, [completeImport, onComplete, result]);
+  }, [completeImport, onComplete, persistEmailTheme, result]);
 
   // Stage crossfade whenever the main step changes
   useLayoutEffect(() => {
@@ -736,8 +764,9 @@ export default function BrandImportGate({
                 </div>
 
                 <p className="mt-4 text-[11px] leading-relaxed text-[#8a8f98]">
-                  After this, use Customizations to tweak colors and copy
-                  anytime. Homepage re-import is limited to once per month.
+                  After this, use Customizations to change the layout, colors,
+                  and copy anytime. Homepage re-import is limited to once per
+                  month.
                 </p>
 
                 <div className="mt-6 flex flex-wrap gap-2">
@@ -778,37 +807,37 @@ export default function BrandImportGate({
                 ) : null}
               </div>
 
-              <div
-                ref={previewEmailRef}
-                className="overflow-hidden rounded-xl border border-black/8 bg-white"
-              >
-                <div className="border-b border-black/8 px-4 py-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8a8f98]">
-                    Email preview · Day 0
-                  </p>
-                </div>
-                <EmailPreviewBody
-                  content={{
-                    headline: previewCopy.headline,
-                    body: previewCopy.body,
-                    cta: previewCopy.cta,
-                  }}
+              <div ref={previewEmailRef}>
+                <EmailLayoutStudio
+                  variant="gate"
                   storeName={previewName}
                   storeLogoUrl={previewLogo}
-                  primary={previewPrimary}
-                  secondary={previewSecondary}
+                  configured={configuredTokensFromSettings({
+                    brandColor: previewPrimary,
+                    secondaryColor: result?.secondaryColor ?? previewSecondary,
+                    mutedTextColor: previewSecondary,
+                    emailBackgroundColor: result?.emailBackgroundColor ?? shellBg,
+                    emailTextColor: result?.emailTextColor ?? shellText,
+                    pageBackgroundColor: result?.pageBackgroundColor ?? shellBg,
+                    pageTextColor: result?.pageTextColor ?? shellText,
+                    linkColor: result?.linkColor,
+                    ctaBackgroundColor: result?.ctaBackgroundColor,
+                    ctaTextColor: result?.ctaTextColor,
+                    ctaBorderRadiusPx: result?.ctaBorderRadiusPx,
+                    emailFont: previewFont,
+                  })}
+                  onPersistTheme={persistEmailTheme}
+                  serverTheme={
+                    emailTheme
+                      ? {
+                          stylingMode: emailTheme.stylingMode,
+                          layoutPresetId: emailTheme.layoutPresetId,
+                        }
+                      : null
+                  }
                   emailFont={previewFont}
-                  ctaStyle={{
-                    backgroundColor: result?.ctaBackgroundColor,
-                    textColor: result?.ctaTextColor,
-                    borderRadiusPx: result?.ctaBorderRadiusPx,
-                  }}
-                  emailBackgroundColor={shellBg}
-                  emailTextColor={shellText}
                   footerSupport={footerSupport}
-                  socialLinks={[]}
                   showDeclineGuardBadge={showDeclineGuardBadge}
-                  className="px-5 py-7 md:px-6 md:py-8"
                 />
               </div>
             </div>
