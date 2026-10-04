@@ -17,7 +17,7 @@ export default defineConfig({
     // @visx packages ship extensionless ESM imports that Node’s SSR resolver
     // cannot load; bundling them for SSR avoids ERR_MODULE_NOT_FOUND.
     ssr: {
-      noExternal: [/^@visx\//],
+      noExternal: [/^@visx\//, "gsap", "@gsap/react"],
     },
   },
   server: {
