@@ -293,7 +293,7 @@ function KitEmailCard({
     <div
       data-email-kit={kitId}
       data-email-day={day}
-      className="dg-keep-light max-h-[min(36rem,calc(100dvh-10rem))] overflow-x-hidden overflow-y-auto rounded-md border border-black/8 bg-white shadow-[0_18px_40px_-24px_rgba(0,0,0,0.28)]"
+      className="dg-keep-light bg-white"
     >
       <div className="border-b border-black/6 bg-[#fafafa] px-4 py-2.5">
         <p className="truncate text-[10px] font-medium uppercase tracking-[0.08em] text-black/40">
