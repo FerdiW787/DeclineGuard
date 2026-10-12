@@ -47,7 +47,7 @@ export default function HomePage({ welcome = false }: { welcome?: boolean }) {
   }, []);
 
   return (
-    <div className="ln-surface ln-home-lock-x min-h-screen overflow-x-clip bg-white text-[#08090a]">
+    <div className="ln-surface ln-home-lock-x min-h-screen overflow-x-clip bg-white text-foreground">
       {welcome && !welcomeDone ? (
         <WelcomeIntro active onComplete={() => setWelcomeDone(true)} />
       ) : null}

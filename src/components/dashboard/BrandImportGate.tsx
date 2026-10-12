@@ -9,14 +9,9 @@ import {
 import { useMutation, useQuery } from "convex/react";
 import gsap from "gsap";
 import {
-  Check,
-  Globe,
-  Loader2,
   Palette,
-  Sparkles,
   Store,
-  Workflow,
-  X,
+  Workflow
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import EmailLayoutStudio from "./email-layouts/EmailLayoutStudio";
@@ -32,6 +27,8 @@ import {
   useImportBrandFromStorefront,
   usePersistEmailTheme,
 } from "@/lib/useEmailThemeApi";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Tick02Icon, Globe02Icon, Loading03Icon, SparklesIcon, Cancel01Icon } from "@hugeicons/core-free-icons";
 
 type ImportResult = {
   domain: string;
@@ -480,23 +477,23 @@ export default function BrandImportGate({
               <button
                 type="button"
                 onClick={onDismiss}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-[#8a8f98] transition hover:bg-black/[0.04] hover:text-[#08090a]"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition hover:bg-black/[0.04] hover:text-foreground"
               >
-                <X className="size-4" />
+                <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-4" />
                 Back to editor
               </button>
             </div>
           ) : null}
 
-          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl border border-black/8 bg-white">
-            <ContextIcon className="size-5 text-[#08090a]" />
+          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl border border-border bg-white">
+            <ContextIcon className="size-5 text-foreground" />
           </div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8a8f98]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             {mode === "reimport"
               ? "Re-import homepage branding"
               : `One step before ${contextTitle.toLowerCase()}`}
           </p>
-          <h2 className="mt-2 ln-h1 text-2xl font-medium tracking-tight text-[#08090a] md:text-3xl">
+          <h2 className="mt-2 ln-h1 text-2xl font-medium tracking-tight text-foreground md:text-3xl">
             {step === "scanning"
               ? "Building your recovery emails"
               : step === "preview" || step === "saving"
@@ -505,7 +502,7 @@ export default function BrandImportGate({
                   ? "Pull fresh tokens from your site"
                   : "Paste your domain — we'll build your recovery emails"}
           </h2>
-          <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-[#8a8a8e]">
+          <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground">
             {step === "scanning"
               ? `Capturing ${domain.trim() || "your site"} and shaping Day 0 to match.`
               : step === "preview" || step === "saving"
@@ -513,7 +510,7 @@ export default function BrandImportGate({
                 : "We capture homepage colors, hero CTA, links, and fonts that email can render, merge them with your Lemon Squeezy store, then you fine-tune anytime."}
           </p>
           {quotaMessage && step === "intro" ? (
-            <p className="mx-auto mt-3 max-w-lg text-[12px] leading-relaxed text-[#8a8f98]">
+            <p className="mx-auto mt-3 max-w-lg text-[12px] leading-relaxed text-muted-foreground">
               {quotaMessage}
             </p>
           ) : null}
@@ -533,17 +530,17 @@ export default function BrandImportGate({
                   <span
                     className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold transition-colors duration-500 ${
                       done
-                        ? "bg-[#08090a] text-[#f7f8f8]"
+                        ? "bg-primary text-foreground"
                         : current
-                          ? "bg-[#08090a] text-[#f7f8f8]"
-                          : "bg-black/[0.06] text-[#8a8f98]"
+                          ? "bg-primary text-foreground"
+                          : "bg-black/[0.06] text-muted-foreground"
                     }`}
                   >
-                    {done ? <Check className="size-3" /> : i + 1}
+                    {done ? <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-3" /> : i + 1}
                   </span>
                   <span
                     className={`truncate text-[11px] font-medium transition-colors duration-500 ${
-                      current || done ? "text-[#08090a]" : "text-[#8a8f98]"
+                      current || done ? "text-foreground" : "text-muted-foreground"
                     }`}
                   >
                     {phase.label}
@@ -555,7 +552,7 @@ export default function BrandImportGate({
           <div className="h-1 overflow-hidden rounded-full bg-black/8">
             <div
               ref={progressFillRef}
-              className="h-full rounded-full bg-[#08090a]"
+              className="h-full rounded-full bg-primary"
               style={{ width: "8%" }}
             />
           </div>
@@ -563,14 +560,14 @@ export default function BrandImportGate({
 
         <div ref={stageRef}>
           {step === "intro" ? (
-            <div className="rounded-xl border border-black/8 bg-white p-6 md:p-8">
+            <div className="rounded-xl border border-border bg-white p-6 md:p-8">
               <label className="block space-y-2">
-                <span className="text-[12px] font-medium text-[#8a8f98]">
+                <span className="text-[12px] font-medium text-muted-foreground">
                   Your marketing domain
                 </span>
                 <div className="flex gap-2">
                   <div className="relative min-w-0 flex-1">
-                    <Globe className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#8a8f98]" />
+                    <HugeiconsIcon icon={Globe02Icon} strokeWidth={2} className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <input
                       type="text"
                       value={domain}
@@ -580,27 +577,27 @@ export default function BrandImportGate({
                       }}
                       disabled={blocked}
                       placeholder="cursor.com"
-                      className="w-full rounded-xl border border-black/8 bg-[#f7f8f8] py-3 pl-10 pr-4 text-sm text-[#08090a] outline-none transition focus:border-black/20 focus:ring-2 focus:ring-black/10 disabled:opacity-60"
+                      className="w-full rounded-xl border border-border bg-background py-3 pl-10 pr-4 text-sm text-foreground outline-none transition focus:border-black/20 focus:ring-2 focus:ring-black/10 disabled:opacity-60"
                     />
                   </div>
                   <button
                     type="button"
                     onClick={() => void runScan()}
                     disabled={blocked}
-                    className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-[#08090a] px-5 py-3 text-sm font-semibold text-[#f7f8f8] transition hover:bg-[#2a2b2e] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-foreground transition hover:bg-[#2a2b2e] disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <Sparkles className="size-4" />
+                    <HugeiconsIcon icon={SparklesIcon} strokeWidth={2} className="size-4" />
                     {mode === "reimport" ? "Re-import" : "Build my emails"}
                   </button>
                 </div>
               </label>
 
-              <div className="mt-5 flex flex-wrap gap-3 text-[11px] text-[#8a8f98]">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-black/8 px-2.5 py-1">
+              <div className="mt-5 flex flex-wrap gap-3 text-[11px] text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1">
                   <Store className="size-3" />
                   Logo & name from Lemon Squeezy
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-black/8 px-2.5 py-1">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1">
                   <Palette className="size-3" />
                   Page bg, CTA, links & font from your site
                 </span>
@@ -615,19 +612,19 @@ export default function BrandImportGate({
           ) : null}
 
           {step === "scanning" ? (
-            <div className="rounded-xl border border-black/8 bg-white p-6 md:p-8">
+            <div className="rounded-xl border border-border bg-white p-6 md:p-8">
               <div className="flex items-center gap-3 border-b border-black/6 pb-5">
                 <div className="relative flex size-10 items-center justify-center">
                   <span className="absolute inset-0 animate-ping rounded-full bg-black/8" />
-                  <span className="relative flex size-10 items-center justify-center rounded-full border border-black/8 bg-[#f7f8f8]">
-                    <Loader2 className="size-4 animate-spin text-[#08090a]" />
+                  <span className="relative flex size-10 items-center justify-center rounded-full border border-border bg-background">
+                    <HugeiconsIcon icon={Loading03Icon} strokeWidth={2} className="size-4 animate-spin text-foreground" />
                   </span>
                 </div>
                 <div className="min-w-0 text-left">
-                  <p className="truncate text-sm font-semibold text-[#08090a]">
+                  <p className="truncate text-sm font-semibold text-foreground">
                     {domain.trim()}
                   </p>
-                  <p className="text-[12px] text-[#8a8f98]">
+                  <p className="text-[12px] text-muted-foreground">
                     Composing your branded recovery email…
                   </p>
                 </div>
@@ -652,16 +649,16 @@ export default function BrandImportGate({
                       <span
                         className={`flex size-6 shrink-0 items-center justify-center rounded-full transition-all duration-500 ${
                           done
-                            ? "bg-[#08090a] text-[#f7f8f8]"
+                            ? "bg-primary text-foreground"
                             : active
-                              ? "border border-black/15 bg-[#f7f8f8]"
-                              : "border border-black/8 bg-black/[0.02]"
+                              ? "border border-black/15 bg-background"
+                              : "border border-border bg-black/[0.02]"
                         }`}
                       >
                         {done ? (
-                          <Check className="size-3.5" />
+                          <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-3.5" />
                         ) : active ? (
-                          <Loader2 className="size-3 animate-spin text-[#8a8f98]" />
+                          <HugeiconsIcon icon={Loading03Icon} strokeWidth={2} className="size-3 animate-spin text-muted-foreground" />
                         ) : (
                           <span className="size-1.5 rounded-full bg-black/15" />
                         )}
@@ -669,10 +666,10 @@ export default function BrandImportGate({
                       <span
                         className={`text-sm transition-colors duration-500 ${
                           done
-                            ? "font-medium text-[#08090a]"
+                            ? "font-medium text-foreground"
                             : active
-                              ? "font-medium text-[#08090a]"
-                              : "text-[#8a8f98]"
+                              ? "font-medium text-foreground"
+                              : "text-muted-foreground"
                         }`}
                       >
                         {item.label}
@@ -700,18 +697,18 @@ export default function BrandImportGate({
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
               <div
                 ref={previewTokensRef}
-                className="rounded-xl border border-black/8 bg-white p-5 md:p-6"
+                className="rounded-xl border border-border bg-white p-5 md:p-6"
               >
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8a8f98]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                   Brand kit tokens
                 </p>
-                <p className="mt-2 text-sm text-[#8a8f98]">
+                <p className="mt-2 text-sm text-muted-foreground">
                   {result
                     ? sourceLabel(result.sources, result.captureMethod)
                     : ""}
                 </p>
                 {result ? (
-                  <p className="mt-1 text-[11px] text-[#8a8f98]">
+                  <p className="mt-1 text-[11px] text-muted-foreground">
                     Confidence {result.confidence}% ·{" "}
                     {captureLabel(result.captureMethod)}
                   </p>
@@ -763,7 +760,7 @@ export default function BrandImportGate({
                   />
                 </div>
 
-                <p className="mt-4 text-[11px] leading-relaxed text-[#8a8f98]">
+                <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">
                   After this, use Customizations to change the layout, colors,
                   and copy anytime. Homepage re-import is limited to once per
                   month.
@@ -778,7 +775,7 @@ export default function BrandImportGate({
                       setScanDoneCount(0);
                     }}
                     disabled={step === "saving"}
-                    className="cursor-pointer rounded-xl border border-black/10 px-4 py-2.5 text-sm font-medium text-[#6b6f76] transition hover:bg-black/[0.03] disabled:opacity-50"
+                    className="cursor-pointer rounded-xl border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-black/[0.03] disabled:opacity-50"
                   >
                     Try another domain
                   </button>
@@ -786,16 +783,16 @@ export default function BrandImportGate({
                     type="button"
                     onClick={() => void applyBranding()}
                     disabled={step === "saving"}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-[#08090a] px-5 py-2.5 text-sm font-semibold text-[#f7f8f8] transition hover:bg-[#2a2b2e] disabled:opacity-60"
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-foreground transition hover:bg-[#2a2b2e] disabled:opacity-60"
                   >
                     {step === "saving" ? (
                       <>
-                        <Loader2 className="size-4 animate-spin" />
+                        <HugeiconsIcon icon={Loading03Icon} strokeWidth={2} className="size-4 animate-spin" />
                         Saving…
                       </>
                     ) : (
                       <>
-                        <Check className="size-4" />
+                        <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-4" />
                         Use this branding
                       </>
                     )}
@@ -864,11 +861,11 @@ function TokenRow({
       data-token
       className="flex items-center justify-between gap-3 rounded-lg border border-black/6 bg-black/[0.02] px-3 py-2.5"
     >
-      <span className="text-[12px] text-[#8a8a8e]">{label}</span>
-      <span className="flex min-w-0 items-center gap-2 text-[12px] font-medium text-[#08090a]">
+      <span className="text-[12px] text-muted-foreground">{label}</span>
+      <span className="flex min-w-0 items-center gap-2 text-[12px] font-medium text-foreground">
         {swatch ? (
           <span
-            className={`size-4 shrink-0 border border-black/10 ${pill ? "rounded-full" : "rounded-md"}`}
+            className={`size-4 shrink-0 border border-border ${pill ? "rounded-full" : "rounded-md"}`}
             style={{ background: swatch }}
           />
         ) : null}

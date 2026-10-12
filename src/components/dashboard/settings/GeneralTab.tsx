@@ -22,13 +22,13 @@ export function GeneralTab({
     >
       <SettingsCard>
         <SettingsRow title="Store" description={storeSlug}>
-          <p className="text-[13px] font-medium text-[#08090a]">{storeName}</p>
+          <p className="text-[13px] font-medium text-foreground">{storeName}</p>
         </SettingsRow>
         <SettingsRow
           title="Mode"
           description="Lemon Squeezy environment for this connection."
         >
-          <span className="rounded-full bg-black/[0.04] px-2.5 py-1 text-[12px] font-semibold text-[#6b6f76]">
+          <span className="rounded-full bg-black/[0.04] px-2.5 py-1 text-[12px] font-semibold text-muted-foreground">
             {testMode ? "Test" : "Live"}
           </span>
         </SettingsRow>
@@ -36,7 +36,7 @@ export function GeneralTab({
           title="Plan"
           description="Set by your Lemon Squeezy Pro subscription. Staff can override with audit."
         >
-          <span className="text-[13px] font-medium text-[#08090a]">
+          <span className="text-[13px] font-medium text-foreground">
             {planTier}
           </span>
         </SettingsRow>

@@ -23,17 +23,14 @@ import SequencesWarrior from "@/components/dashboard/SequencesWarrior";
 import { PLANS } from "@/lib/pricing";
 import { utcCalendarMonthStartMs } from "@/lib/utcMonth";
 import {
-  Check,
-  ChevronsUpDown,
   LayoutDashboard,
   Palette,
-  Plus,
-  Settings,
   Store,
   Wallet,
-  Workflow,
-  X,
+  Workflow
 } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Tick02Icon, UnfoldMoreIcon, Add01Icon, SettingsIcon, Cancel01Icon } from "@hugeicons/core-free-icons";
 
 type Props = {
   merchantUserId: Id<"users">;
@@ -434,9 +431,9 @@ export default function StaffDashboardSim({
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#111] px-3 py-2 text-[12px] font-semibold text-white"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-[12px] font-semibold text-white"
         >
-          <X className="size-3.5" />
+          <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-3.5" />
           Exit simulation
         </button>
       </div>
@@ -463,23 +460,23 @@ export default function StaffDashboardSim({
           <button
             type="button"
             onClick={onClose}
-            className="mt-2 rounded-xl bg-[#111] px-4 py-2 text-sm font-semibold text-white"
+            className="mt-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white"
           >
             Close
           </button>
         </div>
       ) : (
         <div
-          className="dg-shell light ln-surface relative flex min-h-0 flex-1 overflow-hidden text-[#08090a] transition-colors duration-500"
+          className="dg-shell light ln-surface relative flex min-h-0 flex-1 overflow-hidden text-foreground transition-colors duration-500"
           style={emailFocusMode ? { background: "#ffffff" } : undefined}
         >
           <aside
-            className={`relative z-20 flex w-[248px] shrink-0 flex-col bg-[#f7f8f8] max-lg:hidden transition-[margin] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            className={`relative z-20 flex w-[248px] shrink-0 flex-col bg-background max-lg:hidden transition-[margin] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
               storeMenuOpen && !emailFocusMode ? "overflow-visible" : "overflow-hidden"
             } ${emailFocusMode ? "-ml-[248px] pointer-events-none" : ""}`}
           >
             <div
-              className="pointer-events-none absolute inset-0 bg-[#f7f8f8]"
+              className="pointer-events-none absolute inset-0 bg-background"
               aria-hidden
             />
             <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-visible">
@@ -496,7 +493,7 @@ export default function StaffDashboardSim({
                     aria-haspopup="menu"
                     className="flex w-full items-center gap-2 rounded-lg p-2 text-left transition hover:bg-black/[0.04]"
                   >
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#111] text-white">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-white">
                       <Store className="size-4" />
                     </span>
                     <span className="min-w-0 flex-1 grid text-left text-sm leading-tight">
@@ -513,13 +510,13 @@ export default function StaffDashboardSim({
                               : "No store linked"}
                       </span>
                     </span>
-                    <ChevronsUpDown className="ml-auto size-4 shrink-0 text-black/35" />
+                    <HugeiconsIcon icon={UnfoldMoreIcon} strokeWidth={2} className="ml-auto size-4 shrink-0 text-black/35" />
                   </button>
 
                   {storeMenuOpen ? (
                     <div
                       role="menu"
-                      className="absolute left-full top-0 z-50 ml-2 w-56 overflow-hidden rounded-lg border border-black/10 bg-white text-black shadow-[0_10px_40px_-12px_rgba(0,0,0,0.28)]"
+                      className="absolute left-full top-0 z-50 ml-2 w-56 overflow-hidden rounded-lg border border-border bg-white text-black shadow-[0_10px_40px_-12px_rgba(0,0,0,0.28)]"
                     >
                       <div className="px-2 py-1.5 text-xs font-medium text-black/45">
                         Stores
@@ -553,9 +550,9 @@ export default function StaffDashboardSim({
                                       : "text-black/80 hover:bg-black/[0.04]"
                                   }`}
                                 >
-                                  <span className="flex size-6 shrink-0 items-center justify-center rounded-sm border border-black/10 bg-black/[0.03]">
+                                  <span className="flex size-6 shrink-0 items-center justify-center rounded-sm border border-border bg-black/[0.03]">
                                     {store.simulated ? (
-                                      <Plus className="size-3.5 text-black/70" />
+                                      <HugeiconsIcon icon={Add01Icon} strokeWidth={2} className="size-3.5 text-black/70" />
                                     ) : (
                                       <Store className="size-3.5 text-black/70" />
                                     )}
@@ -565,7 +562,7 @@ export default function StaffDashboardSim({
                                     {store.simulated ? " · sim" : ""}
                                   </span>
                                   {selected ? (
-                                    <Check className="size-3.5 text-black/50" />
+                                    <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-3.5 text-black/50" />
                                   ) : null}
                                 </button>
                               </li>
@@ -584,8 +581,8 @@ export default function StaffDashboardSim({
                           }}
                           className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-black/80 outline-none transition hover:bg-black/[0.04]"
                         >
-                          <span className="flex size-6 shrink-0 items-center justify-center rounded-md border border-black/10 bg-transparent">
-                            <Plus className="size-3.5" />
+                          <span className="flex size-6 shrink-0 items-center justify-center rounded-md border border-border bg-transparent">
+                            <HugeiconsIcon icon={Add01Icon} strokeWidth={2} className="size-3.5" />
                           </span>
                           Add store
                         </button>
@@ -636,7 +633,7 @@ export default function StaffDashboardSim({
                       : "font-medium text-black/55 hover:bg-black/[0.03] hover:text-black/80"
                   }`}
                 >
-                  <Settings className="size-4 shrink-0" />
+                  <HugeiconsIcon icon={SettingsIcon} strokeWidth={2} className="size-4 shrink-0" />
                   Settings
                 </button>
               </div>
@@ -656,7 +653,7 @@ export default function StaffDashboardSim({
                   onClick={() => setNav(item.id)}
                   className={`shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold ${
                     nav === item.id
-                      ? "bg-[#111] text-white"
+                      ? "bg-primary text-white"
                       : "bg-black/[0.04] text-black/55"
                   }`}
                 >
@@ -684,9 +681,9 @@ export default function StaffDashboardSim({
                 <button
                   type="button"
                   onClick={() => setAddStoreOpen(true)}
-                  className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#111] px-4 py-2.5 text-sm font-semibold text-white"
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white"
                 >
-                  <Plus className="size-4" />
+                  <HugeiconsIcon icon={Add01Icon} strokeWidth={2} className="size-4" />
                   Add store (simulation)
                 </button>
               </div>
@@ -893,7 +890,7 @@ export default function StaffDashboardSim({
             if (e.target === e.currentTarget) setAddStoreOpen(false);
           }}
         >
-          <div className="w-full max-w-md rounded-2xl border border-black/10 bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-white p-6 shadow-xl">
             <h2
               id="sim-add-store-title"
               className="font-display text-xl tracking-tight"
@@ -923,14 +920,14 @@ export default function StaffDashboardSim({
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
-                className="rounded-xl border border-black/10 px-4 py-2 text-sm font-semibold text-black/65"
+                className="rounded-xl border border-border px-4 py-2 text-sm font-semibold text-black/65"
                 onClick={() => setAddStoreOpen(false)}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="rounded-xl bg-[#111] px-4 py-2 text-sm font-semibold text-white"
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white"
                 onClick={createDummyStore}
               >
                 Create temporary store

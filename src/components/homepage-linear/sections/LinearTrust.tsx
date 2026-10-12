@@ -29,7 +29,7 @@ export function LinearTrust() {
           </div>
           <a
             href="/pricing"
-            className="text-sm font-medium text-[#8a8a8e] hover:text-white"
+            className="text-sm font-medium text-muted-foreground hover:text-white"
           >
             See pricing →
           </a>
@@ -43,13 +43,13 @@ export function LinearTrust() {
                 i > 0 ? "border-t border-white/10 sm:border-t-0 sm:border-l" : ""
               }`}
             >
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#8a8a8e]">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                 {item.label}
               </p>
               <p className="mt-3 text-base font-semibold text-white">
                 {item.title}
               </p>
-              <p className="mt-1.5 text-sm text-[#8a8a8e]">{item.body}</p>
+              <p className="mt-1.5 text-sm text-muted-foreground">{item.body}</p>
             </div>
           ))}
         </div>

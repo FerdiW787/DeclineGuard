@@ -42,11 +42,11 @@ export default function TokenInsertMenu({
       onClick={(e) => e.stopPropagation()}
     >
       <div className="dg-format-in origin-top">
-        <div className="flex items-center gap-0.5 rounded border border-black/8 bg-white p-1 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
+        <div className="flex items-center gap-0.5 rounded border border-border bg-white p-1 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
           <button
             type="button"
             onClick={onInsertAmount}
-            className="h-8 rounded-sm px-2.5 text-[12px] font-medium tracking-tight text-[#08090a] transition-colors hover:bg-black/5"
+            className="h-8 rounded-sm px-2.5 text-[12px] font-medium tracking-tight text-foreground transition-colors hover:bg-black/5"
           >
             Insert amount
           </button>
@@ -54,7 +54,7 @@ export default function TokenInsertMenu({
           <button
             type="button"
             onClick={onInsertProduct}
-            className="h-8 rounded-sm px-2.5 text-[12px] font-medium tracking-tight text-[#08090a] transition-colors hover:bg-black/5"
+            className="h-8 rounded-sm px-2.5 text-[12px] font-medium tracking-tight text-foreground transition-colors hover:bg-black/5"
           >
             Insert product name
           </button>

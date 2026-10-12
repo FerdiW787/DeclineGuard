@@ -1,8 +1,9 @@
-import { ArrowRight } from "lucide-react";
 import { SignedIn, SignedOut } from "@clerk/astro/react";
 import { Button } from "@/components/ui/button";
 import { PLANS } from "@/lib/pricing";
 import { HomePageTiers } from "./HomePageTiers";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 
 const steps = [
   {
@@ -39,24 +40,24 @@ const trust = [
 
 export function HomePageContent() {
   return (
-    <div className="ln-surface bg-white text-[#08090a]">
+    <div className="ln-surface bg-white text-foreground">
       <section id="how" className="scroll-mt-24">
         <div className="mx-auto max-w-[1440px] px-6 py-24 md:py-32 lg:px-10">
-          <p className="text-[13px] font-medium text-[#8a8f98]">How it works</p>
-          <h2 className="ln-h1 mt-5 max-w-xl text-[clamp(1.75rem,3.2vw,2.6rem)] font-medium leading-[1.1] tracking-[-0.02em] text-[#08090a]">
+          <p className="text-[13px] font-medium text-muted-foreground">How it works</p>
+          <h2 className="ln-h1 mt-5 max-w-xl text-[clamp(1.75rem,3.2vw,2.6rem)] font-medium leading-[1.1] tracking-[-0.02em] text-foreground">
             Live in minutes. Recover for months.
           </h2>
 
           <ol className="mt-14 grid gap-10 md:grid-cols-3 md:gap-8">
             {steps.map((step) => (
-              <li key={step.n} className="border-t border-black/[0.08] pt-6">
-                <span className="text-[13px] font-medium text-[#8a8f98]">
+              <li key={step.n} className="border-t border-border pt-6">
+                <span className="text-[13px] font-medium text-muted-foreground">
                   {step.n}
                 </span>
-                <h3 className="mt-4 text-[17px] font-medium tracking-[-0.01em] text-[#08090a]">
+                <h3 className="mt-4 text-[17px] font-medium tracking-[-0.01em] text-foreground">
                   {step.title}
                 </h3>
-                <p className="mt-3 text-[14px] leading-[1.6] text-[#8a8f98]">
+                <p className="mt-3 text-[14px] leading-[1.6] text-muted-foreground">
                   {step.body}
                 </p>
               </li>
@@ -68,7 +69,7 @@ export function HomePageContent() {
               <Button asChild size="lg">
                 <a href="/a/sign-up">
                   Grab a founding spot
-                  <ArrowRight className="size-4" />
+                  <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
                 </a>
               </Button>
               <Button asChild variant="outline" size="lg">
@@ -79,7 +80,7 @@ export function HomePageContent() {
               <Button asChild size="lg">
                 <a href="/a/dashboard">
                   Open dashboard
-                  <ArrowRight className="size-4" />
+                  <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
                 </a>
               </Button>
             </SignedIn>
@@ -89,7 +90,7 @@ export function HomePageContent() {
 
       <HomePageTiers />
 
-      <section className="border-t border-black/[0.06]">
+      <section className="border-t border-border">
         <div className="mx-auto max-w-[1440px] px-6 lg:px-10">
           <div className="grid md:grid-cols-3">
             {trust.map((item, i) => (
@@ -97,14 +98,14 @@ export function HomePageContent() {
                 key={item.title}
                 className={`px-1 py-14 md:px-8 md:py-20 ${
                   i > 0
-                    ? "border-t border-black/[0.06] md:border-t-0 md:border-l md:border-black/[0.06]"
+                    ? "border-t border-border md:border-t-0 md:border-l md:border-border"
                     : ""
                 }`}
               >
-                <h3 className="text-[17px] font-medium tracking-[-0.01em] text-[#08090a]">
+                <h3 className="text-[17px] font-medium tracking-[-0.01em] text-foreground">
                   {item.title}
                 </h3>
-                <p className="mt-3 text-[14px] leading-[1.6] text-[#8a8f98]">
+                <p className="mt-3 text-[14px] leading-[1.6] text-muted-foreground">
                   {item.body}
                 </p>
               </div>

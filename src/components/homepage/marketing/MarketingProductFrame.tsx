@@ -36,7 +36,7 @@ export function MarketingProductFrame({
           </span>
         </div>
         <div
-          className={`dg-marketing-preview dg-shell dark ${frameH} overflow-hidden bg-[#0b0c0e] p-3 sm:p-4 md:p-5`}
+          className={`dg-marketing-preview dg-shell dark ${frameH} overflow-hidden bg-background p-3 sm:p-4 md:p-5`}
         >
           <div className="pointer-events-none h-full w-full select-none overflow-hidden">
             {children}
@@ -48,9 +48,9 @@ export function MarketingProductFrame({
 
   return (
     <div
-      className={`overflow-hidden rounded-2xl border border-black/10 bg-[#f5f5f6] shadow-[0_40px_80px_-48px_rgba(0,0,0,0.45)] ${className}`}
+      className={`overflow-hidden rounded-2xl border border-border bg-[#f5f5f6] shadow-[0_40px_80px_-48px_rgba(0,0,0,0.45)] ${className}`}
     >
-      <div className="flex items-center gap-2 border-b border-black/8 bg-white px-4 py-3">
+      <div className="flex items-center gap-2 border-b border-border bg-white px-4 py-3">
         <span className="size-2.5 rounded-full bg-[#ff5f57]" aria-hidden />
         <span className="size-2.5 rounded-full bg-[#febc2e]" aria-hidden />
         <span className="size-2.5 rounded-full bg-[#28c840]" aria-hidden />

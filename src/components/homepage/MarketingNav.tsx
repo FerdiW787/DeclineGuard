@@ -36,25 +36,25 @@ export function MarketingNav({ homeAnchors = false }: MarketingNavProps) {
         <nav className="hidden items-center gap-0.5 text-sm font-medium md:flex">
           <a
             href={productHref}
-            className="rounded-xl px-3 py-1.5 text-black/70 hover:bg-black/5 hover:text-black"
+            className="rounded-xl px-3 py-1.5 text-black/70 hover:bg-black/5 hover:text-foreground"
           >
             Product
           </a>
           <a
             href={howHref}
-            className="rounded-xl px-3 py-1.5 text-black/70 hover:bg-black/5 hover:text-black"
+            className="rounded-xl px-3 py-1.5 text-black/70 hover:bg-black/5 hover:text-foreground"
           >
             How it works
           </a>
           <a
             href="/pricing"
-            className="rounded-xl px-3 py-1.5 text-black/70 hover:bg-black/5 hover:text-black"
+            className="rounded-xl px-3 py-1.5 text-black/70 hover:bg-black/5 hover:text-foreground"
           >
             Pricing
           </a>
           <a
             href="/features"
-            className="rounded-xl px-3 py-1.5 text-black/70 hover:bg-black/5 hover:text-black"
+            className="rounded-xl px-3 py-1.5 text-black/70 hover:bg-black/5 hover:text-foreground"
           >
             Requests
           </a>

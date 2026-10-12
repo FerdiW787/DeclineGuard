@@ -1,14 +1,14 @@
-/* Scoped Linear marketing tokens — only under .ln-home */
+/* Scoped marketing tokens — inherit the active shadcn preset */
 .ln-home {
-  --ln-bg: #f7f8f8;
-  --ln-bg-elevated: #ffffff;
-  --ln-fg: #08090a;
-  --ln-muted: #6b6f76;
-  --ln-muted-2: #8a8f98;
-  --ln-border: rgba(0, 0, 0, 0.08);
-  --ln-border-strong: rgba(0, 0, 0, 0.12);
-  --ln-card: #ffffff;
-  --font-ln: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --ln-bg: var(--background);
+  --ln-bg-elevated: var(--card);
+  --ln-fg: var(--foreground);
+  --ln-muted: var(--muted-foreground);
+  --ln-muted-2: var(--muted-foreground);
+  --ln-border: var(--border);
+  --ln-border-strong: color-mix(in oklch, var(--foreground) 12%, transparent);
+  --ln-card: var(--card);
+  --font-ln: var(--font-sans);
 
   font-family: var(--font-ln);
   background: var(--ln-bg);
@@ -50,9 +50,9 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border-radius: 9999px;
-  background: #08090a;
-  color: #f7f8f8;
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: var(--primary-foreground);
   font-size: 0.875rem;
   font-weight: 500;
   padding: 0.625rem 1.25rem;
@@ -60,7 +60,7 @@
 }
 
 .ln-btn-primary:hover {
-  background: #2a2b2e;
+  background: color-mix(in oklch, var(--primary) 80%, transparent);
 }
 
 .ln-btn-ghost {
@@ -68,10 +68,10 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border-radius: 9999px;
+  border-radius: var(--radius);
   border: 1px solid var(--ln-border-strong);
   background: transparent;
-  color: #08090a;
+  color: var(--foreground);
   font-size: 0.875rem;
   font-weight: 500;
   padding: 0.625rem 1.25rem;
@@ -79,14 +79,14 @@
 }
 
 .ln-btn-ghost:hover {
-  border-color: rgba(0, 0, 0, 0.22);
-  background: rgba(0, 0, 0, 0.04);
+  border-color: color-mix(in oklch, var(--foreground) 22%, transparent);
+  background: var(--muted);
 }
 
 .ln-hero-glow {
   background: radial-gradient(
     60% 50% at 50% 0%,
-    rgba(16, 185, 129, 0.16) 0%,
+    color-mix(in oklch, var(--primary) 22%, transparent) 0%,
     transparent 70%
   );
 }

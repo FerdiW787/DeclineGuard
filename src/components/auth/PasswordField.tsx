@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
 import { fieldInput, fieldLabel } from "./authFieldClasses";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { EyeIcon, ViewOffIcon } from "@hugeicons/core-free-icons";
 
 type PasswordFieldProps = {
   id: string;
@@ -52,7 +53,7 @@ export default function PasswordField({
         />
         <button
           type="button"
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[#8a8f98] hover:bg-black/[0.04] hover:text-[#08090a] disabled:opacity-50"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-muted-foreground hover:bg-black/[0.04] hover:text-foreground disabled:opacity-50"
           aria-label={visible ? "Hide password" : "Show password"}
           aria-pressed={visible}
           data-password-toggle=""
@@ -62,9 +63,9 @@ export default function PasswordField({
           }}
         >
           {visible ? (
-            <EyeOff className="size-4" />
+            <HugeiconsIcon icon={ViewOffIcon} strokeWidth={2} className="size-4" />
           ) : (
-            <Eye className="size-4" />
+            <HugeiconsIcon icon={EyeIcon} strokeWidth={2} className="size-4" />
           )}
         </button>
       </div>

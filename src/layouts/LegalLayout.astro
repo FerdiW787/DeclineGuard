@@ -13,21 +13,21 @@ const { title, description, heading, eyebrow = "Legal" } = Astro.props;
 ---
 
 <Layout title={`${title} — ${legal.brandName}`} description={description} theme="light" showScrollbar>
-  <div class="ln-surface flex min-h-svh flex-col bg-[#f7f8f8] text-[#08090a]">
-    <header class="shrink-0 border-b border-black/[0.08]">
+  <div class="ln-surface flex min-h-svh flex-col bg-background text-foreground">
+    <header class="shrink-0 border-b border-border">
       <div
         class="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-4 px-6 py-5 md:px-8"
       >
         <a
           href="/"
-          class="text-lg font-semibold tracking-tight text-[#08090a] hover:text-black"
+          class="text-lg font-semibold tracking-tight text-foreground hover:text-foreground"
         >
           {legal.brandName}
         </a>
         <nav class="flex flex-wrap gap-x-4 gap-y-2 text-sm">
           {
             legalNav.map((item) => (
-              <a href={item.href} class="text-[#8a8a8e] hover:text-[#08090a]">
+              <a href={item.href} class="text-muted-foreground hover:text-foreground">
                 {item.label}
               </a>
             ))
@@ -43,14 +43,14 @@ const { title, description, heading, eyebrow = "Legal" } = Astro.props;
       <h1 class="ln-h1 mt-3 text-3xl font-medium tracking-tight md:text-4xl">
         {heading}
       </h1>
-      <p class="mt-3 text-sm text-[#8a8a8e]">
+      <p class="mt-3 text-sm text-muted-foreground">
         Effective: {legal.effectiveDate} · Last updated: {legal.lastUpdated}
       </p>
 
       <aside
-        class="mt-8 rounded-lg border border-black/[0.08] bg-white px-4 py-3 text-sm text-[#6b6f76]"
+        class="mt-8 rounded-lg border border-border bg-white px-4 py-3 text-sm text-muted-foreground"
       >
-        <strong class="font-semibold text-[#08090a]">Fill before launch:</strong> replace all
+        <strong class="font-semibold text-foreground">Fill before launch:</strong> replace all
         bracketed placeholders in
         <code class="rounded bg-black/[0.05] px-1">src/lib/legal.ts</code> (company
         name, address, emails, register, VAT). Have a qualified EU/DE lawyer
@@ -62,19 +62,19 @@ const { title, description, heading, eyebrow = "Legal" } = Astro.props;
       </article>
     </main>
 
-    <footer class="mt-auto shrink-0 border-t border-black/[0.08]">
+    <footer class="mt-auto shrink-0 border-t border-border">
       <div
-        class="mx-auto flex max-w-3xl flex-col gap-3 px-6 py-8 text-sm text-[#8a8a8e] md:px-8"
+        class="mx-auto flex max-w-3xl flex-col gap-3 px-6 py-8 text-sm text-muted-foreground md:px-8"
       >
         <div class="flex flex-wrap gap-x-4 gap-y-2">
           {
             legalNav.map((item) => (
-              <a href={item.href} class="hover:text-[#08090a]">
+              <a href={item.href} class="hover:text-foreground">
                 {item.label}
               </a>
             ))
           }
-          <a href="/" class="hover:text-[#08090a]">Home</a>
+          <a href="/" class="hover:text-foreground">Home</a>
         </div>
         <p>
           © {new Date().getFullYear()}
@@ -93,20 +93,20 @@ const { title, description, heading, eyebrow = "Legal" } = Astro.props;
     font-size: 1.25rem;
     font-weight: 600;
     letter-spacing: -0.02em;
-    color: #08090a;
+    color: var(--foreground);
   }
   .legal-prose h3 {
     margin-top: 1.5rem;
     margin-bottom: 0.5rem;
     font-size: 1.05rem;
     font-weight: 600;
-    color: #08090a;
+    color: var(--foreground);
   }
   .legal-prose p,
   .legal-prose li {
     font-size: 0.95rem;
     line-height: 1.7;
-    color: #6b6f76;
+    color: var(--muted-foreground);
   }
   .legal-prose p + p {
     margin-top: 0.85rem;
@@ -125,16 +125,16 @@ const { title, description, heading, eyebrow = "Legal" } = Astro.props;
     margin-top: 0.35rem;
   }
   .legal-prose a {
-    color: #08090a;
+    color: var(--foreground);
     text-decoration: underline;
     text-underline-offset: 2px;
   }
   .legal-prose a:hover {
-    color: #000000;
+    color: var(--primary-foreground);
   }
   .legal-prose strong {
     font-weight: 600;
-    color: #08090a;
+    color: var(--foreground);
   }
   .legal-prose table {
     width: 100%;
@@ -152,6 +152,6 @@ const { title, description, heading, eyebrow = "Legal" } = Astro.props;
   .legal-prose th {
     background: rgba(0, 0, 0, 0.03);
     font-weight: 600;
-    color: #08090a;
+    color: var(--foreground);
   }
 </style>

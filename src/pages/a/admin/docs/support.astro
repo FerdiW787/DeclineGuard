@@ -38,38 +38,38 @@ const toc = [
   description="How Staff and Admins claim, reply, resolve, and close merchant support chats."
   showScrollbar
 >
-  <div class="ln-surface min-h-screen bg-[#f7f8f8] text-[#08090a]">
+  <div class="ln-surface min-h-screen bg-background text-foreground">
     <header
-      class="sticky top-0 z-20 border-b border-black/8 bg-[#f7f8f8]/90 backdrop-blur-xl"
+      class="sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur-xl"
     >
       <div
         class="mx-auto flex h-14 max-w-3xl items-center justify-between gap-4 px-5 md:px-8"
       >
         <a
           href="/a/admin"
-          class="text-sm font-medium text-[#8a8f98] transition hover:text-[#08090a]"
+          class="text-sm font-medium text-muted-foreground transition hover:text-foreground"
         >
           ← Staff console
         </a>
         <div
-          class="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8a8f98]"
+          class="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
         >
-          <a href="/a/admin/docs" class="hover:text-[#08090a]">Recovery</a>
-          <span class="text-[#08090a]">Support</span>
+          <a href="/a/admin/docs" class="hover:text-foreground">Recovery</a>
+          <span class="text-foreground">Support</span>
         </div>
       </div>
     </header>
 
     <div class="mx-auto max-w-3xl px-5 py-8 md:px-8 md:py-10">
       <p
-        class="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a8f98]"
+        class="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
       >
         Guides
       </p>
       <h1 class="font-display mt-2 text-3xl tracking-tight md:text-4xl">
         Support chat
       </h1>
-      <p class="mt-2 max-w-xl text-sm leading-relaxed text-[#6b6f76]">
+      <p class="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
         How Staff and Admins claim, reply, resolve, and close merchant chats.
       </p>
 
@@ -81,7 +81,7 @@ const toc = [
           toc.map((item) => (
             <a
               href={item.href}
-              class="rounded-full border border-black/8 bg-white px-2.5 py-1 text-[12px] font-medium text-[#6b6f76] transition hover:border-black/16 hover:text-[#08090a]"
+              class="rounded-full border border-border bg-white px-2.5 py-1 text-[12px] font-medium text-muted-foreground transition hover:border-black/16 hover:text-foreground"
             >
               {item.label}
             </a>
@@ -90,7 +90,7 @@ const toc = [
       </nav>
 
       <article
-        class="admin-guide-prose rounded-2xl border border-black/8 bg-white px-5 py-7 md:px-8 md:py-8"
+        class="admin-guide-prose rounded-2xl border border-border bg-white px-5 py-7 md:px-8 md:py-8"
         set:html={html}
       />
     </div>

@@ -85,7 +85,7 @@ export function StoreAvatar({
 
   return (
     <span
-      className={`flex ${box} shrink-0 items-center justify-center ${radius} bg-[#111] font-bold tracking-tight text-white ${text} ${className}`}
+      className={`flex ${box} shrink-0 items-center justify-center ${radius} bg-primary font-bold tracking-tight text-white ${text} ${className}`}
       style={style}
       aria-hidden
       title={alt}
@@ -105,7 +105,7 @@ export function Panel({
 } & HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={`rounded-md border border-black/8 bg-white ${className}`}
+      className={`rounded-md border border-border bg-card ${className}`}
       {...rest}
     >
       {children}
@@ -133,14 +133,14 @@ export function PageHeader({
       className="flex shrink-0 flex-wrap items-start justify-between gap-4"
     >
       <div className={wide ? "min-w-0 max-w-none" : "max-w-xl"}>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a8f98]">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           {eyebrow}
         </p>
-        <h2 className="font-display mt-2 text-3xl leading-[1.15] tracking-tight text-[#08090a] md:text-4xl">
+        <h2 className="font-display mt-2 text-3xl leading-[1.15] tracking-tight text-foreground md:text-4xl">
           {title}
         </h2>
         {description ? (
-          <p className="mt-2 text-sm leading-relaxed text-[#6b6f76]">
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             {description}
           </p>
         ) : null}
@@ -352,7 +352,7 @@ export function deliveryStatusClass(
     case "delivered":
       return "text-emerald-700";
     case "queued":
-      return "text-black/45";
+      return "text-muted-foreground";
     default: {
       const _exhaustive: never = status;
       return _exhaustive;

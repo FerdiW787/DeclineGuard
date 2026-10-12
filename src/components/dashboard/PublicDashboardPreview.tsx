@@ -1,10 +1,8 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import {
-  ChevronsUpDown,
   Headphones,
   LayoutDashboard,
   Palette,
-  Settings,
   Store,
   Wallet,
   Workflow,
@@ -17,6 +15,8 @@ import {
   marketingActivity,
   marketingOpenFailures,
 } from "@/components/homepage/marketing/demoData";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { UnfoldMoreIcon, SettingsIcon } from "@hugeicons/core-free-icons";
 
 const NAV = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -112,8 +112,8 @@ export default function PublicDashboardPreview() {
   }, [updateNavIndicator]);
 
   return (
-    <div className="dg-shell light ln-surface relative flex h-dvh overflow-hidden bg-[#f7f8f8] text-[#08090a]">
-      <aside className="relative z-20 flex w-[248px] shrink-0 flex-col overflow-hidden bg-[#f7f8f8] max-lg:hidden">
+    <div className="dg-shell light ln-surface relative flex h-dvh overflow-hidden bg-background text-foreground">
+      <aside className="relative z-20 flex w-[248px] shrink-0 flex-col overflow-hidden bg-background max-lg:hidden">
         <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="flex shrink-0 items-center px-5 py-5">
             <BrandLogo size="sm" href="/" />
@@ -121,18 +121,18 @@ export default function PublicDashboardPreview() {
 
           <div className="relative z-30 mb-3 shrink-0 px-3">
             <div className="flex w-full items-center gap-2 rounded-lg p-2 text-left">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#08090a] text-[#f7f8f8]">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-foreground">
                 <Store className="size-4" />
               </span>
               <span className="min-w-0 flex-1 grid text-left text-sm leading-tight">
-                <span className="truncate font-semibold text-[#08090a]">
+                <span className="truncate font-semibold text-foreground">
                   Amonen
                 </span>
-                <span className="truncate text-xs text-[#8a8f98]">
+                <span className="truncate text-xs text-muted-foreground">
                   Test mode
                 </span>
               </span>
-              <ChevronsUpDown className="ml-auto size-4 shrink-0 text-[#8a8f98]" />
+              <HugeiconsIcon icon={UnfoldMoreIcon} strokeWidth={2} className="ml-auto size-4 shrink-0 text-muted-foreground" />
             </div>
           </div>
 
@@ -163,8 +163,8 @@ export default function PublicDashboardPreview() {
                       type="button"
                       className={`group relative z-10 flex cursor-default items-center gap-2.5 rounded-lg px-3 py-2 text-sm outline-none ${
                         active
-                          ? "font-semibold text-[#08090a]"
-                          : "font-medium text-[#8a8f98]"
+                          ? "font-semibold text-foreground"
+                          : "font-medium text-muted-foreground"
                       }`}
                     >
                       <Icon className="size-4 shrink-0" />
@@ -177,16 +177,16 @@ export default function PublicDashboardPreview() {
           </div>
 
           <div className="mt-auto shrink-0 px-3 pb-4">
-            <span className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-[#8a8f98]">
+            <span className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground">
               <Headphones className="size-4 shrink-0" />
               Support
             </span>
             <button
               type="button"
               onClick={() => setSettingsOpen(true)}
-              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-[#8a8f98] transition hover:bg-black/[0.04] hover:text-[#08090a]"
+              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-black/[0.04] hover:text-foreground"
             >
-              <Settings className="size-4 shrink-0" />
+              <HugeiconsIcon icon={SettingsIcon} strokeWidth={2} className="size-4 shrink-0" />
               Settings
             </button>
           </div>
@@ -194,14 +194,14 @@ export default function PublicDashboardPreview() {
       </aside>
 
       <div className="relative z-10 flex min-w-0 flex-1 overflow-hidden max-lg:p-0">
-        <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 border-b border-black/6 bg-[#f7f8f8] px-4 py-3 lg:hidden">
+        <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 border-b border-black/6 bg-background px-4 py-3 lg:hidden">
           <BrandLogo size="sm" href="/" />
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
-            className="inline-flex items-center gap-1 rounded-lg border border-black/8 px-2.5 py-1.5 text-xs font-semibold text-[#6b6f76]"
+            className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-muted-foreground"
           >
-            <Settings className="size-3.5" />
+            <HugeiconsIcon icon={SettingsIcon} strokeWidth={2} className="size-3.5" />
             Settings
           </button>
         </div>

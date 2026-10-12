@@ -4,7 +4,7 @@ import "@/styles/global.css";
 interface Props {
   title?: string;
   description?: string;
-  /** Marketing, dashboard, and auth use light Linear. */
+  /** Marketing, dashboard, and auth use the light preset theme. */
   theme?: "light" | "dark";
   /** Show the page scrollbar. Homepage only — hidden everywhere else. */
   showScrollbar?: boolean;
@@ -40,18 +40,12 @@ const {
     <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
-    <meta name="theme-color" content={theme === "light" ? "#f7f8f8" : "#0c0a09"} />
+    <meta name="theme-color" content={theme === "light" ? "#ffffff" : "#09090b"} />
     <title>{title}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Syne:wght@500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
     <script is:inline>
       try {
         const pageTheme = document.documentElement.dataset.theme;
-        // Marketing, dashboard, and auth are light Linear.
+        // Marketing, dashboard, and auth stay on the light preset theme.
         if (pageTheme === "light") {
           document.documentElement.classList.remove("dark");
         } else {
@@ -62,7 +56,7 @@ const {
       }
     </script>
   </head>
-  <body class="min-h-screen bg-background text-foreground antialiased">
+  <body class="min-h-screen bg-background font-sans text-foreground antialiased">
     <slot />
   </body>
 </html>

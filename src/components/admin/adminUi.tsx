@@ -24,19 +24,19 @@ export function AdminPageHeader({
     >
       <div className="max-w-xl">
         {eyebrow ? (
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a8f98]">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             {eyebrow}
           </p>
         ) : null}
         <h1
-          className={`font-display text-3xl leading-[1.15] tracking-tight text-[#08090a] md:text-4xl ${
+          className={`font-display text-3xl leading-[1.15] tracking-tight text-foreground md:text-4xl ${
             eyebrow ? "mt-2" : ""
           }`}
         >
           {title}
         </h1>
         {description ? (
-          <p className="mt-2 text-sm leading-relaxed text-[#6b6f76]">
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             {description}
           </p>
         ) : null}
@@ -57,7 +57,7 @@ export function AdminCard({
 }) {
   return (
     <section
-      className={`rounded-2xl border border-black/8 bg-white ${className}`}
+      className={`rounded-2xl border border-border bg-white ${className}`}
     >
       {children}
     </section>
@@ -75,9 +75,9 @@ export function AdminEmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
-      {icon ? <div className="mb-4 text-[#8a8f98]">{icon}</div> : null}
-      <p className="font-display text-lg tracking-tight text-[#08090a]">{title}</p>
-      <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-[#6b6f76]">
+      {icon ? <div className="mb-4 text-muted-foreground">{icon}</div> : null}
+      <p className="font-display text-lg tracking-tight text-foreground">{title}</p>
+      <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
         {body}
       </p>
     </div>

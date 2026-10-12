@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { ImageIcon } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Image01Icon } from "@hugeicons/core-free-icons";
 
 type Props = {
   /** Short label for the asset role */
@@ -36,8 +37,8 @@ export default function ImageSlot({
         aria-hidden
       />
       <div className="relative z-10 flex max-w-sm flex-col items-center gap-3">
-        <span className="inline-flex size-11 items-center justify-center rounded-2xl border border-black/10 bg-white shadow-sm">
-          <ImageIcon className="size-5 text-black/40" strokeWidth={1.5} />
+        <span className="inline-flex size-11 items-center justify-center rounded-2xl border border-border bg-white shadow-sm">
+          <HugeiconsIcon icon={Image01Icon} className="size-5 text-black/40" strokeWidth={1.5} />
         </span>
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-700">
           {label}

@@ -228,7 +228,7 @@ export default function DashboardBoot({
       >
         <div
           ref={iconRef}
-          className="relative h-12 w-12 will-change-transform"
+          className="relative h-12 w-12 text-primary will-change-transform"
           role="status"
           aria-live="polite"
         >
@@ -244,7 +244,7 @@ export default function DashboardBoot({
                 cy="24"
                 r={RING_R}
                 fill="none"
-                stroke="#0c0c0c"
+                stroke="currentColor"
                 strokeWidth="3.25"
                 strokeLinecap="round"
                 strokeDasharray={`${SPIN_DASH} ${RING_C - SPIN_DASH}`}
@@ -262,7 +262,7 @@ export default function DashboardBoot({
               ref={checkRef}
               d="M14.5 24.5 L21 31 L33.5 17.5"
               fill="none"
-              stroke="#0c0c0c"
+              stroke="currentColor"
               strokeWidth="3.25"
               strokeLinecap="round"
               strokeLinejoin="round"

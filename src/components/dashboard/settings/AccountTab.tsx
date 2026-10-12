@@ -112,7 +112,7 @@ export function AccountTab({
     >
       <SettingsCard>
         <SettingsRow title="Email" description="Used to sign in and get codes.">
-          <p className="max-w-[16rem] truncate text-[13px] font-medium text-[#08090a]">
+          <p className="max-w-[16rem] truncate text-[13px] font-medium text-foreground">
             {email || "—"}
           </p>
         </SettingsRow>
@@ -123,7 +123,7 @@ export function AccountTab({
           <button
             type="button"
             disabled={readOnly}
-            className="rounded-lg border border-black/8 px-3 py-1.5 text-[12px] font-semibold text-[#6b6f76] transition hover:bg-black/[0.04] hover:text-[#08090a] disabled:opacity-40"
+            className="rounded-lg border border-border px-3 py-1.5 text-[12px] font-semibold text-muted-foreground transition hover:bg-black/[0.04] hover:text-foreground disabled:opacity-40"
             onClick={() => {
               setChangeOpen(true);
               setStep("email");
@@ -139,7 +139,7 @@ export function AccountTab({
           <button
             type="button"
             disabled={readOnly}
-            className="rounded-lg border border-black/8 px-3 py-1.5 text-[12px] font-semibold text-[#6b6f76] transition hover:bg-black/[0.04] hover:text-[#08090a] disabled:opacity-40"
+            className="rounded-lg border border-border px-3 py-1.5 text-[12px] font-semibold text-muted-foreground transition hover:bg-black/[0.04] hover:text-foreground disabled:opacity-40"
             onClick={() => void signOut()}
           >
             Sign out
@@ -174,10 +174,10 @@ export function AccountTab({
             if (e.target === e.currentTarget && !busy) setChangeOpen(false);
           }}
         >
-          <div className="w-full max-w-md rounded-xl border border-black/8 bg-white p-6">
+          <div className="w-full max-w-md rounded-xl border border-border bg-white p-6">
             <h2
               id="change-email-title"
-              className="text-lg font-semibold tracking-tight text-[#08090a]"
+              className="text-lg font-semibold tracking-tight text-foreground"
             >
               {step === "email" ? "Change email" : "Check your email"}
             </h2>
@@ -190,7 +190,7 @@ export function AccountTab({
                 }}
               >
                 <label className="block">
-                  <span className="text-[12px] font-medium text-[#6b6f76]">
+                  <span className="text-[12px] font-medium text-muted-foreground">
                     New email
                   </span>
                   <input
@@ -209,7 +209,7 @@ export function AccountTab({
                 <div className="flex justify-end gap-2 pt-2">
                   <button
                     type="button"
-                    className="rounded-lg px-3 py-2 text-xs font-semibold text-[#6b6f76]"
+                    className="rounded-lg px-3 py-2 text-xs font-semibold text-muted-foreground"
                     disabled={busy}
                     onClick={() => setChangeOpen(false)}
                   >
@@ -217,7 +217,7 @@ export function AccountTab({
                   </button>
                   <button
                     type="submit"
-                    className="rounded-lg bg-[#08090a] px-3.5 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                    className="rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-white disabled:opacity-50"
                     disabled={busy || !nextEmail.trim()}
                   >
                     {busy ? "Sending…" : "Send code"}
@@ -232,9 +232,9 @@ export function AccountTab({
                   void verifyChangeEmail(code);
                 }}
               >
-                <p className="text-sm text-[#6b6f76]">
+                <p className="text-sm text-muted-foreground">
                   Enter the code we sent to{" "}
-                  <span className="font-medium text-[#08090a]">{nextEmail}</span>.
+                  <span className="font-medium text-foreground">{nextEmail}</span>.
                 </p>
                 <OtpInput
                   value={code}
@@ -252,7 +252,7 @@ export function AccountTab({
                 <div className="flex justify-end gap-2 pt-2">
                   <button
                     type="button"
-                    className="rounded-lg px-3 py-2 text-xs font-semibold text-[#6b6f76]"
+                    className="rounded-lg px-3 py-2 text-xs font-semibold text-muted-foreground"
                     disabled={busy}
                     onClick={() => setStep("email")}
                   >
@@ -260,7 +260,7 @@ export function AccountTab({
                   </button>
                   <button
                     type="submit"
-                    className="rounded-lg bg-[#08090a] px-3.5 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                    className="rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-white disabled:opacity-50"
                     disabled={busy || code.length < OTP_LENGTH}
                   >
                     {busy ? "Verifying…" : "Update email"}
@@ -284,19 +284,19 @@ export function AccountTab({
             }
           }}
         >
-          <div className="w-full max-w-md rounded-xl border border-black/8 bg-white p-6">
+          <div className="w-full max-w-md rounded-xl border border-border bg-white p-6">
             <h2
               id="delete-account-title"
-              className="text-lg font-semibold tracking-tight text-[#08090a]"
+              className="text-lg font-semibold tracking-tight text-foreground"
             >
               Delete account?
             </h2>
-            <p className="mt-2 text-sm leading-relaxed text-[#6b6f76]">
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               This removes your store connection, recovery history, and
               DeclineGuard account. It cannot be undone.
             </p>
             <label className="mt-5 block">
-              <span className="text-xs font-semibold text-[#08090a]">
+              <span className="text-xs font-semibold text-foreground">
                 Type <span className="font-mono">{email}</span> to confirm
               </span>
               <input
@@ -319,7 +319,7 @@ export function AccountTab({
             <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
-                className="rounded-lg border border-black/8 px-4 py-2.5 text-xs font-semibold text-[#6b6f76]"
+                className="rounded-lg border border-border px-4 py-2.5 text-xs font-semibold text-muted-foreground"
                 disabled={deleteBusy}
                 onClick={() => setDeleteOpen(false)}
               >

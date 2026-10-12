@@ -18,7 +18,7 @@ function toButtonSize(size: Size): "sm" | "lg" {
   return size === "sm" ? "sm" : "lg";
 }
 
-/** Primary CTA — radix-nova default (token-driven primary). */
+/** Primary CTA — preset default (token-driven primary). */
 export function PrimaryCta({
   children,
   href,
@@ -59,7 +59,7 @@ type SecondaryProps = {
   className?: string;
 };
 
-/** Secondary CTA — radix-nova outline. */
+/** Secondary CTA — preset outline. */
 export function SecondaryCta({
   children,
   href,

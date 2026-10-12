@@ -11,12 +11,6 @@ import {
 import { createPortal } from "react-dom";
 import {
   Circle,
-  ImageIcon,
-  Minus,
-  Plus,
-  Square,
-  Star,
-  Trash2,
   Triangle,
   Upload,
 } from "lucide-react";
@@ -41,6 +35,8 @@ import {
 import { cn } from "@/lib/utils";
 import ColorPalette from "./ColorPalette";
 import { TEXT_SWATCHES } from "./SelectionFormatMenu";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Image01Icon, MinusSignIcon, Add01Icon, StopCircleIcon, StarIcon, Delete02Icon } from "@hugeicons/core-free-icons";
 
 type ColorOpen = "shadow" | "border";
 type Open = "image" | "shape" | ColorOpen | null;
@@ -103,7 +99,7 @@ export default function ImageBlockEditBar({
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="dg-format-in pointer-events-auto origin-bottom">
-        <div className="relative inline-flex items-center gap-0.5 rounded border border-black/8 bg-white p-1 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
+        <div className="relative inline-flex items-center gap-0.5 rounded border border-border bg-white p-1 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
           <button
             type="button"
             title="Image"
@@ -113,8 +109,8 @@ export default function ImageBlockEditBar({
             className={cn(
               "inline-flex h-8 items-center gap-1.5 rounded-sm px-2 text-[12px] font-medium tracking-tight transition-colors",
               open === "image"
-                ? "bg-black/[0.06] text-[#08090a]"
-                : "text-[#3a3d42] hover:bg-black/5 hover:text-[#08090a]",
+                ? "bg-black/[0.06] text-foreground"
+                : "text-[#3a3d42] hover:bg-black/5 hover:text-foreground",
             )}
           >
             {block.src.trim() ? (
@@ -124,7 +120,7 @@ export default function ImageBlockEditBar({
                 className="size-3.5 rounded-[3px] object-cover"
               />
             ) : (
-              <ImageIcon className="size-3.5" />
+              <HugeiconsIcon icon={Image01Icon} strokeWidth={2} className="size-3.5" />
             )}
             Image
           </button>
@@ -137,8 +133,8 @@ export default function ImageBlockEditBar({
             className={cn(
               "inline-flex h-8 items-center gap-1.5 rounded-sm px-2 text-[12px] font-medium tracking-tight transition-colors",
               open === "shape"
-                ? "bg-black/[0.06] text-[#08090a]"
-                : "text-[#3a3d42] hover:bg-black/5 hover:text-[#08090a]",
+                ? "bg-black/[0.06] text-foreground"
+                : "text-[#3a3d42] hover:bg-black/5 hover:text-foreground",
             )}
           >
             <ShapeGlyph shape={shape} className="size-3.5" />
@@ -187,9 +183,9 @@ export default function ImageBlockEditBar({
             title="Delete"
             aria-label="Delete"
             onClick={onRemove}
-            className="inline-flex size-8 items-center justify-center rounded-sm text-[#6b6f76] transition-colors hover:bg-red-50 hover:text-red-600"
+            className="inline-flex size-8 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600"
           >
-            <Trash2 className="size-3.5" />
+            <HugeiconsIcon icon={Delete02Icon} strokeWidth={2} className="size-3.5" />
           </button>
 
           {open === "image" ? (
@@ -202,8 +198,8 @@ export default function ImageBlockEditBar({
           ) : null}
 
           {open === "shape" ? (
-            <div className="absolute left-0 top-[calc(100%+6px)] z-30 w-[252px] rounded border border-black/8 bg-white p-2 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
-              <p className="mb-1.5 px-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-[#8a8f98]">
+            <div className="absolute left-0 top-[calc(100%+6px)] z-30 w-[252px] rounded border border-border bg-white p-2 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
+              <p className="mb-1.5 px-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 Shape
               </p>
               <div className="grid grid-cols-6 gap-1">
@@ -219,8 +215,8 @@ export default function ImageBlockEditBar({
                   className={cn(
                     "inline-flex h-9 items-center justify-center rounded-sm transition-colors",
                     shape == null
-                      ? "bg-black/[0.08] text-[#08090a]"
-                      : "text-[#6b6f76] hover:bg-black/[0.04] hover:text-[#08090a]",
+                      ? "bg-black/[0.08] text-foreground"
+                      : "text-muted-foreground hover:bg-black/[0.04] hover:text-foreground",
                   )}
                 >
                   <ShapeGlyph shape={null} className="size-4" />
@@ -244,8 +240,8 @@ export default function ImageBlockEditBar({
                       className={cn(
                         "inline-flex h-9 items-center justify-center rounded-sm transition-colors",
                         active
-                          ? "bg-black/[0.08] text-[#08090a]"
-                          : "text-[#6b6f76] hover:bg-black/[0.04] hover:text-[#08090a]",
+                          ? "bg-black/[0.08] text-foreground"
+                          : "text-muted-foreground hover:bg-black/[0.04] hover:text-foreground",
                       )}
                     >
                       <ShapeGlyph shape={option.id} className="size-4" />
@@ -257,7 +253,7 @@ export default function ImageBlockEditBar({
           ) : null}
 
           {open === "shadow" || open === "border" ? (
-            <div className="absolute left-1/2 top-[calc(100%+6px)] z-30 -translate-x-1/2 rounded border border-black/8 bg-white p-2 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
+            <div className="absolute left-1/2 top-[calc(100%+6px)] z-30 -translate-x-1/2 rounded border border-border bg-white p-2 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
               <ColorPalette
                 usedColors={emailColors}
                 general={swatches}
@@ -327,12 +323,12 @@ function ImagePopover({
   };
 
   return (
-    <div className="absolute left-0 top-[calc(100%+6px)] z-30 w-[240px] rounded border border-black/8 bg-white p-2 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
-      <p className="mb-1.5 px-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-[#8a8f98]">
+    <div className="absolute left-0 top-[calc(100%+6px)] z-30 w-[240px] rounded border border-border bg-white p-2 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
+      <p className="mb-1.5 px-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
         Image
       </p>
       {src.trim() ? (
-        <div className="mb-2 overflow-hidden rounded-sm border border-black/8">
+        <div className="mb-2 overflow-hidden rounded-sm border border-border">
           <img src={src} alt="" className="h-16 w-full object-cover" />
         </div>
       ) : null}
@@ -349,13 +345,13 @@ function ImagePopover({
         type="button"
         disabled={uploading}
         onClick={() => fileRef.current?.click()}
-        className="inline-flex h-8 w-full cursor-pointer items-center justify-center gap-1.5 rounded-sm border border-black/10 bg-white px-2 text-[12px] font-semibold text-[#08090a] transition-colors hover:bg-black/[0.04] disabled:cursor-wait disabled:opacity-60"
+        className="inline-flex h-8 w-full cursor-pointer items-center justify-center gap-1.5 rounded-sm border border-border bg-white px-2 text-[12px] font-semibold text-foreground transition-colors hover:bg-black/[0.04] disabled:cursor-wait disabled:opacity-60"
       >
         <Upload className="size-3.5" />
         {uploading ? "Uploading…" : "Upload image"}
       </button>
       <label className="mt-2 block space-y-1 px-0.5">
-        <span className="text-[11px] text-[#6b6f76]">Or paste a URL</span>
+        <span className="text-[11px] text-muted-foreground">Or paste a URL</span>
         <input
           type="url"
           value={src}
@@ -364,7 +360,7 @@ function ImagePopover({
             onPatch({ src: e.target.value, align: "left" });
           }}
           placeholder="https://…"
-          className="h-8 w-full rounded-sm border border-black/10 bg-white px-2 text-[12px] text-[#08090a] outline-none focus:border-black/25"
+          className="h-8 w-full rounded-sm border border-border bg-white px-2 text-[12px] text-foreground outline-none focus:border-black/25"
         />
       </label>
       {error ? (
@@ -395,7 +391,7 @@ function OnOff({
       <div
         role="group"
         aria-label={groupLabel}
-        className="inline-flex h-6 rounded-sm border border-black/10 bg-black/[0.04] p-0.5"
+        className="inline-flex h-6 rounded-sm border border-border bg-black/[0.04] p-0.5"
       >
         <button
           type="button"
@@ -404,8 +400,8 @@ function OnOff({
           className={cn(
             "h-full rounded-[3px] px-2 text-[11px] font-semibold tracking-tight transition-colors",
             on
-              ? "bg-[#08090a] text-white"
-              : "text-[#8a8f98] hover:text-[#08090a]",
+              ? "bg-primary text-white"
+              : "text-muted-foreground hover:text-foreground",
           )}
         >
           On
@@ -417,8 +413,8 @@ function OnOff({
           className={cn(
             "h-full rounded-[3px] px-2 text-[11px] font-semibold tracking-tight transition-colors",
             !on
-              ? "bg-[#08090a] text-white"
-              : "text-[#8a8f98] hover:text-[#08090a]",
+              ? "bg-primary text-white"
+              : "text-muted-foreground hover:text-foreground",
           )}
         >
           Off
@@ -451,13 +447,13 @@ function ColorBtn({
       className={cn(
         "inline-flex h-8 items-center gap-1.5 rounded-sm px-2 text-[12px] font-medium tracking-tight transition-colors",
         open
-          ? "bg-black/[0.06] text-[#08090a]"
-          : "text-[#3a3d42] hover:bg-black/5 hover:text-[#08090a]",
+          ? "bg-black/[0.06] text-foreground"
+          : "text-[#3a3d42] hover:bg-black/5 hover:text-foreground",
         dimmed && !open && "opacity-45",
       )}
     >
       <span
-        className="size-3.5 rounded-[3px] border border-black/10"
+        className="size-3.5 rounded-[3px] border border-border"
         style={{ background: color }}
       />
       {label}
@@ -504,13 +500,13 @@ function StepperField({
       <span className="text-[12px] font-medium tracking-tight text-[#3a3d42]">
         {label}
       </span>
-      <div className="inline-flex h-6 items-stretch overflow-hidden rounded-sm border border-black/10 bg-black/[0.03]">
+      <div className="inline-flex h-6 items-stretch overflow-hidden rounded-sm border border-border bg-black/[0.03]">
         <HoldStepButton
           label={`Decrease ${ariaLabel}`}
           disabled={disabled || value <= min}
           onStep={() => stepBy(-1)}
         >
-          <Minus className="size-3" strokeWidth={2.25} />
+          <HugeiconsIcon icon={MinusSignIcon} className="size-3" strokeWidth={2.25} />
         </HoldStepButton>
         <input
           type="text"
@@ -528,14 +524,14 @@ function StepperField({
             if (!Number.isFinite(next)) return;
             onChange(clamp(next));
           }}
-          className="w-7 border-x border-black/8 bg-transparent text-center text-[12px] font-semibold tabular-nums text-[#08090a] outline-none"
+          className="w-7 border-x border-border bg-transparent text-center text-[12px] font-semibold tabular-nums text-foreground outline-none"
         />
         <HoldStepButton
           label={`Increase ${ariaLabel}`}
           disabled={disabled || value >= max}
           onStep={() => stepBy(1)}
         >
-          <Plus className="size-3" strokeWidth={2.25} />
+          <HugeiconsIcon icon={Add01Icon} className="size-3" strokeWidth={2.25} />
         </HoldStepButton>
       </div>
     </div>
@@ -594,7 +590,7 @@ function HoldStepButton({
       onPointerDown={start}
       onPointerUp={stop}
       onPointerCancel={stop}
-      className="flex w-6 cursor-pointer items-center justify-center text-[#6b6f76] transition-colors hover:bg-black/[0.06] hover:text-[#08090a] disabled:pointer-events-none disabled:cursor-default disabled:opacity-30"
+      className="flex w-6 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:bg-black/[0.06] hover:text-foreground disabled:pointer-events-none disabled:cursor-default disabled:opacity-30"
     >
       {children}
     </button>
@@ -688,7 +684,7 @@ function ShapeGlyph({
   className?: string;
 }) {
   if (shape === "circle") return <Circle className={className} />;
-  if (shape === "star") return <Star className={className} />;
+  if (shape === "star") return <HugeiconsIcon icon={StarIcon} strokeWidth={2} className={className} />;
   if (shape === "triangle") return <Triangle className={className} />;
   if (shape === "pill") {
     return (
@@ -704,7 +700,7 @@ function ShapeGlyph({
       </svg>
     );
   }
-  if (shape === "square") return <Square className={className} />;
+  if (shape === "square") return <HugeiconsIcon icon={StopCircleIcon} strokeWidth={2} className={className} />;
   return (
     <svg
       viewBox="0 0 16 16"

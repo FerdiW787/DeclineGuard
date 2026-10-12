@@ -47,7 +47,7 @@ export function AuthProgressDots({
         <span
           key={i}
           className={`block size-1.5 rounded-full transition-colors ${
-            i === activeIndex ? "bg-[#08090a]" : "bg-black/15"
+            i === activeIndex ? "bg-primary" : "bg-black/15"
           }`}
           aria-current={i === activeIndex ? "step" : undefined}
         />
@@ -58,7 +58,7 @@ export function AuthProgressDots({
 
 export function AuthHeading({ children }: { children: ReactNode }) {
   return (
-    <h1 className="ln-h1 text-center text-[1.35rem] font-semibold leading-tight tracking-[-0.022em] text-[#08090a]">
+    <h1 className="ln-h1 text-center text-[1.35rem] font-semibold leading-tight tracking-[-0.022em] text-foreground">
       {children}
     </h1>
   );
@@ -66,7 +66,7 @@ export function AuthHeading({ children }: { children: ReactNode }) {
 
 export function AuthSub({ children }: { children: ReactNode }) {
   return (
-    <p className="mt-2 text-center text-[13px] leading-relaxed text-[#6b6f76]">
+    <p className="mt-2 text-center text-[13px] leading-relaxed text-muted-foreground">
       {children}
     </p>
   );
@@ -84,7 +84,7 @@ export function AuthBackLink({
   return (
     <button
       type="button"
-      className="text-[13px] text-[#8a8f98] transition hover:text-[#08090a] disabled:opacity-50"
+      className="text-[13px] text-muted-foreground transition hover:text-foreground disabled:opacity-50"
       onClick={onClick}
       disabled={disabled}
     >
@@ -95,13 +95,13 @@ export function AuthBackLink({
 
 export function AuthLegal() {
   return (
-    <p className="text-center text-[12px] leading-relaxed text-[#8a8f98]">
+    <p className="text-center text-[12px] leading-relaxed text-muted-foreground">
       By signing up, you agree to our{" "}
-      <a href="/legal/terms" className="font-medium text-[#6b6f76] hover:text-[#08090a]">
+      <a href="/legal/terms" className="font-medium text-muted-foreground hover:text-foreground">
         Terms of Service
       </a>{" "}
       and{" "}
-      <a href="/legal/dpa" className="font-medium text-[#6b6f76] hover:text-[#08090a]">
+      <a href="/legal/dpa" className="font-medium text-muted-foreground hover:text-foreground">
         Data Processing Agreement
       </a>
       .
@@ -119,11 +119,11 @@ export function AuthSwitch({
   label: string;
 }) {
   return (
-    <p className="text-center text-[13px] text-[#8a8f98]">
+    <p className="text-center text-[13px] text-muted-foreground">
       {prompt}{" "}
       <a
         href={href}
-        className="font-medium text-[#08090a] transition hover:opacity-70"
+        className="font-medium text-foreground transition hover:opacity-70"
       >
         {label}
       </a>

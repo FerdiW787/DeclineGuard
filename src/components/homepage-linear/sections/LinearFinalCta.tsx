@@ -1,6 +1,7 @@
-import { ArrowRight } from "lucide-react";
 import { SignedIn, SignedOut } from "@clerk/astro/react";
 import { LinearCta } from "../LinearCta";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 
 export function LinearFinalCta() {
   return (
@@ -10,14 +11,14 @@ export function LinearFinalCta() {
           <h2 className="text-[clamp(1.85rem,4.2vw,3rem)] font-semibold leading-[1.1] tracking-[-0.04em] text-white">
             Don&apos;t let a declined card end the subscription
           </h2>
-          <p className="mx-auto mt-5 max-w-md text-base text-[#8a8a8e] md:text-lg">
+          <p className="mx-auto mt-5 max-w-md text-base text-muted-foreground md:text-lg">
             Connect Lemon Squeezy in seconds. Pay only when we help recover.
           </p>
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
             <SignedOut>
               <LinearCta href="/a/sign-up">
                 Grab a founding spot
-                <ArrowRight className="size-4" />
+                <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
               </LinearCta>
               <LinearCta href="/pricing" variant="ghost">
                 See pricing
@@ -26,7 +27,7 @@ export function LinearFinalCta() {
             <SignedIn>
               <LinearCta href="/a/dashboard">
                 Open dashboard
-                <ArrowRight className="size-4" />
+                <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
               </LinearCta>
             </SignedIn>
           </div>

@@ -53,7 +53,7 @@ export default function AdminOverview() {
             </span>
           ) : null}
           {data.recoveredCurrencyMixed ? (
-            <span className="rounded-full border border-black/8 bg-white px-2.5 py-1 text-[11px] font-semibold text-[#6b6f76]">
+            <span className="rounded-full border border-border bg-white px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
               Recovered $ mixed currencies
             </span>
           ) : null}
@@ -73,11 +73,11 @@ export default function AdminOverview() {
             : [];
           return (
             <AdminCard key={id} className="flex flex-col p-5 md:p-6">
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8a8f98]">
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 <Icon className="size-3.5" />
                 {meta.label}
               </div>
-              <p className="font-display mt-4 text-4xl tracking-tight tabular-nums text-[#08090a] md:text-5xl">
+              <p className="font-display mt-4 text-4xl tracking-tight tabular-nums text-foreground md:text-5xl">
                 {pair
                   ? formatAdminMetricValue(pair.current.total, meta.format)
                   : "—"}
@@ -89,13 +89,13 @@ export default function AdminOverview() {
                       ? "text-emerald-700"
                       : delta.tone === "warn"
                         ? "text-amber-800"
-                        : "text-[#8a8f98]"
+                        : "text-muted-foreground"
                   }`}
                 >
                   {delta.label}
                 </p>
               ) : (
-                <p className="mt-1.5 text-[12px] text-[#8a8f98]">
+                <p className="mt-1.5 text-[12px] text-muted-foreground">
                   {ADMIN_PERIOD_META[period].hint}
                 </p>
               )}

@@ -553,7 +553,7 @@ function FitToggle({
       data-image-handle=""
       role="group"
       aria-label="Image fit"
-      className="pointer-events-auto fixed z-[77] inline-flex h-7 rounded-sm border border-black/10 bg-white p-0.5 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]"
+      className="pointer-events-auto fixed z-[77] inline-flex h-7 rounded-sm border border-border bg-white p-0.5 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]"
       style={{
         left,
         top,
@@ -569,8 +569,8 @@ function FitToggle({
         className={cn(
           "h-full rounded-[3px] px-2.5 text-[11px] font-semibold tracking-tight transition-colors",
           fit === "adjust"
-            ? "bg-[#08090a] text-white"
-            : "text-[#8a8f98] hover:text-[#08090a]",
+            ? "bg-primary text-white"
+            : "text-muted-foreground hover:text-foreground",
         )}
       >
         Adjust
@@ -582,8 +582,8 @@ function FitToggle({
         className={cn(
           "h-full rounded-[3px] px-2.5 text-[11px] font-semibold tracking-tight transition-colors",
           fit === "stretch"
-            ? "bg-[#08090a] text-white"
-            : "text-[#8a8f98] hover:text-[#08090a]",
+            ? "bg-primary text-white"
+            : "text-muted-foreground hover:text-foreground",
         )}
       >
         Stretch

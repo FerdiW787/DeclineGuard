@@ -13,15 +13,7 @@ import { useAction, useQuery } from "convex/react";
 import gsap from "gsap";
 import { curveMonotoneX } from "@visx/curve";
 import {
-  Activity,
-  ArrowLeft,
-  CheckCircle2,
-  ChevronRight,
-  Download,
-  Link2,
-  Loader2,
-  RefreshCw,
-  Search,
+  Link2
 } from "lucide-react";
 import {
   useMarketingDesktop,
@@ -61,6 +53,8 @@ import SegmentedControl from "./SegmentedControl";
 import BorderGlow from "./border-glow/BorderGlow";
 import { type ActivityTimelineSimulation } from "./ActivityTimeline";
 import RailActivityFeed from "./RailActivityFeed";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ActivityIcon as ActivityStrokeIcon, ArrowLeft02Icon, CheckmarkCircle02Icon, ArrowRight01Icon, DownloadIcon, Loading03Icon, RepeatIcon, SearchIcon } from "@hugeicons/core-free-icons";
 
 export type RecoveriesQueueFilter =
   | "all"
@@ -550,9 +544,9 @@ export default function RecoveriesPage({
           <button
             type="button"
             onClick={() => setSelectedId(null)}
-            className="dg-interactive mb-4 inline-flex min-h-11 w-fit items-center gap-1.5 rounded-md border border-black/8 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-[#6b6f76]"
+            className="dg-interactive mb-4 inline-flex min-h-11 w-fit items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] font-semibold text-muted-foreground"
           >
-            <ArrowLeft className="size-3.5" />
+            <HugeiconsIcon icon={ArrowLeft02Icon} strokeWidth={2} className="size-3.5" />
             Back to queue
           </button>
           <CasePanel
@@ -581,13 +575,13 @@ export default function RecoveriesPage({
         )}
       >
         <div data-enter className="shrink-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-black/45">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Recoveries
           </p>
           <h2 className="font-display mt-2 text-3xl tracking-tight md:text-4xl">
             {openCount > 0 ? "Recovery queue" : "Recovery workspace"}
           </h2>
-          <p className="mt-2 max-w-xl text-sm text-black/45">
+          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
             Prioritize open declines, open a case, send the card-update link,
             and confirm wins.
           </p>
@@ -617,7 +611,7 @@ export default function RecoveriesPage({
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-black/45">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                     Recovered vs new declines
                   </p>
                   <p className="font-display mt-1 text-xl tracking-tight">
@@ -628,7 +622,7 @@ export default function RecoveriesPage({
                   className={
                     hasActivity && (totalRecovered > 0 || totalAtRisk > 0)
                       ? "rounded-full bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-800"
-                      : "rounded-full bg-black/5 px-2.5 py-1 text-[11px] font-semibold text-black/55"
+                      : "rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold text-muted-foreground"
                   }
                 >
                   {chartBadge}
@@ -694,7 +688,7 @@ export default function RecoveriesPage({
                 </ComposedChart>
               </div>
               {recoveryRatePercent != null ? (
-                <p className="mt-2 text-[11px] text-black/40">
+                <p className="mt-2 text-[11px] text-muted-foreground">
                   This month cohort recovery rate: {recoveryRatePercent}%
                 </p>
               ) : null}
@@ -708,7 +702,7 @@ export default function RecoveriesPage({
               )}
             >
               <div className="shrink-0">
-                <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-black/45">
+                <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                   Recent wins
                 </p>
                 <p className="font-display mt-1 text-xl tracking-tight">
@@ -718,7 +712,7 @@ export default function RecoveriesPage({
               {recentWins === undefined ? (
                 <WinsLoadingSkeleton />
               ) : recentWins.length === 0 ? (
-                <p className="mt-4 text-sm leading-relaxed text-black/40">
+                <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
                   Recovered customers show up here as soon as Lemon Squeezy
                   confirms payment.
                 </p>
@@ -741,7 +735,7 @@ export default function RecoveriesPage({
                           <p className="truncate text-sm font-semibold">
                             {name}
                           </p>
-                          <p className="truncate text-[11px] text-black/40">
+                          <p className="truncate text-[11px] text-muted-foreground">
                             {[
                               win.productName?.trim() || null,
                               formatRelativeTime(win.recoveredAt, nowMs),
@@ -755,7 +749,7 @@ export default function RecoveriesPage({
                             +{formatMoneyAmount(win.amountCents, win.currency)}
                           </span>
                           {win.feeCents != null && win.feeCents > 0 ? (
-                            <p className="text-[11px] tabular-nums text-black/40">
+                            <p className="text-[11px] tabular-nums text-muted-foreground">
                               Fee {formatMoneyAmount(win.feeCents, win.currency)}
                             </p>
                           ) : null}
@@ -778,16 +772,16 @@ export default function RecoveriesPage({
           >
             <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8a8f98]">
+                <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                   Open failures
                 </p>
-                <p className="font-display mt-1 text-2xl tracking-tight text-[#08090a]">
+                <p className="font-display mt-1 text-2xl tracking-tight text-foreground">
                   {openCount > 0 ? "Needs a nudge" : "All clear"}
                 </p>
                 {openCount > 0 ? (
-                  <p className="mt-1 inline-flex items-center gap-1 text-[12px] font-medium text-[#6b6f76]">
+                  <p className="mt-1 inline-flex items-center gap-1 text-[12px] font-medium text-muted-foreground">
                     Click a customer to open their case
-                    <ChevronRight className="size-3.5" />
+                    <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-3.5" />
                   </p>
                 ) : null}
               </div>
@@ -796,7 +790,7 @@ export default function RecoveriesPage({
 
             <div className="mt-4 flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center">
               <label className="relative min-w-0 flex-1">
-                <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-black/35" />
+                <HugeiconsIcon icon={SearchIcon} strokeWidth={2} className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
                 <input
                   type="search"
                   value={query}
@@ -805,14 +799,14 @@ export default function RecoveriesPage({
                     setVisibleCount(25);
                   }}
                   placeholder="Search customer, product, reason…"
-                  className="w-full rounded-md border border-black/8 bg-[#f7f8f8] py-2 pr-3 pl-9 text-sm outline-none placeholder:text-black/35 focus:border-black/20"
+                  className="w-full rounded-md border border-border bg-background py-2 pr-3 pl-9 text-sm outline-none placeholder:text-muted-foreground focus:border-ring"
                 />
               </label>
               <div className="min-w-0 max-w-full overflow-x-auto">
                 <SegmentedControl
                   ariaLabel="Queue filter"
                   idPrefix="queue-filter"
-                  className="shrink-0 rounded-md bg-[#f7f8f8] shadow-none"
+                  className="shrink-0 rounded-md bg-background shadow-none"
                   value={filter}
                   onChange={(next) => {
                     setFilter(next);
@@ -907,14 +901,14 @@ export default function RecoveriesPage({
               <FailuresLoadingSkeleton />
             ) : openFailures.length === 0 ? (
               <div className="mt-8 flex flex-col items-center rounded-md bg-teal-50/60 px-4 py-10 text-center">
-                <CheckCircle2 className="size-8 text-teal-600" />
+                <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} className="size-8 text-teal-600" />
                 <p className="mt-3 text-sm font-semibold">No open failures</p>
-                <p className="mt-1 max-w-sm text-[12px] text-black/45">
+                <p className="mt-1 max-w-sm text-[12px] text-muted-foreground">
                   New declines from Lemon Squeezy land here automatically.
                 </p>
               </div>
             ) : filteredQueue.length === 0 ? (
-              <p className="mt-8 text-sm text-black/40">
+              <p className="mt-8 text-sm text-muted-foreground">
                 No failures match this search or filter.
               </p>
             ) : (
@@ -991,7 +985,7 @@ export default function RecoveriesPage({
                                 <Badge tone="neutral">Test</Badge>
                               ) : null}
                             </div>
-                            <p className="mt-0.5 truncate text-[11px] text-black/40">
+                            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
                               {[
                                 row.productName?.trim() || null,
                                 openFailureStatusLine(row),
@@ -1005,23 +999,20 @@ export default function RecoveriesPage({
                                 .join(" · ")}
                             </p>
                             {row.customerName?.trim() ? (
-                              <p className="truncate text-[11px] text-black/35">
+                              <p className="truncate text-[11px] text-muted-foreground">
                                 {row.customerEmail}
                               </p>
                             ) : null}
                           </div>
                           <span className="flex shrink-0 items-center gap-1.5 pt-0.5">
-                            <span className="text-sm font-semibold tabular-nums text-black/70">
+                            <span className="text-sm font-semibold tabular-nums text-foreground/80">
                               {amount}
                             </span>
-                            <ChevronRight
-                              className={`size-4 shrink-0 transition-all ${
-                                selected
-                                  ? "text-teal-600"
-                                  : "text-black/25 group-hover:translate-x-0.5 group-hover:text-black/55"
-                              }`}
-                              aria-hidden
-                            />
+                            <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className={`size-4 shrink-0 transition-all ${
+                                                                    selected
+                                                                      ? "text-teal-600"
+                                                                      : "text-muted-foreground/50 group-hover:translate-x-0.5 group-hover:text-muted-foreground"
+                                                                  }`} aria-hidden />
                           </span>
                         </button>
                       </li>
@@ -1033,7 +1024,7 @@ export default function RecoveriesPage({
                   <button
                     type="button"
                     onClick={() => setVisibleCount((n) => n + 25)}
-                    className="mt-3 w-full rounded-xl border border-dashed border-black/12 py-2 text-xs font-semibold text-black/55 transition hover:border-black/25 hover:text-black/80"
+                    className="mt-3 w-full rounded-xl border border-dashed border-border py-2 text-xs font-semibold text-muted-foreground transition hover:border-foreground/25 hover:text-foreground"
                   >
                     Show more ({filteredQueue.length - visibleCount} left)
                   </button>
@@ -1168,31 +1159,31 @@ function RailShell({
 }) {
   return (
     <div
-      className={`flex flex-col overflow-hidden rounded-md border border-black/8 bg-white ${
+      className={`flex flex-col overflow-hidden rounded-md border border-border bg-card ${
         fill ? "min-h-0 flex-1" : ""
       }`}
     >
-      <header className="flex shrink-0 items-center gap-2.5 border-b border-black/6 px-4 py-3">
+      <header className="flex shrink-0 items-center gap-2.5 border-b border-border px-4 py-3">
         {onBack ? (
           <button
             type="button"
             onClick={onBack}
-            className="dg-interactive inline-flex min-h-11 items-center gap-1.5 rounded-full border border-black/8 bg-transparent px-2.5 py-1 text-[11px] font-semibold text-black/60"
+            className="dg-interactive inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-transparent px-2.5 py-1 text-[11px] font-semibold text-muted-foreground"
           >
-            <ArrowLeft className="size-3.5" />
+            <HugeiconsIcon icon={ArrowLeft02Icon} strokeWidth={2} className="size-3.5" />
             {backLabel ?? "Back"}
           </button>
         ) : (
           <>
             {icon === "activity" ? (
-              <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-black/[0.05] text-black/60">
-                <Activity className="size-3.5" />
+              <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <HugeiconsIcon icon={ActivityStrokeIcon} strokeWidth={2} className="size-3.5" />
               </span>
             ) : null}
             <div className="min-w-0">
               <p className="text-sm font-semibold leading-tight">{title}</p>
               {subtitle ? (
-                <p className="text-[11px] leading-tight text-black/40">
+                <p className="text-[11px] leading-tight text-muted-foreground">
                   {subtitle}
                 </p>
               ) : null}
@@ -1225,7 +1216,7 @@ function Badge({
         ? "bg-rose-50 text-rose-800"
         : tone === "good"
           ? "bg-teal-50 text-teal-800"
-          : "bg-black/5 text-black/55";
+          : "bg-muted text-muted-foreground";
   return (
     <span
       className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${cls}`}
@@ -1246,10 +1237,10 @@ function WinsLoadingSkeleton() {
             className="flex h-[52px] items-center justify-between gap-3 rounded-xl px-2 py-2"
           >
             <div className="min-w-0 flex-1 space-y-2">
-              <div className="h-3.5 w-28 rounded-full bg-black/8 motion-safe:animate-pulse" />
-              <div className="h-2.5 w-20 rounded-full bg-black/5 motion-safe:animate-pulse" />
+              <div className="h-3.5 w-28 rounded-full bg-muted motion-safe:animate-pulse" />
+              <div className="h-2.5 w-20 rounded-full bg-muted motion-safe:animate-pulse" />
             </div>
-            <div className="h-4 w-14 shrink-0 rounded-full bg-black/8 motion-safe:animate-pulse" />
+            <div className="h-4 w-14 shrink-0 rounded-full bg-muted motion-safe:animate-pulse" />
           </li>
         ))}
       </ul>
@@ -1269,15 +1260,15 @@ function FailuresLoadingSkeleton() {
           >
             <div className="min-w-0 flex-1 space-y-2 pt-0.5">
               <div className="flex items-center gap-1.5">
-                <div className="h-3.5 w-32 rounded-full bg-black/8 motion-safe:animate-pulse" />
-                <div className="h-4 w-14 rounded-full bg-black/5 motion-safe:animate-pulse" />
+                <div className="h-3.5 w-32 rounded-full bg-muted motion-safe:animate-pulse" />
+                <div className="h-4 w-14 rounded-full bg-muted motion-safe:animate-pulse" />
               </div>
-              <div className="h-2.5 w-44 rounded-full bg-black/5 motion-safe:animate-pulse" />
-              <div className="h-2.5 w-28 rounded-full bg-black/[0.03] motion-safe:animate-pulse" />
+              <div className="h-2.5 w-44 rounded-full bg-muted motion-safe:animate-pulse" />
+              <div className="h-2.5 w-28 rounded-full bg-muted motion-safe:animate-pulse" />
             </div>
             <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
-              <div className="h-4 w-12 rounded-full bg-black/8 motion-safe:animate-pulse" />
-              <div className="size-4 rounded bg-black/5 motion-safe:animate-pulse" />
+              <div className="h-4 w-12 rounded-full bg-muted motion-safe:animate-pulse" />
+              <div className="size-4 rounded bg-muted motion-safe:animate-pulse" />
             </div>
           </div>
         ))}
@@ -1333,17 +1324,17 @@ function CasePanel({
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-black/45">
+          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
             Customer
           </p>
           <p className="font-display mt-1 text-2xl leading-[1.2] tracking-tight">
             {displayName}
           </p>
           {row.customerName?.trim() ? (
-            <p className="truncate text-sm text-black/45">{row.customerEmail}</p>
+            <p className="truncate text-sm text-muted-foreground">{row.customerEmail}</p>
           ) : null}
         </div>
-        <span className="shrink-0 rounded-full bg-black/5 px-3 py-1.5 text-sm font-semibold tabular-nums">
+        <span className="shrink-0 rounded-full bg-muted px-3 py-1.5 text-sm font-semibold tabular-nums">
           {formatMoneyAmount(row.amountCents, row.currency)}
         </span>
       </div>
@@ -1363,17 +1354,17 @@ function CasePanel({
 
       <dl className="grid gap-2 text-[12px]">
         <div className="flex justify-between gap-3">
-          <dt className="text-black/40">Product</dt>
+          <dt className="text-muted-foreground">Product</dt>
           <dd className="truncate text-right font-medium">
             {row.productName?.trim() || "—"}
           </dd>
         </div>
         <div className="flex justify-between gap-3">
-          <dt className="text-black/40">Failed</dt>
+          <dt className="text-muted-foreground">Failed</dt>
           <dd className="font-medium">{formatFailedAt(row.failedAt)}</dd>
         </div>
         <div className="flex justify-between gap-3">
-          <dt className="text-black/40">Next email</dt>
+          <dt className="text-muted-foreground">Next email</dt>
           <dd className="font-medium">
             {nextLabel
               ? overdue
@@ -1384,7 +1375,7 @@ function CasePanel({
         </div>
         {row.declineReason?.trim() ? (
           <div className="flex justify-between gap-3">
-            <dt className="text-black/40">Status</dt>
+            <dt className="text-muted-foreground">Status</dt>
             <dd className="max-w-[60%] truncate text-right font-medium">
               {row.declineReason}
             </dd>
@@ -1398,13 +1389,13 @@ function CasePanel({
             href={paymentUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-full bg-[#111] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-black motion-reduce:transition-none"
+            className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary/80 motion-reduce:transition-none"
           >
             <Link2 className="size-4" />
             Open card-fix link
           </a>
         ) : (
-          <p className="flex min-h-[2.75rem] items-center rounded-xl bg-black/[0.03] px-3 py-2.5 text-[12px] text-black/45">
+          <p className="flex min-h-[2.75rem] items-center rounded-xl bg-muted px-3 py-2.5 text-[12px] text-muted-foreground">
             No card-fix link on this failure yet — sequence is still running.
           </p>
         )}
@@ -1416,7 +1407,7 @@ function CasePanel({
       </div>
 
       <div>
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-black/45">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
           Sequence
         </p>
         <ol className="relative mt-3 space-y-0">
@@ -1430,7 +1421,7 @@ function CasePanel({
               <li key={step.id} className="relative flex gap-3 pb-4 last:pb-0">
                 {i < arr.length - 1 ? (
                   <span
-                    className="absolute top-6 left-[11px] h-[calc(100%-8px)] w-px bg-black/10"
+                    className="absolute top-6 left-[11px] h-[calc(100%-8px)] w-px bg-border"
                     aria-hidden
                   />
                 ) : null}
@@ -1440,7 +1431,7 @@ function CasePanel({
                       ? "bg-teal-600 text-white"
                       : pendingNext
                         ? "bg-amber-100 text-amber-900"
-                        : "bg-black/8 text-black/40"
+                        : "bg-muted text-muted-foreground"
                   }`}
                 >
                   {done ? "✓" : i + 1}
@@ -1448,11 +1439,11 @@ function CasePanel({
                 <div className="min-w-0 pt-0.5">
                   <p className="text-sm font-semibold">
                     {step.label}{" "}
-                    <span className="font-medium text-black/40">
+                    <span className="font-medium text-muted-foreground">
                       · {step.hint}
                     </span>
                   </p>
-                  <p className="text-[11px] text-black/40">
+                  <p className="text-[11px] text-muted-foreground">
                     {done
                       ? `Sent ${formatFailedAt(step.sentAt!)}`
                       : pendingNext
@@ -1472,7 +1463,7 @@ function CasePanel({
               <button
                 type="button"
                 onClick={onGoToCustomizations}
-                className="mt-3 text-xs font-semibold text-[#6b6f76] underline-offset-2 hover:text-[#08090a] hover:underline"
+                className="mt-3 text-xs font-semibold text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
               >
                 Edit emails
               </button>
@@ -1481,17 +1472,17 @@ function CasePanel({
 
           <div>
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-black/45">
+              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 Timeline
               </p>
           {caseLoading ? (
-            <span className="text-[11px] text-black/35 motion-safe:animate-pulse">
+            <span className="text-[11px] text-muted-foreground motion-safe:animate-pulse">
               Loading…
             </span>
           ) : null}
         </div>
         {activity.length === 0 ? (
-          <p className="mt-3 text-[12px] text-black/40">
+          <p className="mt-3 text-[12px] text-muted-foreground">
             Events for this customer will appear as emails and webhooks fire.
           </p>
         ) : (
@@ -1508,7 +1499,7 @@ function CasePanel({
                     <p className="truncate text-[12px] font-semibold">
                       {formatActivityTitle(item.title, item.type)}
                     </p>
-                    <p className="text-[10px] text-black/40">
+                    <p className="text-[10px] text-muted-foreground">
                       {formatRelativeTime(item.occurredAt, nowMs)}
                     </p>
                   </div>
@@ -1594,9 +1585,9 @@ function RetryPaymentButton({
       className={RETRY_BTN_CLASS}
     >
       {busy ? (
-        <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden />
+        <HugeiconsIcon icon={Loading03Icon} strokeWidth={2} className="size-4 motion-safe:animate-spin" aria-hidden />
       ) : (
-        <RefreshCw className="size-4" aria-hidden />
+        <HugeiconsIcon icon={RepeatIcon} strokeWidth={2} className="size-4" aria-hidden />
       )}
       <RetryButtonLabel state={state} />
     </button>
@@ -1624,7 +1615,7 @@ function RetryStatus({
           ? "text-rose-700"
           : state === "success"
             ? "text-teal-800"
-            : "text-black/45",
+            : "text-muted-foreground",
       )}
     >
       {show ? message : null}
@@ -1736,7 +1727,7 @@ function ExportCsvButton({ enabled }: { enabled: boolean }) {
         className="dg-btn shrink-0 cursor-pointer !gap-1.5 !px-2.5 !py-1.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-45"
         title="Export is available in your live dashboard"
       >
-        <Download className="size-3.5" />
+        <HugeiconsIcon icon={DownloadIcon} strokeWidth={2} className="size-3.5" />
         Export CSV
       </button>
     );
@@ -1758,7 +1749,7 @@ function ExportCsvButtonLive() {
       className="dg-btn shrink-0 cursor-pointer !gap-1.5 !px-2.5 !py-1.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-45"
       title="Export open + recovered rows"
     >
-      <Download className="size-3.5" />
+      <HugeiconsIcon icon={DownloadIcon} strokeWidth={2} className="size-3.5" />
       Export CSV
     </button>
   );

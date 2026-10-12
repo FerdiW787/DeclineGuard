@@ -31,18 +31,18 @@ export default function EmailFocusSandbox() {
 
   return (
     <div
-      className="dg-shell light flex h-dvh overflow-hidden text-[#08090a] transition-colors duration-500"
+      className="dg-shell light flex h-dvh overflow-hidden text-foreground transition-colors duration-500"
       style={focusMode ? { background: "#ffffff" } : undefined}
     >
       <aside
-        className={`relative z-20 hidden w-[248px] shrink-0 flex-col overflow-hidden bg-[#f7f8f8] transition-[margin] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] lg:flex ${
+        className={`relative z-20 hidden w-[248px] shrink-0 flex-col overflow-hidden bg-background transition-[margin] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] lg:flex ${
           focusMode ? "-ml-[248px] pointer-events-none" : ""
         }`}
       >
         <div className="px-5 py-5 text-[13px] font-semibold tracking-[-0.02em]">
           DeclineGuard
         </div>
-        <p className="px-5 text-[12px] text-[#8a8f98]">Customizations</p>
+        <p className="px-5 text-[12px] text-muted-foreground">Customizations</p>
       </aside>
       <div className="relative z-10 flex min-w-0 flex-1 overflow-hidden">
         <CustomizationsPage

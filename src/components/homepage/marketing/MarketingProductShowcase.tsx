@@ -27,8 +27,8 @@ export function MarketingProductShowcase({
             onClick={() => onTabChange(t.id)}
             className={`cursor-pointer rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
               tab === t.id
-                ? "bg-[#0c0a09] text-white"
-                : "text-black/50 hover:bg-black/5 hover:text-black"
+                ? "bg-primary text-white"
+                : "text-black/50 hover:bg-black/5 hover:text-foreground"
             }`}
           >
             {t.label}

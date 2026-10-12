@@ -1,4 +1,3 @@
-import { ArrowRight, Check, Plus } from "lucide-react";
 import { SignedIn, SignedOut } from "@clerk/astro/react";
 import { ProCheckoutButton } from "@/components/billing/ProCheckoutButton";
 import { LinearCta } from "@/components/homepage-linear/LinearCta";
@@ -15,6 +14,8 @@ import {
   PLANS,
   PRICING_FAQS,
 } from "@/lib/pricing";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowRight01Icon, Tick02Icon, Add01Icon } from "@hugeicons/core-free-icons";
 
 const free = PLANS.free;
 const pro = PLANS.pro;
@@ -43,16 +44,16 @@ function FreePlanCtas() {
 
 function PricingPage() {
   return (
-    <div className="ln-surface min-h-screen bg-white text-[#08090a]">
+    <div className="ln-surface min-h-screen bg-white text-foreground">
       <HomeNav homeAnchors={false} current="pricing" />
 
       <main className="mx-auto max-w-[1440px] px-6 pb-24 pt-28 md:pb-32 md:pt-36 lg:px-10">
         <div className="mx-auto max-w-xl text-center">
-          <p className="text-[13px] font-medium text-[#8a8f98]">Pricing</p>
+          <p className="text-[13px] font-medium text-muted-foreground">Pricing</p>
           <h1 className="ln-h1 mt-5 text-[clamp(2rem,4.5vw,3rem)] font-medium leading-[1.08] tracking-[-0.022em]">
             Free and Pro. Monthly decline buckets.
           </h1>
-          <p className="mt-5 text-[15px] leading-[1.6] text-[#8a8f98]">
+          <p className="mt-5 text-[15px] leading-[1.6] text-muted-foreground">
             {free.includedDeclinesPerMonth} or {pro.includedDeclinesPerMonth}{" "}
             declines each month. Need more? Stack {formatDeclineAddon()}. Over
             quota, new declines wait in a hold queue — we never kill a sequence
@@ -61,19 +62,19 @@ function PricingPage() {
         </div>
 
         <div className="mt-14 grid items-stretch gap-4 md:mt-16 md:grid-cols-2 md:gap-5">
-          <article className="flex flex-col rounded-2xl border border-black/[0.08] bg-white p-7 md:p-8">
-            <p className="text-[13px] font-medium text-[#8a8f98]">{free.name}</p>
+          <article className="flex flex-col rounded-2xl border border-border bg-white p-7 md:p-8">
+            <p className="text-[13px] font-medium text-muted-foreground">{free.name}</p>
             <p className="ln-h1 mt-3 text-5xl font-medium tracking-tight">$0</p>
-            <p className="mt-2 text-[15px] font-medium text-[#08090a]">
+            <p className="mt-2 text-[15px] font-medium text-foreground">
               {formatDeclineQuota(free.includedDeclinesPerMonth)}
             </p>
-            <p className="mt-2 text-[14px] leading-[1.6] text-[#8a8f98]">
+            <p className="mt-2 text-[14px] leading-[1.6] text-muted-foreground">
               {free.tagline}
             </p>
-            <ul className="mt-8 flex-1 space-y-3 text-[14px] leading-[1.6] text-[#6b6f76]">
+            <ul className="mt-8 flex-1 space-y-3 text-[14px] leading-[1.6] text-muted-foreground">
               {free.features.map((line) => (
                 <li key={line} className="flex gap-3">
-                  <Check className="mt-0.5 size-4 shrink-0 text-black/35" />
+                  <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="mt-0.5 size-4 shrink-0 text-black/35" />
                   {line}
                 </li>
               ))}
@@ -83,13 +84,13 @@ function PricingPage() {
             </div>
           </article>
 
-          <article className="flex flex-col rounded-2xl bg-[#08090a] p-7 text-[#f7f8f8] md:p-8">
+          <article className="flex flex-col rounded-2xl bg-primary p-7 text-foreground md:p-8">
             <p className="text-[13px] font-medium text-white/50">{pro.name}</p>
             <p className="ln-h1 mt-3 text-5xl font-medium tracking-tight">
               {formatUsd(pro.monthlyPriceUsd)}
               <span className="text-xl font-medium text-white/40">/mo</span>
             </p>
-            <p className="mt-2 text-[15px] font-medium text-[#f7f8f8]">
+            <p className="mt-2 text-[15px] font-medium text-foreground">
               {formatDeclineQuota(pro.includedDeclinesPerMonth)}
             </p>
             <p className="mt-2 text-[14px] leading-[1.6] text-white/50">
@@ -98,7 +99,7 @@ function PricingPage() {
             <ul className="mt-8 flex-1 space-y-3 text-[14px] leading-[1.6] text-white/65">
               {pro.features.map((line) => (
                 <li key={line} className="flex gap-3">
-                  <Check className="mt-0.5 size-4 shrink-0 text-white/40" />
+                  <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="mt-0.5 size-4 shrink-0 text-white/40" />
                   {line}
                 </li>
               ))}
@@ -109,21 +110,21 @@ function PricingPage() {
           </article>
         </div>
 
-        <section className="mt-10 rounded-2xl border border-black/[0.08] bg-[#f7f8f8] px-6 py-7 md:px-8">
+        <section className="mt-10 rounded-2xl border border-border bg-background px-6 py-7 md:px-8">
           <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] md:items-start md:gap-12">
             <div>
-              <p className="text-[13px] font-medium text-[#8a8f98]">Add-on</p>
+              <p className="text-[13px] font-medium text-muted-foreground">Add-on</p>
               <h2 className="ln-h1 mt-3 text-[clamp(1.35rem,2.4vw,1.75rem)] font-medium leading-[1.15] tracking-[-0.02em]">
                 Need more than your bucket?
               </h2>
-              <p className="mt-3 text-[14px] leading-[1.6] text-[#8a8f98]">
+              <p className="mt-3 text-[14px] leading-[1.6] text-muted-foreground">
                 Same add-on on Free and Pro. Stack as many as you need — extra
                 monthly decline capacity on top of your plan bucket.
               </p>
             </div>
             <dl className="grid gap-4 sm:grid-cols-3">
               <div className="rounded-xl bg-white px-4 py-4">
-                <dt className="text-[12px] font-medium text-[#8a8f98]">
+                <dt className="text-[12px] font-medium text-muted-foreground">
                   Capacity
                 </dt>
                 <dd className="mt-1 text-[15px] font-medium tracking-tight">
@@ -131,13 +132,13 @@ function PricingPage() {
                 </dd>
               </div>
               <div className="rounded-xl bg-white px-4 py-4">
-                <dt className="text-[12px] font-medium text-[#8a8f98]">Price</dt>
+                <dt className="text-[12px] font-medium text-muted-foreground">Price</dt>
                 <dd className="mt-1 text-[15px] font-medium tracking-tight">
                   {formatUsd(DECLINE_ADDON.monthlyPriceUsd)}/mo
                 </dd>
               </div>
               <div className="rounded-xl bg-white px-4 py-4">
-                <dt className="text-[12px] font-medium text-[#8a8f98]">
+                <dt className="text-[12px] font-medium text-muted-foreground">
                   Over quota
                 </dt>
                 <dd className="mt-1 text-[15px] font-medium tracking-tight">
@@ -149,7 +150,7 @@ function PricingPage() {
         </section>
 
         <section id="faq" className="mx-auto mt-20 max-w-2xl scroll-mt-24 md:mt-24">
-          <p className="text-center text-[13px] font-medium text-[#8a8f98]">
+          <p className="text-center text-[13px] font-medium text-muted-foreground">
             FAQ
           </p>
           <h2 className="ln-h1 mt-4 text-center text-[clamp(1.75rem,3.2vw,2.4rem)] font-medium leading-[1.1] tracking-[-0.02em]">
@@ -159,15 +160,15 @@ function PricingPage() {
             {PRICING_FAQS.map((item) => (
               <details
                 key={item.q}
-                className="group border-b border-black/[0.08] py-5 first:border-t"
+                className="group border-b border-border py-5 first:border-t"
               >
-                <summary className="flex cursor-pointer list-none items-start gap-4 text-[15px] font-medium tracking-[-0.01em] text-[#08090a] [&::-webkit-details-marker]:hidden">
+                <summary className="flex cursor-pointer list-none items-start gap-4 text-[15px] font-medium tracking-[-0.01em] text-foreground [&::-webkit-details-marker]:hidden">
                   <span className="min-w-0 flex-1">{item.q}</span>
-                  <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border border-black/15 text-[#8a8f98] transition-transform duration-200 group-open:rotate-45 group-hover:border-black/30 group-hover:text-[#08090a]">
-                    <Plus className="size-4" />
+                  <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border border-black/15 text-muted-foreground transition-transform duration-200 group-open:rotate-45 group-hover:border-black/30 group-hover:text-foreground">
+                    <HugeiconsIcon icon={Add01Icon} strokeWidth={2} className="size-4" />
                   </span>
                 </summary>
-                <p className="mt-3 max-w-2xl pr-10 text-[14px] leading-[1.65] text-[#8a8f98]">
+                <p className="mt-3 max-w-2xl pr-10 text-[14px] leading-[1.65] text-muted-foreground">
                   {item.a}
                 </p>
               </details>
@@ -179,17 +180,17 @@ function PricingPage() {
           <SignedOut>
             <LinearCta href="/a/sign-up">
               Start free — no card required
-              <ArrowRight className="size-4" />
+              <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
             </LinearCta>
           </SignedOut>
           <SignedIn>
             <LinearCta href="/a/dashboard">
               Open dashboard
-              <ArrowRight className="size-4" />
+              <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
             </LinearCta>
           </SignedIn>
-          <p className="mt-4 text-[13px] text-[#8a8f98]">
-            <a href="/" className="transition-colors hover:text-[#08090a]">
+          <p className="mt-4 text-[13px] text-muted-foreground">
+            <a href="/" className="transition-colors hover:text-foreground">
               ← Back to homepage
             </a>
           </p>

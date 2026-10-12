@@ -66,7 +66,7 @@ export default function HomePageLinear() {
   );
 
   return (
-    <div ref={rootRef} className="ln-home min-h-screen overflow-x-hidden bg-[#f7f8f8] text-[#08090a]">
+    <div ref={rootRef} className="ln-home min-h-screen overflow-x-hidden bg-background text-foreground">
       <LinearNav />
       <main>
         <LinearHero tab={tab} onTabChange={setTab} />

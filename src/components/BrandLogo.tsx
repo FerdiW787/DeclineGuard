@@ -47,7 +47,7 @@ export default function BrandLogo({
       />
       <span
         className={`font-display font-bold leading-none tracking-[-0.04em] ${textClass[size]} ${
-          onDark ? "text-white" : "text-[#0c0a09]"
+          onDark ? "text-white" : "text-foreground"
         }`}
       >
         DeclineGuard

@@ -1,7 +1,6 @@
 import { useMemo, useRef } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
-import { Check, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   useActivityFeedPrefs,
@@ -17,6 +16,8 @@ import {
   type ActivityRow,
 } from "./dashboardUi";
 import SegmentedControl from "./SegmentedControl";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Tick02Icon, ArrowDown01Icon, ArrowUp01Icon } from "@hugeicons/core-free-icons";
 
 gsap.registerPlugin(useGSAP);
 
@@ -227,7 +228,7 @@ export default function RailActivityFeed({
             ariaLabel="Activity time range"
             idPrefix={idPrefix}
             equal
-            className="w-full rounded-md bg-[#f7f8f8] shadow-none"
+            className="w-full rounded-md bg-background shadow-none"
             value={range}
             onChange={setRange}
             options={RANGE_OPTIONS}
@@ -243,7 +244,7 @@ export default function RailActivityFeed({
                 <div
                   role="group"
                   aria-label="Sort activity"
-                  className="inline-flex items-center gap-0.5 rounded-md border border-black/8 bg-[#f7f8f8] p-0.5"
+                  className="inline-flex items-center gap-0.5 rounded-md border border-border bg-background p-0.5"
                 >
                   {(
                     [
@@ -261,7 +262,7 @@ export default function RailActivityFeed({
                         className={cn(
                           "cursor-pointer rounded-[5px] px-2 py-1 text-[10px] font-semibold transition",
                           active
-                            ? "bg-white text-[#08090a] shadow-sm"
+                            ? "bg-white text-foreground shadow-sm"
                             : "text-black/40 hover:text-black/65",
                         )}
                       >
@@ -284,7 +285,7 @@ export default function RailActivityFeed({
                     "dg-interactive cursor-pointer rounded-md border px-2.5 py-2 text-left",
                     kind === null
                       ? "border-black/15 bg-white shadow-sm"
-                      : "border-black/8 bg-[#f7f8f8] hover:border-black/20 hover:bg-white",
+                      : "border-border bg-background hover:border-black/20 hover:bg-white",
                   )}
                 >
                   <span className="flex items-center justify-between gap-1">
@@ -292,10 +293,10 @@ export default function RailActivityFeed({
                       All
                     </span>
                     {kind === null ? (
-                      <Check className="size-3 shrink-0 text-black/45" />
+                      <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-3 shrink-0 text-black/45" />
                     ) : null}
                   </span>
-                  <p className="mt-0.5 text-sm font-semibold tabular-nums text-[#08090a]">
+                  <p className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">
                     {loading
                       ? "—"
                       : counts.recovered + counts.failed + counts.email}
@@ -313,7 +314,7 @@ export default function RailActivityFeed({
                         "dg-interactive cursor-pointer rounded-md border px-2.5 py-2 text-left",
                         active
                           ? "border-black/15 bg-white shadow-sm"
-                          : "border-black/8 bg-[#f7f8f8] hover:border-black/20 hover:bg-white",
+                          : "border-border bg-background hover:border-black/20 hover:bg-white",
                       )}
                     >
                       <span className="flex items-center justify-between gap-1">
@@ -321,10 +322,10 @@ export default function RailActivityFeed({
                           {chip.label}
                         </span>
                         {active ? (
-                          <Check className="size-3 shrink-0 text-black/45" />
+                          <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-3 shrink-0 text-black/45" />
                         ) : null}
                       </span>
-                      <p className="mt-0.5 text-sm font-semibold tabular-nums text-[#08090a]">
+                      <p className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">
                         {loading ? "—" : countFor(chip.id)}
                       </p>
                     </button>
@@ -345,9 +346,9 @@ export default function RailActivityFeed({
             {filtersOpen ? "Hide Filters" : "Show Filters"}
           </span>
           {filtersOpen ? (
-            <ChevronUp className="size-3.5 shrink-0 text-black/40" />
+            <HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={2} className="size-3.5 shrink-0 text-black/40" />
           ) : (
-            <ChevronDown className="size-3.5 shrink-0 text-black/40" />
+            <HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={2} className="size-3.5 shrink-0 text-black/40" />
           )}
         </button>
       </div>
@@ -393,7 +394,7 @@ export default function RailActivityFeed({
                   <ActivityIcon type={uiType} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="truncate text-[13px] font-semibold leading-snug text-[#08090a]">
+                      <p className="truncate text-[13px] font-semibold leading-snug text-foreground">
                         {activityPrimary(item)}
                       </p>
                       {amount ? (
@@ -435,13 +436,13 @@ export default function RailActivityFeed({
                         "w-full rounded-xl border px-3.5 py-3.5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors",
                         inspected
                           ? "border-black/15 bg-white ring-1 ring-black/8"
-                          : "dg-interactive cursor-pointer border-black/8 bg-white hover:border-black/15",
+                          : "dg-interactive cursor-pointer border-border bg-white hover:border-black/15",
                       )}
                     >
                       {body}
                     </button>
                   ) : (
-                    <div className="rounded-xl border border-black/8 bg-white px-3.5 py-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                    <div className="rounded-xl border border-border bg-white px-3.5 py-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                       {body}
                     </div>
                   )}

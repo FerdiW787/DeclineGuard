@@ -191,7 +191,7 @@ const CustomizationsPage = forwardRef<EmailCustomizeHandle, Props>(
     const font = normalizeEmailFont(emailFont);
 
     return (
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <h2 className="sr-only">Recovery email kits</h2>
         <KitGallerySlider
           kitLabel={(kitId) => LAYOUT_PRESET_STRUCTURE_META[kitId].label}

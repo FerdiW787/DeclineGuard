@@ -469,7 +469,7 @@ export default function CustomSignInForm() {
         <AuthHeading>Check your email</AuthHeading>
         <AuthSub>
           We’ve sent you a temporary login code. Please check your inbox at{" "}
-          <span className="font-medium text-[#08090a]">{email}</span>.
+          <span className="font-medium text-foreground">{email}</span>.
         </AuthSub>
 
         <form
@@ -514,7 +514,7 @@ export default function CustomSignInForm() {
         <div className="mt-5 flex flex-col items-center gap-3">
           <button
             type="button"
-            className="text-[13px] text-[#8a8f98] transition hover:text-[#08090a] disabled:opacity-50"
+            className="text-[13px] text-muted-foreground transition hover:text-foreground disabled:opacity-50"
             onClick={() => void resendEmailCode()}
             disabled={pending}
           >

@@ -8,10 +8,11 @@ import {
 } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { LAYOUT_PRESET_IDS, type LayoutPresetId } from "@/lib/emailTheme";
 import { TEMPLATE_META, type RecoveryTemplateId } from "@/lib/recoveryEmailCopy";
 import { cn } from "@/lib/utils";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowLeft01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 
 gsap.registerPlugin(useGSAP);
 
@@ -384,7 +385,7 @@ export default function KitGallerySlider({
       role="region"
       aria-roledescription="carousel"
       aria-label="Recovery email kits"
-      className="relative flex min-h-0 flex-1 flex-col bg-white"
+      className="relative flex min-h-0 flex-1 flex-col bg-background"
     >
       <div
         ref={stageRef}
@@ -482,20 +483,20 @@ export default function KitGallerySlider({
             type="button"
             aria-label="Previous kit"
             onClick={() => stepRail(-1)}
-            className="dg-interactive flex size-9 items-center justify-center rounded-full border border-black/8 bg-white text-[#08090a]"
+            className="dg-interactive flex size-9 items-center justify-center rounded-full border border-border bg-card text-foreground"
           >
-            <ChevronLeft className="size-4" />
+            <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} className="size-4" />
           </button>
-          <p className="min-w-[10rem] text-center text-[13px] font-semibold tracking-[-0.02em] text-[#08090a]">
+          <p className="min-w-[10rem] text-center text-[13px] font-semibold tracking-[-0.02em] text-foreground">
             {activeKit ? kitLabel(activeKit) : ""}
           </p>
           <button
             type="button"
             aria-label="Next kit"
             onClick={() => stepRail(1)}
-            className="dg-interactive flex size-9 items-center justify-center rounded-full border border-black/8 bg-white text-[#08090a]"
+            className="dg-interactive flex size-9 items-center justify-center rounded-full border border-border bg-card text-foreground"
           >
-            <ChevronRight className="size-4" />
+            <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
           </button>
         </div>
         <div className="flex gap-1.5" role="tablist" aria-label="Kits">
@@ -514,7 +515,7 @@ export default function KitGallerySlider({
                 }}
                 className={cn(
                   "h-1.5 rounded-full",
-                  selected ? "w-5 bg-[#08090a]" : "w-1.5 bg-black/20 hover:bg-black/35",
+                  selected ? "w-5 bg-primary" : "w-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/50",
                 )}
               />
             );
@@ -535,7 +536,7 @@ function EmailFrame({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-lg border border-black/10 bg-white shadow-[0_10px_24px_-18px_rgba(0,0,0,0.5)]",
+        "relative overflow-hidden rounded-lg border border-border bg-card shadow-[0_10px_24px_-18px_rgba(0,0,0,0.5)]",
         scrollable
           ? "max-h-[min(30rem,calc(100dvh-12rem))] overflow-y-auto"
           : "h-[min(24rem,calc(100dvh-14rem))]",
@@ -564,10 +565,10 @@ function SlideCaption({
   const meta = TEMPLATE_META[day];
   return (
     <div className="mb-2 min-w-0 text-center">
-      <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-[#8a8f98]">
+      <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
         {meta.day}
       </p>
-      <p className="mt-0.5 truncate text-[13px] font-semibold tracking-[-0.02em] text-[#08090a]">
+      <p className="mt-0.5 truncate text-[13px] font-semibold tracking-[-0.02em] text-foreground">
         {kitName}
       </p>
     </div>

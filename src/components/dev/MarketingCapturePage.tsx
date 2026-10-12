@@ -5,7 +5,7 @@ export default function MarketingCapturePage() {
   return (
     <main className="min-h-screen bg-[#ececee] px-4 py-10 md:px-8">
       <div className="mx-auto max-w-[1400px] space-y-16">
-        <header className="rounded-xl border border-black/10 bg-white p-6">
+        <header className="rounded-xl border border-border bg-white p-6">
           <h1 className="font-display text-2xl tracking-tight">
             Marketing capture
           </h1>

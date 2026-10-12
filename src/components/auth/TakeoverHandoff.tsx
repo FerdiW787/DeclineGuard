@@ -5,10 +5,10 @@
  */
 export default function TakeoverHandoff() {
   return (
-    <div className="ln-surface flex min-h-screen items-center justify-center bg-[#08090a] px-6 text-[#f7f8f8]">
+    <div className="ln-surface flex min-h-screen items-center justify-center bg-primary px-6 text-foreground">
       <div className="max-w-md text-center">
         <p className="ln-h1 text-2xl tracking-tight">Takeover handoff moved</p>
-        <p className="mt-3 text-sm leading-relaxed text-[#8a8a8e]">
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
           Admin takeover no longer uses Clerk impersonation. Start it from the
           Support inbox — you’ll stay signed in as Admin and work on the
           merchant’s dashboard directly.
@@ -16,7 +16,7 @@ export default function TakeoverHandoff() {
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <a
             href="/a/admin"
-            className="rounded-full bg-[#f7f8f8] px-4 py-2.5 text-sm font-semibold text-[#08090a]"
+            className="rounded-full bg-background px-4 py-2.5 text-sm font-semibold text-foreground"
           >
             Admin console
           </a>

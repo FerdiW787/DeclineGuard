@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "convex/react";
-import { ChevronLeft, ChevronRight, Plus, Search, X } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import {
   ActivityIcon,
@@ -10,6 +9,8 @@ import {
   formatRelativeTime,
   Panel,
 } from "./dashboardUi";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowLeft01Icon, ArrowRight01Icon, Add01Icon, SearchIcon, Cancel01Icon } from "@hugeicons/core-free-icons";
 
 type ActivityType =
   | "payment_failed"
@@ -195,7 +196,7 @@ export default function ActivityTimeline({
         <div
           role="tablist"
           aria-label="Activity type"
-          className="inline-flex w-fit flex-wrap items-center gap-0.5 rounded-full border border-black/8 bg-[#f0f0f2] p-1 dark:border-white/10 dark:bg-[#1a1a1d]"
+          className="inline-flex w-fit flex-wrap items-center gap-0.5 rounded-full border border-border bg-[#f0f0f2] p-1 dark:border-white/10 dark:bg-[#1a1a1d]"
         >
           {TYPE_FILTERS.map((item) => {
             const active = typeFilter === item.id;
@@ -208,7 +209,7 @@ export default function ActivityTimeline({
                 onClick={() => setType(item.id)}
                 className={`rounded-full px-3 py-1.5 text-xs font-semibold outline-none transition focus:outline-none focus-visible:outline-none ${
                   active
-                    ? "bg-white text-black shadow-sm dark:bg-[#2a2c31] dark:text-[#f7f8f8] dark:shadow-none"
+                    ? "bg-white text-black shadow-sm dark:bg-[#2a2c31] dark:text-foreground dark:shadow-none"
                     : "text-black/45 hover:text-black/70 dark:text-white/45 dark:hover:text-white/75"
                 }`}
               >
@@ -227,15 +228,15 @@ export default function ActivityTimeline({
               aria-haspopup="listbox"
               className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-black/15 bg-white px-3 py-1.5 text-xs font-semibold text-black/55 transition hover:border-black/25 hover:text-black/80 dark:border-white/20 dark:bg-[#161618] dark:text-zinc-100/55 dark:hover:border-white/30 dark:hover:text-zinc-100/80"
             >
-              <Plus className="size-3.5" />
+              <HugeiconsIcon icon={Add01Icon} strokeWidth={2} className="size-3.5" />
               By Customer
             </button>
           ) : null}
 
           {emailMenuOpen ? (
-            <div className="absolute top-full left-0 z-30 mt-1.5 w-[min(100vw-2rem,20rem)] overflow-hidden rounded-xl border border-black/10 bg-white shadow-[0_12px_40px_-16px_rgba(0,0,0,0.35)] dark:border-white/10 dark:bg-[#1a1a1d]">
+            <div className="absolute top-full left-0 z-30 mt-1.5 w-[min(100vw-2rem,20rem)] overflow-hidden rounded-xl border border-border bg-white shadow-[0_12px_40px_-16px_rgba(0,0,0,0.35)] dark:border-white/10 dark:bg-[#1a1a1d]">
               <div className="relative border-b border-black/6 px-2.5 py-2 dark:border-white/8">
-                <Search className="pointer-events-none absolute top-1/2 left-4 size-3.5 -translate-y-1/2 text-black/35" />
+                <HugeiconsIcon icon={SearchIcon} strokeWidth={2} className="pointer-events-none absolute top-1/2 left-4 size-3.5 -translate-y-1/2 text-black/35" />
                 <input
                   ref={emailInputRef}
                   type="text"
@@ -284,7 +285,7 @@ export default function ActivityTimeline({
       {/* Active filters as chips — PayPal / Stripe pattern */}
       {selectedEmail ? (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-black/8 bg-black/[0.04] py-1 pr-1 pl-3 text-[12px] font-medium dark:border-white/10 dark:bg-white/[0.06]">
+          <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-black/[0.04] py-1 pr-1 pl-3 text-[12px] font-medium dark:border-white/10 dark:bg-white/[0.06]">
             <span className="truncate text-black/45 dark:text-zinc-100/45">
               Customer
             </span>
@@ -295,7 +296,7 @@ export default function ActivityTimeline({
               onClick={clearEmail}
               className="flex size-6 shrink-0 items-center justify-center rounded-full text-black/40 transition hover:bg-black/8 hover:text-black/70 dark:hover:bg-white/10"
             >
-              <X className="size-3.5" />
+              <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-3.5" />
             </button>
           </span>
           <button
@@ -379,19 +380,19 @@ export default function ActivityTimeline({
                 type="button"
                 disabled={pageIndex <= 0 || isRefreshing}
                 onClick={() => setPage(pageIndex - 1)}
-                className="dg-interactive inline-flex items-center gap-1 rounded-full border border-black/8 bg-transparent px-3 py-1.5 text-xs font-semibold disabled:pointer-events-none disabled:opacity-35 dark:border-white/10"
+                className="dg-interactive inline-flex items-center gap-1 rounded-full border border-border bg-transparent px-3 py-1.5 text-xs font-semibold disabled:pointer-events-none disabled:opacity-35 dark:border-white/10"
               >
-                <ChevronLeft className="size-3.5" />
+                <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} className="size-3.5" />
                 Previous
               </button>
               <button
                 type="button"
                 disabled={pageIndex >= pageCount - 1 || isRefreshing}
                 onClick={() => setPage(pageIndex + 1)}
-                className="dg-interactive inline-flex items-center gap-1 rounded-full border border-black/8 bg-transparent px-3 py-1.5 text-xs font-semibold disabled:pointer-events-none disabled:opacity-35 dark:border-white/10"
+                className="dg-interactive inline-flex items-center gap-1 rounded-full border border-border bg-transparent px-3 py-1.5 text-xs font-semibold disabled:pointer-events-none disabled:opacity-35 dark:border-white/10"
               >
                 Next
-                <ChevronRight className="size-3.5" />
+                <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-3.5" />
               </button>
             </div>
           </div>

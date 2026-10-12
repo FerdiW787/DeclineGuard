@@ -33,10 +33,10 @@ export default function EmailLabSidebar({
   return (
     <div className="space-y-4">
       <Panel className="p-5">
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8a8f98]">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
           Lab
         </p>
-        <p className="mt-1 text-[12px] leading-relaxed text-[#6b6f76]">
+        <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
           We A/B five recovery layouts. Day 0, Day 2, and Day 5 share the same
           kit — only the copy changes. Merchants set brand colors and the CTA.
           Assignment stays on the backend.
@@ -44,10 +44,10 @@ export default function EmailLabSidebar({
       </Panel>
 
       <Panel className="p-5">
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8a8f98]">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
           Preview
         </p>
-        <p className="mt-1 text-[12px] leading-relaxed text-[#8a8f98]">
+        <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
           {LAYOUT_PRESET_CATALOG[layoutPresetId]?.description}
         </p>
         <div className="mt-3">
@@ -62,10 +62,10 @@ export default function EmailLabSidebar({
       </Panel>
 
       <Panel className="p-5">
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8a8f98]">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
           Colors
         </p>
-        <p className="mt-1 text-[12px] leading-relaxed text-[#8a8f98]">
+        <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
           Template applies kit structure. Personal uses your store scrape
           tokens. CTA and colors stay on BrandKit when configured — kits
           never invent a palette.
@@ -104,8 +104,8 @@ function ConfigButton({
       className={cn(
         "dg-interactive w-full rounded-md border px-2.5 py-2 text-left text-[12px] font-semibold",
         active
-          ? "border-black/12 bg-[#f7f8f8] text-[#08090a]"
-          : "border-transparent text-[#6b6f76]",
+          ? "border-black/12 bg-background text-foreground"
+          : "border-transparent text-muted-foreground",
       )}
     >
       {label}
@@ -141,7 +141,7 @@ function EmailLabKitPreview({
         : "";
   return (
     <div
-      className="overflow-hidden border border-black/8"
+      className="overflow-hidden border border-border"
       style={{
         background: theme.emailBackgroundColor,
         color: theme.emailTextColor,

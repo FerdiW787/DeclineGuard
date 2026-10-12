@@ -43,10 +43,10 @@ export default function EmailCustomizeSidebar({
   return (
     <div className="space-y-4">
       <Panel className="p-5">
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8a8f98]">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
           Colors
         </p>
-        <p className="mt-1 text-[12px] leading-relaxed text-[#8a8f98]">
+        <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
           {stylingMode === "preset"
             ? "Edits apply when you switch to Configured. The layout stays."
             : "These are your store tokens."}
@@ -64,10 +64,10 @@ export default function EmailCustomizeSidebar({
       </Panel>
 
       <Panel className="p-5">
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8a8f98]">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
           Short copy
         </p>
-        <p className="mt-1 text-[12px] leading-relaxed text-[#8a8f98]">
+        <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
           Overrides for {dayLabel} only. Day 0 / 2 / 5 share the same layout.
         </p>
         <div className="mt-3 space-y-2.5">
@@ -114,21 +114,21 @@ function ColorField({
 }) {
   const hex = /^#([0-9a-fA-F]{6})$/.test(value) ? value : "#0c0c0c";
   return (
-    <label className="flex items-center justify-between gap-2 rounded-md border border-black/8 px-2.5 py-2">
-      <span className="text-[12px] font-medium text-[#08090a]">{label}</span>
+    <label className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-2">
+      <span className="text-[12px] font-medium text-foreground">{label}</span>
       <span className="flex items-center gap-1.5">
         <input
           type="color"
           value={hex}
           onChange={(e) => onChange(e.target.value)}
-          className="h-7 w-8 shrink-0 cursor-pointer rounded border border-black/10 bg-transparent p-0.5"
+          className="h-7 w-8 shrink-0 cursor-pointer rounded border border-border bg-transparent p-0.5"
         />
         <input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           spellCheck={false}
-          className="w-[5.5rem] rounded-md border border-black/10 px-1.5 py-1 font-mono text-[11px] outline-none focus:border-black/25"
+          className="w-[5.5rem] rounded-md border border-border px-1.5 py-1 font-mono text-[11px] outline-none focus:border-black/25"
         />
       </span>
     </label>
@@ -147,7 +147,7 @@ function TextField({
   multiline?: boolean;
 }) {
   const fieldClass =
-    "w-full rounded-md border border-black/8 bg-[#f7f8f8] px-2.5 py-1.5 text-[13px] outline-none focus:border-black/20";
+    "w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-[13px] outline-none focus:border-black/20";
   return (
     <label className="block space-y-1">
       <span className="text-[11px] font-medium text-black/50">{label}</span>

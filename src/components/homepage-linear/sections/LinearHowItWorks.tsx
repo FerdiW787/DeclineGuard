@@ -1,6 +1,7 @@
-import { ArrowRight } from "lucide-react";
 import { SignedIn, SignedOut } from "@clerk/astro/react";
 import { LinearCta } from "../LinearCta";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 
 const steps = [
   {
@@ -41,13 +42,13 @@ export function LinearHowItWorks() {
                 i > 0 ? "border-t border-white/10 md:border-t-0 md:border-l" : ""
               }`}
             >
-              <span className="text-xs font-medium tracking-wide text-[#8a8a8e]">
+              <span className="text-xs font-medium tracking-wide text-muted-foreground">
                 {step.n}
               </span>
               <h3 className="mt-4 text-lg font-semibold tracking-tight text-white">
                 {step.title}
               </h3>
-              <p className="mt-3 text-sm leading-relaxed text-[#8a8a8e] md:text-[15px]">
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground md:text-[15px]">
                 {step.body}
               </p>
             </li>
@@ -58,7 +59,7 @@ export function LinearHowItWorks() {
           <SignedOut>
             <LinearCta href="/a/sign-up">
               Grab a founding spot
-              <ArrowRight className="size-4" />
+              <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
             </LinearCta>
             <LinearCta href="/pricing" variant="ghost">
               See pricing
@@ -67,7 +68,7 @@ export function LinearHowItWorks() {
           <SignedIn>
             <LinearCta href="/a/dashboard">
               Open dashboard
-              <ArrowRight className="size-4" />
+              <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
             </LinearCta>
           </SignedIn>
         </div>

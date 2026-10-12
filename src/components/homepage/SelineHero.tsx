@@ -1,9 +1,10 @@
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
-import { Star } from "lucide-react";
 import { useRef, useState } from "react";
 import ImageSlot from "./ImageSlot";
 import { MascotGaze } from "./MascotGaze";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { StarIcon } from "@hugeicons/core-free-icons";
 
 const TABS = [
   {
@@ -99,7 +100,7 @@ export function SelineHero() {
           ref={copyRef}
           className="relative z-10 max-w-[34rem] md:max-w-[min(34rem,54%)]"
         >
-          <h1 className="font-display text-[clamp(2.35rem,5.6vw,4.35rem)] font-medium leading-[1.05] tracking-[-0.035em] text-[#0c0a09]">
+          <h1 className="font-display text-[clamp(2.35rem,5.6vw,4.35rem)] font-medium leading-[1.05] tracking-[-0.035em] text-foreground">
             Analytics made{" "}
             <span className="text-[#3b82f6]">simple &amp; actionable</span>
           </h1>
@@ -118,7 +119,7 @@ export function SelineHero() {
             </a>
             <a
               href="#product"
-              className="inline-flex h-11 items-center justify-center rounded-md border border-black/10 bg-white px-5 text-[15px] font-semibold text-[#0c0a09] transition hover:bg-black/[0.03]"
+              className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-white px-5 text-[15px] font-semibold text-foreground transition hover:bg-black/[0.03]"
             >
               See how it works
             </a>
@@ -133,7 +134,7 @@ export function SelineHero() {
                 (name) => (
                   <span
                     key={name}
-                    className="font-display text-lg font-semibold tracking-tight text-[#0c0a09]"
+                    className="font-display text-lg font-semibold tracking-tight text-foreground"
                   >
                     {name}
                   </span>
@@ -145,7 +146,7 @@ export function SelineHero() {
           <div className="mt-8 flex max-w-md items-start gap-2.5">
             <div className="mt-0.5 flex shrink-0 gap-0.5 text-[#f59e0b]">
               {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} className="size-3.5 fill-current" />
+                <HugeiconsIcon icon={StarIcon} strokeWidth={2} key={i} className="size-3.5 fill-current" />
               ))}
             </div>
             <p className="text-[13px] leading-snug text-[#78716c] sm:text-sm">
@@ -180,8 +181,8 @@ export function SelineHero() {
                 onClick={() => setTab(t.id)}
                 className={`cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium transition ${
                   tab === t.id
-                    ? "bg-black/[0.06] text-[#0c0a09]"
-                    : "text-[#78716c] hover:text-[#0c0a09]"
+                    ? "bg-black/[0.06] text-foreground"
+                    : "text-[#78716c] hover:text-foreground"
                 }`}
               >
                 {t.label}
@@ -189,7 +190,7 @@ export function SelineHero() {
             ))}
           </div>
 
-          <div className="relative mb-6 overflow-hidden rounded-lg border border-black/10 bg-stone-100 shadow-[0_25px_50px_-20px_rgba(0,0,0,0.25)]">
+          <div className="relative mb-6 overflow-hidden rounded-lg border border-border bg-stone-100 shadow-[0_25px_50px_-20px_rgba(0,0,0,0.25)]">
             <ImageSlot
               label={active.slot}
               brief={active.brief}

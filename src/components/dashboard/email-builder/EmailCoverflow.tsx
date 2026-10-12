@@ -230,22 +230,22 @@ export default function EmailCoverflow({
               <p
                 className={cn(
                   "text-[11px] font-medium tracking-[-0.01em] transition-colors",
-                  focused ? "text-[#08090a]" : "text-[#8a8f98]",
+                  focused ? "text-foreground" : "text-muted-foreground",
                 )}
               >
                 <span className="uppercase tracking-[0.08em]">{meta.day}</span>
-                <span className="mx-1.5 text-[#8a8f98]/50">·</span>
+                <span className="mx-1.5 text-muted-foreground/50">·</span>
                 {meta.label}
               </p>
               <p
                 className={cn(
                   "mt-1 truncate text-[13px] font-medium tracking-[-0.015em]",
-                  focused ? "text-[#08090a]" : "text-[#6b6f76]",
+                  focused ? "text-foreground" : "text-muted-foreground",
                 )}
               >
                 {inbox.subject}
               </p>
-              <p className="mt-0.5 truncate text-[11px] text-[#8a8f98]">
+              <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
                 {inbox.from}
               </p>
             </div>
@@ -283,7 +283,7 @@ export default function EmailCoverflow({
                   ) : null}
                   {!focusMode && hoveredId === id ? (
                     <div
-                      className="pointer-events-none absolute right-2.5 top-2.5 z-[13] flex size-9 items-center justify-center rounded-lg border border-black/8 bg-white/95 text-[#2563eb] shadow-[0_8px_24px_-8px_rgba(37,99,235,0.45)] backdrop-blur-sm"
+                      className="pointer-events-none absolute right-2.5 top-2.5 z-[13] flex size-9 items-center justify-center rounded-lg border border-border bg-white/95 text-[#2563eb] shadow-[0_8px_24px_-8px_rgba(37,99,235,0.45)] backdrop-blur-sm"
                       aria-hidden
                     >
                       <SquarePen className="size-4" strokeWidth={2} />
