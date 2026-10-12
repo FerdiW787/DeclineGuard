@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useAction } from "convex/react";
-import { CheckCircle2, ExternalLink, RefreshCw } from "lucide-react";
 import { api } from "../../../../convex/_generated/api";
 import { formatRelativeTime } from "../dashboardUi";
 import {
@@ -13,6 +12,8 @@ import type {
   SettingsWebhookSetup,
   SettingsWebhookStatus,
 } from "./settingsTypes";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { CheckmarkCircle02Icon, LinkSquare02Icon, RepeatIcon } from "@hugeicons/core-free-icons";
 
 export function WebhooksTab({
   webhookSetup,
@@ -33,9 +34,9 @@ export function WebhooksTab({
       description="Lemon Squeezy and Resend endpoints. Signing secrets stay on the server."
     >
       {webhookSetup === undefined ? (
-        <p className="text-sm text-[#8a8f98]">Loading webhook details…</p>
+        <p className="text-sm text-muted-foreground">Loading webhook details…</p>
       ) : webhookSetup === null ? (
-        <p className="text-sm text-[#8a8f98]">
+        <p className="text-sm text-muted-foreground">
           Webhook details unavailable. Confirm{" "}
           <code className="rounded bg-black/5 px-1.5 py-0.5 text-[12px]">
             CONVEX_SITE_URL
@@ -57,22 +58,22 @@ export function WebhooksTab({
             <HealthBadge status={webhookStatus} />
           </SettingsRow>
           <div className="space-y-2.5 px-4 py-3.5">
-            <p className="text-[13px] font-medium text-[#08090a]">
+            <p className="text-[13px] font-medium text-foreground">
               Subscribe to these events
             </p>
-            <ul className="space-y-2 text-[13px] text-[#6b6f76]">
+            <ul className="space-y-2 text-[13px] text-muted-foreground">
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
+                <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} className="size-4 shrink-0 text-emerald-600" />
                 <code className="text-[12px]">subscription_payment_failed</code>
               </li>
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
+                <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} className="size-4 shrink-0 text-emerald-600" />
                 <code className="text-[12px]">
                   subscription_payment_recovered
                 </code>
               </li>
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
+                <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} className="size-4 shrink-0 text-emerald-600" />
                 <code className="text-[12px]">subscription_updated</code>
               </li>
             </ul>
@@ -81,10 +82,10 @@ export function WebhooksTab({
                 href="https://app.lemonsqueezy.com/settings/webhooks"
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#08090a] underline-offset-2 hover:underline"
+                className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-foreground underline-offset-2 hover:underline"
               >
                 Open Lemon Squeezy webhooks
-                <ExternalLink className="size-3.5" />
+                <HugeiconsIcon icon={LinkSquare02Icon} strokeWidth={2} className="size-3.5" />
               </a>
             ) : (
               <WebhookRefreshControls />
@@ -140,21 +141,19 @@ function WebhookRefreshControls() {
               }
             })();
           }}
-          className="dg-interactive inline-flex items-center gap-1.5 rounded-full border border-black/8 bg-white px-3 py-1.5 text-[12px] font-semibold text-[#08090a] transition hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:opacity-60"
+          className="dg-interactive inline-flex items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1.5 text-[12px] font-semibold text-foreground transition hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <RefreshCw
-            className={`size-3.5 ${refreshBusy ? "animate-spin" : ""}`}
-          />
+          <HugeiconsIcon icon={RepeatIcon} strokeWidth={2} className={`size-3.5 ${refreshBusy ? "animate-spin" : ""}`} />
           {refreshBusy ? "Refreshing…" : "Refresh webhook"}
         </button>
         <a
           href="https://app.lemonsqueezy.com/settings/webhooks"
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#08090a] underline-offset-2 hover:underline"
+          className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-foreground underline-offset-2 hover:underline"
         >
           Open Lemon Squeezy webhooks
-          <ExternalLink className="size-3.5" />
+          <HugeiconsIcon icon={LinkSquare02Icon} strokeWidth={2} className="size-3.5" />
         </a>
       </div>
       {refreshMsg ? (
@@ -176,7 +175,7 @@ function HealthBadge({
   status: SettingsWebhookStatus | undefined;
 }) {
   if (status === undefined) {
-    return <span className="text-[12px] text-[#8a8f98]">Checking…</span>;
+    return <span className="text-[12px] text-muted-foreground">Checking…</span>;
   }
   if (status?.verified && status.lastReceivedAt != null) {
     return (

@@ -8,7 +8,6 @@ import {
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
-import { Minus, Plus } from "lucide-react";
 import {
   SHELL_BORDER_WIDTH_MAX,
   SHELL_RADIUS_MAX,
@@ -17,6 +16,8 @@ import {
 import { cn } from "@/lib/utils";
 import ColorPalette from "./ColorPalette";
 import { TEXT_SWATCHES } from "./SelectionFormatMenu";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { MinusSignIcon, Add01Icon } from "@hugeicons/core-free-icons";
 
 type Patch = Partial<
   Pick<
@@ -99,7 +100,7 @@ export default function EmailShellEditBar({
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="dg-format-in pointer-events-auto origin-bottom">
-        <div className="relative inline-flex items-center gap-0.5 rounded border border-black/8 bg-white p-1 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
+        <div className="relative inline-flex items-center gap-0.5 rounded border border-border bg-white p-1 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
           <ColorBtn
             label="Background color"
             color={background}
@@ -121,7 +122,7 @@ export default function EmailShellEditBar({
             <div
               role="group"
               aria-label="Border on or off"
-              className="inline-flex h-6 rounded-sm border border-black/10 bg-black/[0.04] p-0.5"
+              className="inline-flex h-6 rounded-sm border border-border bg-black/[0.04] p-0.5"
             >
               <button
                 type="button"
@@ -130,8 +131,8 @@ export default function EmailShellEditBar({
                 className={cn(
                   "h-full rounded-[3px] px-2 text-[11px] font-semibold tracking-tight transition-colors",
                   borderOn
-                    ? "bg-[#08090a] text-white"
-                    : "text-[#8a8f98] hover:text-[#08090a]",
+                    ? "bg-primary text-white"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 On
@@ -143,8 +144,8 @@ export default function EmailShellEditBar({
                 className={cn(
                   "h-full rounded-[3px] px-2 text-[11px] font-semibold tracking-tight transition-colors",
                   !borderOn
-                    ? "bg-[#08090a] text-white"
-                    : "text-[#8a8f98] hover:text-[#08090a]",
+                    ? "bg-primary text-white"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 Off
@@ -174,7 +175,7 @@ export default function EmailShellEditBar({
           />
 
           {open ? (
-            <div className="absolute left-1/2 top-[calc(100%+6px)] z-30 -translate-x-1/2 rounded border border-black/8 bg-white p-2 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
+            <div className="absolute left-1/2 top-[calc(100%+6px)] z-30 -translate-x-1/2 rounded border border-border bg-white p-2 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
               <ColorPalette
                 usedColors={emailColors}
                 general={swatches}
@@ -252,13 +253,13 @@ function StepperField({
       <span className="text-[12px] font-medium tracking-tight text-[#3a3d42]">
         {label}
       </span>
-      <div className="inline-flex h-6 items-stretch overflow-hidden rounded-sm border border-black/10 bg-black/[0.03]">
+      <div className="inline-flex h-6 items-stretch overflow-hidden rounded-sm border border-border bg-black/[0.03]">
         <HoldStepButton
           label={`Decrease ${ariaLabel}`}
           disabled={disabled || value <= min}
           onStep={() => stepBy(-1)}
         >
-          <Minus className="size-3" strokeWidth={2.25} />
+          <HugeiconsIcon icon={MinusSignIcon} className="size-3" strokeWidth={2.25} />
         </HoldStepButton>
         <input
           type="text"
@@ -276,14 +277,14 @@ function StepperField({
             if (!Number.isFinite(next)) return;
             onChange(clamp(next));
           }}
-          className="w-7 border-x border-black/8 bg-transparent text-center text-[12px] font-semibold tabular-nums text-[#08090a] outline-none"
+          className="w-7 border-x border-border bg-transparent text-center text-[12px] font-semibold tabular-nums text-foreground outline-none"
         />
         <HoldStepButton
           label={`Increase ${ariaLabel}`}
           disabled={disabled || value >= max}
           onStep={() => stepBy(1)}
         >
-          <Plus className="size-3" strokeWidth={2.25} />
+          <HugeiconsIcon icon={Add01Icon} className="size-3" strokeWidth={2.25} />
         </HoldStepButton>
       </div>
     </div>
@@ -338,7 +339,7 @@ function HoldStepButton({
       onPointerDown={start}
       onPointerUp={stop}
       onPointerCancel={stop}
-      className="flex w-6 cursor-pointer items-center justify-center text-[#6b6f76] transition-colors hover:bg-black/[0.06] hover:text-[#08090a] disabled:pointer-events-none disabled:cursor-default disabled:opacity-30"
+      className="flex w-6 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:bg-black/[0.06] hover:text-foreground disabled:pointer-events-none disabled:cursor-default disabled:opacity-30"
     >
       {children}
     </button>
@@ -366,12 +367,12 @@ function ColorBtn({
       className={cn(
         "inline-flex h-8 items-center gap-1.5 rounded-sm px-2 text-[12px] font-medium tracking-tight transition-colors",
         open
-          ? "bg-black/[0.06] text-[#08090a]"
-          : "text-[#3a3d42] hover:bg-black/5 hover:text-[#08090a]",
+          ? "bg-black/[0.06] text-foreground"
+          : "text-[#3a3d42] hover:bg-black/5 hover:text-foreground",
       )}
     >
       <span
-        className="size-3.5 rounded-[3px] border border-black/10"
+        className="size-3.5 rounded-[3px] border border-border"
         style={{ background: color }}
       />
       {label}

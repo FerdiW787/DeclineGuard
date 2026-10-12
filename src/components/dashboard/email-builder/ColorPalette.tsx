@@ -27,7 +27,7 @@ export default function ColorPalette({
     <div className="w-[188px]">
       {usedColors.length > 0 ? (
         <section className="mb-2.5">
-          <p className="mb-1.5 px-0.5 text-[10px] font-medium tracking-tight text-[#8a8f98]">
+          <p className="mb-1.5 px-0.5 text-[10px] font-medium tracking-tight text-muted-foreground">
             Colors in the Email
           </p>
           <SwatchGrid
@@ -43,7 +43,7 @@ export default function ColorPalette({
         </section>
       ) : null}
       <section>
-        <p className="mb-1.5 px-0.5 text-[10px] font-medium tracking-tight text-[#8a8f98]">
+        <p className="mb-1.5 px-0.5 text-[10px] font-medium tracking-tight text-muted-foreground">
           General
         </p>
         <SwatchGrid
@@ -54,13 +54,13 @@ export default function ColorPalette({
         />
       </section>
       {showCustom && onCustom ? (
-        <label className="mt-2 flex items-center gap-2 px-0.5 text-[11px] text-[#6b6f76]">
+        <label className="mt-2 flex items-center gap-2 px-0.5 text-[11px] text-muted-foreground">
           Custom
           <input
             type="color"
             value={toHex6(customValue || activeColor || "#08090a")}
             onChange={(e) => onCustom(e.target.value)}
-            className="h-6 w-8 cursor-pointer rounded-sm border border-black/10 bg-white p-0"
+            className="h-6 w-8 cursor-pointer rounded-sm border border-border bg-white p-0"
             title="Custom color"
           />
         </label>
@@ -94,8 +94,8 @@ function SwatchGrid({
             onClick={() => onPick(swatch.color)}
             className={cn(
               mode === "letter"
-                ? "flex h-8 items-center justify-center rounded-sm border border-black/8 text-[13px] font-semibold transition-colors hover:bg-black/[0.04]"
-                : "h-8 rounded-sm border border-black/8 transition-colors hover:bg-black/[0.04]",
+                ? "flex h-8 items-center justify-center rounded-sm border border-border text-[13px] font-semibold transition-colors hover:bg-black/[0.04]"
+                : "h-8 rounded-sm border border-border transition-colors hover:bg-black/[0.04]",
               active
                 ? mode === "letter"
                   ? "bg-black/[0.06] ring-1 ring-black/10"

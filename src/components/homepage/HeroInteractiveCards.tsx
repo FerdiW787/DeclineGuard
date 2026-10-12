@@ -29,7 +29,7 @@ export function Glass({
 }) {
   return (
     <div
-      className={`relative overflow-hidden rounded-[1.15rem] border border-black/10 bg-white ${className}`}
+      className={`relative overflow-hidden rounded-[1.15rem] border border-border bg-white ${className}`}
     >
       {children}
     </div>
@@ -61,7 +61,7 @@ export function AskCard() {
           />
           <button
             type="submit"
-            className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#111] text-sm text-white transition hover:bg-[#2a2a2a] active:scale-95"
+            className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary text-sm text-white transition hover:bg-[#2a2a2a] active:scale-95"
             aria-label="Send"
           >
             ↑
@@ -122,7 +122,7 @@ export function RecoveredCard() {
             <div
               id={tipId}
               role="tooltip"
-              className="pointer-events-none absolute -top-1 left-1/2 z-30 -translate-x-1/2 -translate-y-full rounded-md bg-[#111] px-2 py-1 text-[11px] font-medium text-white"
+              className="pointer-events-none absolute -top-1 left-1/2 z-30 -translate-x-1/2 -translate-y-full rounded-md bg-primary px-2 py-1 text-[11px] font-medium text-white"
               style={{
                 left: `${((hover + 0.5) / CHART_BARS.length) * 100}%`,
               }}
@@ -197,7 +197,7 @@ export function EmailCard() {
         </div>
         <div className="space-y-3 px-5 py-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#111] text-[10px] font-bold text-white">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-[10px] font-bold text-white">
               CS
             </div>
             <div>
@@ -205,7 +205,7 @@ export function EmailCard() {
               <p className="text-[10px] text-black/40">DeclineGuard</p>
             </div>
           </div>
-          <p className="text-[15px] font-semibold tracking-tight text-[#111]">
+          <p className="text-[15px] font-semibold tracking-tight text-foreground">
             Your payment didn&apos;t go through
           </p>
           <p className="max-w-[16rem] text-xs leading-relaxed text-black/50">
@@ -217,7 +217,7 @@ export function EmailCard() {
               setClicked(true);
               window.setTimeout(() => setClicked(false), 1600);
             }}
-            className="inline-flex cursor-pointer rounded-full bg-[#111] px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-[#2a2a2a] active:scale-[0.98]"
+            className="inline-flex cursor-pointer rounded-full bg-primary px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-[#2a2a2a] active:scale-[0.98]"
           >
             {clicked ? "Link sent" : "Update payment method"}
           </button>

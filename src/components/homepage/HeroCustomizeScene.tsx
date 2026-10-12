@@ -63,14 +63,14 @@ export function HeroCustomizeScene() {
       onMouseLeave={() => setRevealed(false)}
     >
       <div className="ln-customize-copy">
-        <p className="ln-h1 flex flex-wrap items-center text-[clamp(1.85rem,3.4vw,2.75rem)] font-medium leading-[1.08] tracking-[-0.035em] text-[#08090a]">
+        <p className="ln-h1 flex flex-wrap items-center text-[clamp(1.85rem,3.4vw,2.75rem)] font-medium leading-[1.08] tracking-[-0.035em] text-foreground">
           <span>Your&nbsp;</span>
           <BrandWordSwap texts={BRAND_WORDS} />
         </p>
-        <p className="ln-h1 mt-1 text-[clamp(1.85rem,3.4vw,2.75rem)] font-medium leading-[1.08] tracking-[-0.035em] text-[#08090a]">
+        <p className="ln-h1 mt-1 text-[clamp(1.85rem,3.4vw,2.75rem)] font-medium leading-[1.08] tracking-[-0.035em] text-foreground">
           Our Expertise
         </p>
-        <p className="mt-4 max-w-[22rem] text-[15px] leading-[1.45] tracking-[-0.011em] text-[#8a8f98]">
+        <p className="mt-4 max-w-[22rem] text-[15px] leading-[1.45] tracking-[-0.011em] text-muted-foreground">
           We write it in your voice, send it when a card fails, and bring the
           payment back.
         </p>

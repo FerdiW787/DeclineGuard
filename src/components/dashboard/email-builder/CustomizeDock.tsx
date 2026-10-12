@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
-import { Check, Loader2, Plus, Redo2, Undo2 } from "lucide-react";
+import { Redo2, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Tick02Icon, Loading03Icon, Add01Icon } from "@hugeicons/core-free-icons";
 
 export type CustomizeDockVariant = "compact" | "full";
 
@@ -21,7 +23,7 @@ type Props = {
 
 function DockIsland({ children }: { children: ReactNode }) {
   return (
-    <div className="flex items-center gap-0.5 rounded border border-black/8 bg-white/90 p-1 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)] backdrop-blur-xl">
+    <div className="flex items-center gap-0.5 rounded border border-border bg-white/90 p-1 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)] backdrop-blur-xl">
       {children}
     </div>
   );
@@ -51,7 +53,7 @@ function DockIconButton({
         "inline-flex size-9 items-center justify-center rounded-sm transition-colors",
         disabled
           ? "cursor-not-allowed text-black/20"
-          : "cursor-pointer text-[#6b6f76] hover:bg-black/5 hover:text-[#08090a]",
+          : "cursor-pointer text-muted-foreground hover:bg-black/5 hover:text-foreground",
         className,
       )}
     >
@@ -126,7 +128,7 @@ export default function CustomizeDock({
                 className={cn(
                   "relative z-20 inline-flex h-9 items-center justify-center rounded-sm px-4 text-[13px] font-medium tracking-[-0.015em] transition-colors",
                   canSave || saving
-                    ? "cursor-pointer bg-[#08090a] text-[#f7f8f8] hover:bg-[#2a2b2e]"
+                    ? "cursor-pointer bg-primary text-foreground hover:bg-[#2a2b2e]"
                     : "cursor-not-allowed bg-black/8 text-black/30",
                 )}
               >
@@ -139,13 +141,11 @@ export default function CustomizeDock({
                   )}
                   aria-hidden
                 >
-                  <Loader2
-                    className={cn("size-3.5 shrink-0", saving && "animate-spin")}
-                  />
+                  <HugeiconsIcon icon={Loading03Icon} strokeWidth={2} className={cn("size-3.5 shrink-0", saving && "animate-spin")} />
                 </span>
                 {showSaved && !saving ? (
                   <span className="inline-flex items-center gap-1">
-                    <Check className="size-3.5" aria-hidden />
+                    <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-3.5" aria-hidden />
                     Saved
                   </span>
                 ) : (
@@ -162,7 +162,7 @@ export default function CustomizeDock({
                     : "pointer-events-none absolute left-1/2 z-0 -translate-x-1/2 translate-y-0.5 scale-[0.88] opacity-35",
                 )}
               >
-                <Plus className="size-4" />
+                <HugeiconsIcon icon={Add01Icon} strokeWidth={2} className="size-4" />
               </DockIconButton>
             </div>
           </DockIsland>

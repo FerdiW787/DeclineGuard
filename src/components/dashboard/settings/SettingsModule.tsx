@@ -7,8 +7,7 @@ import {
   Settings,
   Store,
   UserRound,
-  Webhook,
-  X,
+  Webhook
 } from "lucide-react";
 import { useClerkUser } from "@/components/auth/useClerkClient";
 import CRTWarp from "@/components/homepage/crt-warp/CRTWarp";
@@ -19,6 +18,8 @@ import { GeneralTab } from "./GeneralTab";
 import { StoreTab } from "./StoreTab";
 import { WebhooksTab } from "./WebhooksTab";
 import type { SettingsModuleProps, SettingsTabId } from "./settingsTypes";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Cancel01Icon } from "@hugeicons/core-free-icons";
 
 gsap.registerPlugin(useGSAP);
 
@@ -199,13 +200,13 @@ export default function SettingsModule({
           role="dialog"
           aria-modal="true"
           aria-labelledby="settings-module-title"
-          className="relative flex h-[min(680px,86dvh)] overflow-hidden rounded-xl border border-black/8 bg-white shadow-[0_24px_80px_-24px_rgba(0,0,0,0.28)]"
+          className="relative flex h-[min(680px,86dvh)] overflow-hidden rounded-xl border border-border bg-white shadow-[0_24px_80px_-24px_rgba(0,0,0,0.28)]"
         >
-        <aside className="flex w-[200px] shrink-0 flex-col bg-[#f7f8f8]">
+        <aside className="flex w-[200px] shrink-0 flex-col bg-background">
           <div className="px-4 py-4">
             <p
               id="settings-module-title"
-              className="text-[13px] font-semibold text-[#08090a]"
+              className="text-[13px] font-semibold text-foreground"
             >
               Settings
             </p>
@@ -221,8 +222,8 @@ export default function SettingsModule({
                   onClick={() => setTab(item.id)}
                   className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition ${
                     active
-                      ? "bg-black/[0.06] font-semibold text-[#08090a]"
-                      : "font-medium text-[#8a8f98] hover:bg-black/[0.04] hover:text-[#08090a]"
+                      ? "bg-black/[0.06] font-semibold text-foreground"
+                      : "font-medium text-muted-foreground hover:bg-black/[0.04] hover:text-foreground"
                   }`}
                 >
                   <Icon className="size-4 shrink-0" />
@@ -236,11 +237,11 @@ export default function SettingsModule({
         <div className="relative flex min-w-0 flex-1 flex-col bg-white">
           <button
             type="button"
-            className="absolute right-3 top-3 rounded-lg p-1.5 text-[#8a8f98] transition hover:bg-black/[0.04] hover:text-[#08090a]"
+            className="absolute right-3 top-3 rounded-lg p-1.5 text-muted-foreground transition hover:bg-black/[0.04] hover:text-foreground"
             onClick={onClose}
             aria-label="Close"
           >
-            <X className="size-4" />
+            <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-4" />
           </button>
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 pr-12 md:px-8">
             {readOnlyNotice ? (

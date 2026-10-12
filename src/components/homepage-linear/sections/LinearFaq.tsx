@@ -1,5 +1,6 @@
-import { ChevronRight } from "lucide-react";
 import { homeFaqs } from "@/components/homepage/HomePageBento";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 
 export function LinearFaq() {
   return (
@@ -12,7 +13,7 @@ export function LinearFaq() {
             <h2 className="text-[clamp(1.75rem,3vw,2.35rem)] font-semibold leading-[1.15] tracking-[-0.03em] text-white">
               Questions and answers
             </h2>
-            <p className="mt-4 text-sm text-[#8a8a8e]">
+            <p className="mt-4 text-sm text-muted-foreground">
               Can&apos;t find the answer?{" "}
               <a href="/features" className="text-white underline">
                 Request a feature
@@ -27,10 +28,10 @@ export function LinearFaq() {
                 className="group border-b border-white/10"
               >
                 <summary className="flex cursor-pointer list-none items-center gap-3 py-5 text-[15px] font-medium tracking-tight text-white [&::-webkit-details-marker]:hidden">
-                  <ChevronRight className="size-4 shrink-0 text-[#8a8a8e] transition-transform duration-200 group-open:rotate-90" />
+                  <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-90" />
                   <span className="min-w-0 flex-1">{item.q}</span>
                 </summary>
-                <p className="pb-5 pl-7 text-sm leading-relaxed text-[#8a8a8e] md:text-[15px]">
+                <p className="pb-5 pl-7 text-sm leading-relaxed text-muted-foreground md:text-[15px]">
                   {item.a}
                 </p>
               </details>

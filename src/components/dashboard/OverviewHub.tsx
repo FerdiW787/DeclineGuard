@@ -1,9 +1,7 @@
 import {
-  ArrowUpRight,
   Mail,
   Percent,
   Radio,
-  Sparkles,
   TriangleAlert,
   Wallet,
   Workflow,
@@ -22,6 +20,8 @@ import OverviewSlider, { type DayRow } from "./OverviewSlider";
 import BorderGlow from "./border-glow/BorderGlow";
 import CRTWarp from "@/components/homepage/crt-warp/CRTWarp";
 import { useMarketingDesktop } from "@/components/homepage/marketing/MarketingDesktopContext";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowUpRightIcon, SparklesIcon } from "@hugeicons/core-free-icons";
 
 type WebhookHealth = {
   connected: boolean;
@@ -230,14 +230,14 @@ export default function OverviewHub({
     return (
       <div className="relative z-10 flex h-full flex-col pt-1 pb-0">
         <section data-enter className="flex min-h-0 flex-1 flex-col">
-          <div className="relative min-h-0 w-full flex-1 overflow-hidden rounded-md border border-black/8">
+          <div className="relative min-h-0 w-full flex-1 overflow-hidden rounded-md border border-border">
             <div
-              className="pointer-events-none absolute inset-x-0 top-0 z-10 h-40 bg-linear-to-b from-[#08090a] from-35% via-[#08090a]/80 to-transparent"
+              className="pointer-events-none absolute inset-x-0 top-0 z-10 h-40 bg-linear-to-b from-background from-35% via-background/80 to-transparent"
               aria-hidden
             />
             <div className="pointer-events-none relative z-20 flex items-end justify-between gap-4 px-6 pt-6">
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-black/45">
+                <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                   Recovered this month
                 </p>
                 <div className="mt-1 flex flex-wrap items-end gap-3">
@@ -255,7 +255,7 @@ export default function OverviewHub({
                           ? "bg-teal-50 text-teal-800"
                           : monthTrend.tone === "warn"
                             ? "bg-amber-50 text-amber-900"
-                            : "bg-black/5 text-black/55"
+                            : "bg-muted text-muted-foreground"
                       }`}
                     >
                       {monthTrend.label}
@@ -299,21 +299,21 @@ export default function OverviewHub({
         />
         </div>
 
-        <Panel className="relative mx-auto flex w-full max-w-6xl shrink-0 flex-col overflow-visible bg-white">
+        <Panel className="relative mx-auto flex w-full max-w-6xl shrink-0 flex-col overflow-visible bg-card">
           <div className="relative z-10 flex items-end justify-between gap-4 px-5 pt-5 pb-4 md:px-6 md:pt-6">
             <div className="min-w-0">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8a8f98]">
+              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 This calendar month
               </p>
               <p
-                className={`font-display mt-1 text-4xl tracking-tight tabular-nums text-[#08090a] md:text-5xl ${
+                className={`font-display mt-1 text-4xl tracking-tight tabular-nums text-foreground md:text-5xl ${
                   kpiLive ? "ln-hero-kpi-pop text-teal-700" : ""
                 }`}
               >
                 {recoveredLabel}
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <p className="text-sm font-medium text-[#6b6f76]">
+                <p className="text-sm font-medium text-muted-foreground">
                   Recovered this month
                 </p>
                 <span
@@ -322,11 +322,11 @@ export default function OverviewHub({
                       ? "bg-teal-50 text-teal-800"
                       : monthTrend.tone === "warn"
                         ? "bg-amber-50 text-amber-900"
-                        : "bg-black/5 text-[#6b6f76]"
+                        : "bg-muted text-muted-foreground"
                   }`}
                 >
                   {monthTrend.tone === "good" ? (
-                    <Sparkles className="size-3" />
+                    <HugeiconsIcon icon={SparklesIcon} strokeWidth={2} className="size-3" />
                   ) : null}
                   {monthTrend.label}
                 </span>
@@ -563,9 +563,9 @@ function ScoreStat({
       >
         <HaloCrt color={t.crt} />
       </div>
-      <div className="relative z-10 rounded-t-[12px] border border-b-0 border-black/8 bg-white px-3.5 py-3.5">
+      <div className="relative z-10 rounded-t-[12px] border border-b-0 border-border bg-card px-3.5 py-3.5">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#8a8f98]">
+          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
             {label}
           </p>
           <span
@@ -574,10 +574,10 @@ function ScoreStat({
             <Icon className={`size-3.5 ${t.icon}`} />
           </span>
         </div>
-        <p className="font-display mt-1.5 text-lg leading-[1.2] tracking-tight tabular-nums text-[#08090a]">
+        <p className="font-display mt-1.5 text-lg leading-[1.2] tracking-tight tabular-nums text-foreground">
           {value}
         </p>
-        <p className="mt-1 text-[11px] text-[#6b6f76]">{hint}</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>
       </div>
     </div>
   );
@@ -627,7 +627,7 @@ function HealthCard({
       ? "text-teal-800"
       : tone === "warn"
         ? "text-amber-900"
-        : "text-[#08090a]";
+        : "text-foreground";
   const iconTone =
     tone === "good"
       ? "text-teal-700"
@@ -656,7 +656,7 @@ function HealthCard({
         className="relative flex h-full w-full cursor-pointer flex-col bg-transparent p-4 text-left"
       >
         <div className="relative z-10 flex shrink-0 items-start justify-between gap-3">
-          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#8a8f98]">
+          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
             {label}
           </p>
           <Icon className={`size-4 shrink-0 ${iconTone}`} strokeWidth={1.75} />
@@ -673,12 +673,12 @@ function HealthCard({
             ) : null}
             {value}
           </p>
-          <p className="mt-1 text-[12px] text-[#6b6f76]">{hint}</p>
+          <p className="mt-1 text-[12px] text-muted-foreground">{hint}</p>
           {children}
         </div>
-        <span className="relative z-10 mt-auto inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[#6b6f76] transition-colors duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:text-[#08090a]">
+        <span className="relative z-10 mt-auto inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-muted-foreground transition-colors duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:text-foreground">
           {action}
-          <ArrowUpRight className="size-3.5 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          <HugeiconsIcon icon={ArrowUpRightIcon} strokeWidth={2} className="size-3.5 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
         </span>
       </button>
     </BorderGlow>
@@ -719,7 +719,7 @@ function MonthSpark({ rows }: { rows: DayRow[] }) {
           strokeLinejoin="round"
         />
       </svg>
-      <p className="text-right text-[10px] font-medium tracking-[0.06em] text-[#8a8f98] uppercase">
+      <p className="text-right text-[10px] font-medium tracking-[0.06em] text-muted-foreground uppercase">
         Last 30 days
       </p>
     </div>

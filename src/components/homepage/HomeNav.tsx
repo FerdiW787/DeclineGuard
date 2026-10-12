@@ -41,14 +41,14 @@ export function HomeNav({
       <div
         className={`transition-[background-color,border-color,backdrop-filter] duration-300 ${
           solid
-            ? "border-b border-black/[0.08] bg-white/90 backdrop-blur-xl"
+            ? "border-b border-border bg-white/90 backdrop-blur-xl"
             : "border-b border-transparent bg-transparent"
         }`}
       >
         <div className="relative mx-auto flex h-[68px] max-w-[1440px] items-center justify-between px-6 lg:px-10">
           <BrandLogo size="sm" href="/" />
 
-          <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 text-[13px] text-[#8a8f98] md:flex">
+          <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 text-[13px] text-muted-foreground md:flex">
             {navLinks.map((l) => {
               const active =
                 (current === "pricing" && l.label === "Pricing") ||
@@ -57,8 +57,8 @@ export function HomeNav({
                 <a
                   key={l.label}
                   href={l.href}
-                  className={`rounded-full px-3 py-1.5 transition-colors hover:text-[#08090a] ${
-                    active ? "text-[#08090a]" : ""
+                  className={`rounded-full px-3 py-1.5 transition-colors hover:text-foreground ${
+                    active ? "text-foreground" : ""
                   }`}
                 >
                   {l.label}

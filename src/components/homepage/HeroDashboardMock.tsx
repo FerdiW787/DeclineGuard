@@ -8,7 +8,6 @@ import {
   type FunctionComponent,
 } from "react";
 import {
-  ChevronsUpDown,
   LayoutDashboard,
   Palette,
   Settings,
@@ -20,6 +19,8 @@ import { withConvexClerkProvider } from "@/lib/withConvexClerkProvider";
 import { type MarketingProductTab } from "./marketing/MarketingProductPreview";
 import { marketingStore } from "./marketing/demoData";
 import { useHeroStoryBeat } from "./HeroStoryContext";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { UnfoldMoreIcon } from "@hugeicons/core-free-icons";
 
 /** Desktop canvas — same 16:10 landscape as linear.app’s hero product mock. */
 const DESIGN_W = 1600;
@@ -144,9 +145,9 @@ function HeroDashboardMockInner() {
   }, [updateNavIndicator]);
 
   return (
-    <div ref={viewportRef} className="relative h-full w-full overflow-clip bg-[#0b0c0e]">
+    <div ref={viewportRef} className="relative h-full w-full overflow-clip bg-background">
       <div
-        className="ln-dash absolute top-0 left-0 flex flex-col overflow-hidden bg-[#0b0c0e] text-left text-[#e6e7ea]"
+        className="ln-dash absolute top-0 left-0 flex flex-col overflow-hidden bg-background text-left text-[#e6e7ea]"
         style={{
           width: DESIGN_W,
           height: DESIGN_H,
@@ -165,23 +166,23 @@ function HeroDashboardMockInner() {
                 className="size-[18px] shrink-0 object-contain"
                 aria-hidden
               />
-              <span className="truncate text-[13px] font-semibold tracking-[-0.02em] text-[#f7f8f8]">
+              <span className="truncate text-[13px] font-semibold tracking-[-0.02em] text-foreground">
                 DeclineGuard
               </span>
             </div>
 
             <div className="mb-2 px-3">
               <div className="flex w-full items-center gap-2 rounded-lg p-2 text-left">
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[#f7f8f8] text-[#0c0c0c]">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-background text-foreground">
                   <Store className="size-3.5" />
                 </span>
                 <span className="min-w-0 flex-1 grid text-left text-[12px] leading-tight">
-                  <span className="truncate font-semibold text-[#f7f8f8]">
+                  <span className="truncate font-semibold text-foreground">
                     {marketingStore.name}
                   </span>
                   <span className="truncate text-[10px] text-white/40">Live</span>
                 </span>
-                <ChevronsUpDown className="size-3.5 shrink-0 text-white/30" />
+                <HugeiconsIcon icon={UnfoldMoreIcon} strokeWidth={2} className="size-3.5 shrink-0 text-white/30" />
               </div>
             </div>
 
@@ -220,8 +221,8 @@ function HeroDashboardMockInner() {
                         disabled
                           ? "cursor-not-allowed font-medium text-white/25"
                           : active
-                            ? "font-semibold text-[#f7f8f8]"
-                            : "font-medium text-white/50 hover:bg-white/[0.03] hover:text-[#f7f8f8]"
+                            ? "font-semibold text-foreground"
+                            : "font-medium text-white/50 hover:bg-white/[0.03] hover:text-foreground"
                       }`}
                     >
                       <Icon
@@ -245,7 +246,7 @@ function HeroDashboardMockInner() {
                 F
               </span>
               <div className="min-w-0 flex-1 leading-tight">
-                <p className="truncate text-[12px] font-semibold text-[#f7f8f8]">
+                <p className="truncate text-[12px] font-semibold text-foreground">
                   Ferdi
                 </p>
                 <p className="truncate text-[10px] text-white/40">Free plan</p>
@@ -254,7 +255,7 @@ function HeroDashboardMockInner() {
           </aside>
 
           {/* Height-bounded main — pages use flex fill + internal scroll */}
-          <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#f7f8f8] text-[#08090a]">
+          <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background text-foreground">
             {PreviewInner ? (
               <PreviewInner
                 tab={tab}
@@ -265,7 +266,7 @@ function HeroDashboardMockInner() {
                 desktopPreview
               />
             ) : (
-              <div className="flex flex-1 items-center justify-center text-sm text-[#8a8f98]">
+              <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
                 Loading dashboard…
               </div>
             )}

@@ -20,20 +20,17 @@ import {
   Ban,
   BarChart3,
   BookOpen,
-  CheckCircle2,
-  ChevronDown,
   Headphones,
   KeyRound,
   Layers,
-  LayoutDashboard,
-  Lock,
   Radio,
-  Search,
   ShieldAlert,
   Store,
   Unlock,
   Users,
 } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { CheckmarkCircle02Icon, ArrowDown01Icon, DashboardSquare01Icon, SquareLock02Icon, SearchIcon } from "@hugeicons/core-free-icons";
 
 const ADMIN_DOCS = "/a/admin/docs";
 
@@ -64,7 +61,7 @@ function AdminNavGroup({
 }) {
   return (
     <div className="mb-4 last:mb-0">
-      <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8a8f98]">
+      <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
         {label}
       </p>
       <div className="flex flex-col gap-0.5">{children}</div>
@@ -107,9 +104,9 @@ function StepCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-black/8 bg-white p-5">
+    <section className="rounded-2xl border border-border bg-white p-5">
       <div className="flex gap-3">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#111] text-[13px] font-bold text-white">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-[13px] font-bold text-white">
           {step}
         </span>
         <div className="min-w-0 flex-1">
@@ -117,7 +114,7 @@ function StepCard({
             <h3 className="font-display text-lg tracking-tight">{title}</h3>
             {docHash ? <DocLink hash={docHash} /> : null}
           </div>
-          <p className="mt-1 text-sm leading-relaxed text-[#6b6f76]">{body}</p>
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{body}</p>
           <div className="mt-4">{children}</div>
         </div>
       </div>
@@ -182,7 +179,7 @@ function roleLabel(role: AppRole): string {
 function roleBadgeClasses(role: AppRole): string {
   switch (role) {
     case "user":
-      return "bg-black/[0.04] text-black/65 border-black/10";
+      return "bg-black/[0.04] text-black/65 border-border";
     case "staff":
       return "bg-sky-50 text-sky-900 border-sky-200";
     case "admin":
@@ -254,7 +251,7 @@ function toneClasses(tone: StatusInfo["tone"]): string {
 }
 
 const staffFieldClass =
-  "w-full rounded-lg border border-black/8 bg-[#f7f8f8] px-3 py-2.5 text-sm text-[#08090a] outline-none ring-black/10 placeholder:text-[#8a8f98] focus:ring-2";
+  "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-black/10 placeholder:text-muted-foreground focus:ring-2";
 
 function ActionButton({
   children,
@@ -380,7 +377,7 @@ function AdminConsoleInner() {
 
   if (!isLoaded) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f7f8f8] text-sm text-[#8a8f98]">
+      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
         Loading…
       </div>
     );
@@ -395,7 +392,7 @@ function AdminConsoleInner() {
 
   if (me === undefined) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f7f8f8] text-sm text-[#8a8f98]">
+      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
         Syncing account…
       </div>
     );
@@ -403,10 +400,10 @@ function AdminConsoleInner() {
 
   if (!me || !canAccessPortal(normalizeRole(me.role))) {
     return (
-      <div className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center gap-4 bg-[#f7f8f8] px-6 text-center text-[#08090a]">
+      <div className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center gap-4 bg-background px-6 text-center text-foreground">
         <BrandLogo />
         <h1 className="font-display text-3xl tracking-tight">Staff only</h1>
-        <p className="text-sm leading-relaxed text-[#6b6f76]">
+        <p className="text-sm leading-relaxed text-muted-foreground">
           This page is for DeclineGuard Staff and Admins. Ask an owner to set
           your Clerk{" "}
           <code className="rounded bg-black/5 px-1.5 py-0.5 text-[12px]">
@@ -496,14 +493,14 @@ function AdminConsoleInner() {
         onClick={() => goToNav(item.id)}
         className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition ${
           active
-            ? "bg-black/[0.06] font-semibold text-[#08090a]"
-            : "font-medium text-[#8a8f98] hover:bg-black/[0.04] hover:text-[#08090a]"
+            ? "bg-black/[0.06] font-semibold text-foreground"
+            : "font-medium text-muted-foreground hover:bg-black/[0.04] hover:text-foreground"
         }`}
       >
         <Icon className="size-4 shrink-0" />
         <span className="flex-1 text-left">{item.label}</span>
         {waitingBadge != null ? (
-          <span className="rounded-full bg-[#111] px-1.5 py-0.5 text-[10px] font-bold text-white">
+          <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-white">
             {waitingBadge}
           </span>
         ) : null}
@@ -520,17 +517,17 @@ function AdminConsoleInner() {
   };
 
   return (
-    <div className="dg-shell light ln-surface relative flex h-dvh overflow-hidden bg-[#f7f8f8] text-[#08090a]">
+    <div className="dg-shell light ln-surface relative flex h-dvh overflow-hidden bg-background text-foreground">
       {/* Desktop sidebar — same flow as merchant dashboard */}
-      <aside className="relative z-20 flex w-[248px] shrink-0 flex-col bg-[#f7f8f8] max-lg:hidden">
+      <aside className="relative z-20 flex w-[248px] shrink-0 flex-col bg-background max-lg:hidden">
         <div
-          className="pointer-events-none absolute inset-0 bg-[#f7f8f8]"
+          className="pointer-events-none absolute inset-0 bg-background"
           aria-hidden
         />
         <div className="relative z-10 flex min-h-0 flex-1 flex-col">
           <div className="flex items-center gap-2.5 px-5 py-5">
             <BrandLogo size="sm" href="/a/admin" />
-            <span className="rounded-md border border-black/8 bg-black/[0.04] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8a8f98]">
+            <span className="rounded-md border border-border bg-black/[0.04] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               {roleLabel(myRole)}
             </span>
           </div>
@@ -555,7 +552,7 @@ function AdminConsoleInner() {
           <div className="mt-auto space-y-2 px-3 py-4">
             <Button asChild variant="ghost" className="w-full justify-start">
               <a href="/a/dashboard">
-                <LayoutDashboard className="size-4 shrink-0" />
+                <HugeiconsIcon icon={DashboardSquare01Icon} strokeWidth={2} className="size-4 shrink-0" />
                 Merchant dashboard
               </a>
             </Button>
@@ -569,7 +566,7 @@ function AdminConsoleInner() {
                 <p className="truncate text-sm font-semibold text-black">
                   {me.userName}
                 </p>
-                <p className="truncate text-xs text-[#8a8f98]">
+                <p className="truncate text-xs text-muted-foreground">
                   {roleLabel(myRole)}
                 </p>
               </div>
@@ -580,11 +577,11 @@ function AdminConsoleInner() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar + pills */}
-        <header className="shrink-0 border-b border-black/6 bg-[#f7f8f8] lg:hidden">
+        <header className="shrink-0 border-b border-black/6 bg-background lg:hidden">
           <div className="flex h-14 items-center justify-between gap-3 px-4">
             <div className="flex items-center gap-2">
               <BrandLogo size="sm" href="/a/admin" />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8a8f98]">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 {roleLabel(myRole)}
               </span>
             </div>
@@ -673,13 +670,13 @@ function AdminConsoleInner() {
                     href={`${ADMIN_DOCS}#overview`}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-2xl border border-black/8 bg-white px-5 py-5 transition hover:border-black/15 hover:bg-black/[0.02]"
+                    className="rounded-2xl border border-border bg-white px-5 py-5 transition hover:border-black/15 hover:bg-black/[0.02]"
                   >
-                    <ShieldAlert className="size-4 text-[#8a8f98]" />
-                    <p className="mt-3 text-sm font-semibold text-[#08090a]">
+                    <ShieldAlert className="size-4 text-muted-foreground" />
+                    <p className="mt-3 text-sm font-semibold text-foreground">
                       Recovery console
                     </p>
-                    <p className="mt-1.5 text-[13px] leading-relaxed text-[#6b6f76]">
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
                       Freeze, kick sessions, restore, reclaim store, unlock, ban
                     </p>
                   </a>
@@ -687,13 +684,13 @@ function AdminConsoleInner() {
                     href="/a/admin/docs/support"
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-2xl border border-black/8 bg-white px-5 py-5 transition hover:border-black/15 hover:bg-black/[0.02]"
+                    className="rounded-2xl border border-border bg-white px-5 py-5 transition hover:border-black/15 hover:bg-black/[0.02]"
                   >
-                    <Headphones className="size-4 text-[#8a8f98]" />
-                    <p className="mt-3 text-sm font-semibold text-[#08090a]">
+                    <Headphones className="size-4 text-muted-foreground" />
+                    <p className="mt-3 text-sm font-semibold text-foreground">
                       Support chat
                     </p>
-                    <p className="mt-1.5 text-[13px] leading-relaxed text-[#6b6f76]">
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
                       Claim, reply, mark done, escalate to Admin, close as spam
                     </p>
                   </a>
@@ -701,13 +698,13 @@ function AdminConsoleInner() {
                     href={`${ADMIN_DOCS}#roles`}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-2xl border border-black/8 bg-white px-5 py-5 transition hover:border-black/15 hover:bg-black/[0.02]"
+                    className="rounded-2xl border border-border bg-white px-5 py-5 transition hover:border-black/15 hover:bg-black/[0.02]"
                   >
-                    <Users className="size-4 text-[#8a8f98]" />
-                    <p className="mt-3 text-sm font-semibold text-[#08090a]">
+                    <Users className="size-4 text-muted-foreground" />
+                    <p className="mt-3 text-sm font-semibold text-foreground">
                       Roles
                     </p>
-                    <p className="mt-1.5 text-[13px] leading-relaxed text-[#6b6f76]">
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
                       What Staff vs Admin can do
                     </p>
                   </a>
@@ -724,25 +721,25 @@ function AdminConsoleInner() {
                 />
 
                 <section
-                  className="mb-6 shrink-0 rounded-2xl border border-black/8 bg-white"
+                  className="mb-6 shrink-0 rounded-2xl border border-border bg-white"
                   data-enter
                 >
                   <div className="px-5 py-4">
-                    <p className="text-sm font-semibold text-[#08090a]">
+                    <p className="text-sm font-semibold text-foreground">
                       Resend quota
                     </p>
-                    <p className="mt-1 text-[13px] leading-relaxed text-[#6b6f76]">
+                    <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
                       Provider 429 / quota blocks — sequences skip that send,
                       they are not merchant plan overage.
                     </p>
                   </div>
-                  <ul className="max-h-48 overflow-auto border-t border-black/8">
+                  <ul className="max-h-48 overflow-auto border-t border-border">
                     {quotaBlocked === undefined ? (
-                      <li className="px-5 py-3 text-sm text-[#8a8f98]">
+                      <li className="px-5 py-3 text-sm text-muted-foreground">
                         Loading…
                       </li>
                     ) : quotaBlocked.length === 0 ? (
-                      <li className="px-5 py-3 text-sm text-[#8a8f98]">
+                      <li className="px-5 py-3 text-sm text-muted-foreground">
                         No Resend quota blocks
                       </li>
                     ) : (
@@ -753,11 +750,11 @@ function AdminConsoleInner() {
                         >
                           <span className="text-sm font-medium">
                             {row.targetName ?? "Unknown merchant"}
-                            <span className="ml-2 text-[12px] font-normal text-[#8a8f98]">
+                            <span className="ml-2 text-[12px] font-normal text-muted-foreground">
                               {humanAction(row.action)}
                             </span>
                           </span>
-                          <span className="text-[12px] text-[#8a8f98]">
+                          <span className="text-[12px] text-muted-foreground">
                             {new Date(row.createdAt).toLocaleString()}
                           </span>
                         </li>
@@ -772,15 +769,15 @@ function AdminConsoleInner() {
                 >
         {/* LEFT: find account */}
         <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-          <div className="rounded-2xl border border-black/8 bg-white p-4">
+          <div className="rounded-2xl border border-border bg-white p-4">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-sm font-semibold">
-                <Search className="size-4 text-[#6b6f76]" />
+                <HugeiconsIcon icon={SearchIcon} strokeWidth={2} className="size-4 text-muted-foreground" />
                 1. Find the merchant
               </div>
               <DocLink hash="overview" label="Guide" />
             </div>
-            <p className="mt-1 text-[13px] leading-relaxed text-[#6b6f76]">
+            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
               Search by their name, email-ish Clerk id, or Lemon Squeezy store
               name / id.
             </p>
@@ -792,17 +789,17 @@ function AdminConsoleInner() {
             />
           </div>
 
-          <ul className="overflow-hidden rounded-2xl border border-black/8 bg-white">
+          <ul className="overflow-hidden rounded-2xl border border-border bg-white">
             {!searchQ ? (
-              <li className="px-4 py-8 text-center text-sm text-[#8a8f98]">
+              <li className="px-4 py-8 text-center text-sm text-muted-foreground">
                 Type at least 2 characters to search
               </li>
             ) : results === undefined ? (
-              <li className="px-4 py-8 text-center text-sm text-[#8a8f98]">
+              <li className="px-4 py-8 text-center text-sm text-muted-foreground">
                 Searching…
               </li>
             ) : results.length === 0 ? (
-              <li className="px-4 py-8 text-center text-sm text-[#8a8f98]">
+              <li className="px-4 py-8 text-center text-sm text-muted-foreground">
                 No merchants matched
               </li>
             ) : (
@@ -843,7 +840,7 @@ function AdminConsoleInner() {
                           </span>
                         </span>
                       </span>
-                      <span className="truncate text-[12px] text-[#8a8f98]">
+                      <span className="truncate text-[12px] text-muted-foreground">
                         {row.connection
                           ? row.connection.storeName
                           : "No Lemon Squeezy store linked"}
@@ -861,30 +858,30 @@ function AdminConsoleInner() {
         <div className="min-w-0 space-y-4">
           {!selectedId ? (
             <div className="rounded-2xl border border-dashed border-black/15 bg-black/[0.015] px-6 py-14 text-center">
-              <ShieldAlert className="mx-auto size-8 text-[#8a8f98]" />
-              <h2 className="font-display mt-4 text-xl tracking-tight text-[#08090a]">
+              <ShieldAlert className="mx-auto size-8 text-muted-foreground" />
+              <h2 className="font-display mt-4 text-xl tracking-tight text-foreground">
                 Pick a merchant on the left
               </h2>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-[#6b6f76]">
+              <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
                 You’ll get a clear checklist: freeze if needed, restore wiped
                 data, reclaim a stolen store, then unlock them again.
               </p>
             </div>
           ) : selected === undefined ? (
-            <div className="rounded-2xl border border-black/8 bg-white px-5 py-12 text-center text-sm text-[#8a8f98]">
+            <div className="rounded-2xl border border-border bg-white px-5 py-12 text-center text-sm text-muted-foreground">
               Loading merchant…
             </div>
           ) : selected === null ? (
-            <div className="rounded-2xl border border-black/8 bg-white px-5 py-12 text-center text-sm text-[#8a8f98]">
+            <div className="rounded-2xl border border-border bg-white px-5 py-12 text-center text-sm text-muted-foreground">
               Merchant not found
             </div>
           ) : (
             <>
               {/* Snapshot */}
-              <section className="rounded-2xl border border-black/8 bg-white p-5 md:p-6">
+              <section className="rounded-2xl border border-border bg-white p-5 md:p-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8a8f98]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                       Working on
                     </p>
                     <h2 className="font-display mt-1 text-2xl tracking-tight">
@@ -913,7 +910,7 @@ function AdminConsoleInner() {
                 </div>
 
                 {status ? (
-                  <p className="mt-3 text-sm leading-relaxed text-[#6b6f76]">
+                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
                     {status.meaning}
                   </p>
                 ) : null}
@@ -992,7 +989,7 @@ function AdminConsoleInner() {
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-3">
                   <div className="rounded-xl bg-black/[0.03] px-3.5 py-3">
-                    <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#8a8f98]">
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                       <Store className="size-3.5" />
                       Store
                     </div>
@@ -1001,7 +998,7 @@ function AdminConsoleInner() {
                         ? selected.connection.storeName
                         : "None linked"}
                     </p>
-                    <p className="mt-0.5 text-[12px] text-[#8a8f98]">
+                    <p className="mt-0.5 text-[12px] text-muted-foreground">
                       {storeArchived
                         ? "Disconnected (backup kept)"
                         : selected.connection
@@ -1010,25 +1007,25 @@ function AdminConsoleInner() {
                     </p>
                   </div>
                   <div className="rounded-xl bg-black/[0.03] px-3.5 py-3">
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-[#8a8f98]">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                       Open failures
                     </div>
                     <p className="mt-1 text-sm font-medium">
                       {selected.openFailureCount}
                     </p>
-                    <p className="mt-0.5 text-[12px] text-[#8a8f98]">
+                    <p className="mt-0.5 text-[12px] text-muted-foreground">
                       {selected.activityCount} activity events visible
                     </p>
                   </div>
                   <div className="rounded-xl bg-black/[0.03] px-3.5 py-3">
-                    <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#8a8f98]">
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                       <ArchiveRestore className="size-3.5" />
                       Backup
                     </div>
                     <p className="mt-1 text-sm font-medium">
                       {needsRestore ? "Available to restore" : "Nothing archived"}
                     </p>
-                    <p className="mt-0.5 text-[12px] text-[#8a8f98]">
+                    <p className="mt-0.5 text-[12px] text-muted-foreground">
                       Kept ~90 days after disconnect
                     </p>
                   </div>
@@ -1037,13 +1034,13 @@ function AdminConsoleInner() {
                 <div className="mt-3 rounded-xl bg-black/[0.03] px-3.5 py-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8a8f98]">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                         Plan
                       </p>
                       <p className="mt-1 text-sm font-medium capitalize">
                         {selected.plan}
                       </p>
-                      <p className="mt-0.5 text-[12px] text-[#8a8f98]">
+                      <p className="mt-0.5 text-[12px] text-muted-foreground">
                         {selected.lsSubscriptionId
                           ? `LS ${selected.lsSubscriptionId}${
                               selected.lsSubscriptionStatus
@@ -1154,9 +1151,9 @@ function AdminConsoleInner() {
                 <div className="mb-3">
                   <DocLink hash="kick-sessions" label="About Kick sessions" />
                 </div>
-                <label className="block text-[12px] font-medium text-[#6b6f76]">
+                <label className="block text-[12px] font-medium text-muted-foreground">
                   Required comment{" "}
-                  <span className="font-normal text-[#8a8f98]">
+                  <span className="font-normal text-muted-foreground">
                     (Staff and Admins — shown in the live log)
                   </span>
                 </label>
@@ -1169,7 +1166,7 @@ function AdminConsoleInner() {
                 />
                 <p
                   className={`mt-1 text-[11px] ${
-                    commentReady ? "text-[#8a8f98]" : "text-amber-800"
+                    commentReady ? "text-muted-foreground" : "text-amber-800"
                   }`}
                 >
                   {commentReady
@@ -1198,7 +1195,7 @@ function AdminConsoleInner() {
                         )
                       }
                     >
-                      <Lock className="size-4" />
+                      <HugeiconsIcon icon={SquareLock02Icon} strokeWidth={2} className="size-4" />
                       {busy === "Freeze" ? "Freezing…" : "Freeze account"}
                     </ActionButton>
                   ) : selected.accountStatus === "frozen" ? (
@@ -1245,7 +1242,7 @@ function AdminConsoleInner() {
                       {busy === "Unban" ? "Unbanning…" : "Lift ban"}
                     </ActionButton>
                   ) : (
-                    <p className="w-full text-sm text-[#6b6f76]">
+                    <p className="w-full text-sm text-muted-foreground">
                       This account is banned. Only an Admin can lift the ban.
                     </p>
                   )}
@@ -1286,7 +1283,7 @@ function AdminConsoleInner() {
                 </div>
                 {needsRestore ? (
                   <>
-                    <p className="mb-3 text-sm text-[#6b6f76]">
+                    <p className="mb-3 text-sm text-muted-foreground">
                       We found archived data for this merchant.
                     </p>
                     <ActionButton
@@ -1313,17 +1310,17 @@ function AdminConsoleInner() {
                     </ActionButton>
                   </>
                 ) : (
-                  <p className="flex items-start gap-2 text-sm text-[#6b6f76]">
-                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                  <p className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} className="mt-0.5 size-4 shrink-0 text-emerald-600" />
                     Nothing to restore right now. Skip this step.
                   </p>
                 )}
 
-                <div className="mt-5 border-t border-black/8 pt-4">
+                <div className="mt-5 border-t border-border pt-4">
                   <p className="text-sm font-semibold">
                     Stolen Lemon Squeezy API key?
                   </p>
-                  <p className="mt-1 text-[13px] leading-relaxed text-[#6b6f76]">
+                  <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
                     Point this store’s webhooks back to this merchant. Then tell
                     them to rotate the LS API key and change their password.
                   </p>
@@ -1367,14 +1364,14 @@ function AdminConsoleInner() {
                 body="When the incident is handled, unfreeze (or lift the ban) so the merchant can work again."
                 docHash="unlock"
               >
-                <ul className="mb-3 space-y-1.5 text-sm text-[#6b6f76]">
+                <ul className="mb-3 space-y-1.5 text-sm text-muted-foreground">
                   <li>• Ask them to change their DeclineGuard password</li>
                   <li>• Ask them to rotate their Lemon Squeezy API key</li>
                   <li>• Unfreeze / lift ban when you’re done</li>
                 </ul>
                 {selected.accountStatus !== "active" ? (
                   selected.accountStatus === "disabled" && !iAmAdmin ? (
-                    <p className="text-sm text-[#6b6f76]">
+                    <p className="text-sm text-muted-foreground">
                       Banned accounts can only be unlocked by an Admin.
                     </p>
                   ) : (
@@ -1416,8 +1413,8 @@ function AdminConsoleInner() {
                     </ActionButton>
                   )
                 ) : (
-                  <p className="flex items-start gap-2 text-sm text-[#6b6f76]">
-                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                  <p className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} className="mt-0.5 size-4 shrink-0 text-emerald-600" />
                     Already unlocked — nothing to do here.
                   </p>
                 )}
@@ -1446,9 +1443,7 @@ function AdminConsoleInner() {
                       Ban completely blocks sign-in. Prefer freeze for most cases.
                     </span>
                   </span>
-                  <ChevronDown
-                    className={`size-4 shrink-0 text-rose-800 transition ${showDanger ? "rotate-180" : ""}`}
-                  />
+                  <HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={2} className={`size-4 shrink-0 text-rose-800 transition ${showDanger ? "rotate-180" : ""}`} />
                 </button>
                 {showDanger ? (
                   <div className="space-y-3 border-t border-rose-200/80 px-5 py-4">
@@ -1519,11 +1514,11 @@ function AdminConsoleInner() {
                 ) : null}
               </section>
               ) : (
-                <section className="rounded-2xl border border-black/8 bg-black/[0.02] px-5 py-4">
-                  <p className="text-sm font-semibold text-[#08090a]">
+                <section className="rounded-2xl border border-border bg-black/[0.02] px-5 py-4">
+                  <p className="text-sm font-semibold text-foreground">
                     Ban is Admin-only
                   </p>
-                  <p className="mt-1 text-[13px] leading-relaxed text-[#6b6f76]">
+                  <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
                     For safety, Staff cannot ban accounts. Freeze a merchant if
                     you need to pause them, and escalate to an Admin for bans.
                   </p>
@@ -1534,7 +1529,7 @@ function AdminConsoleInner() {
               )}
 
               {/* History */}
-              <section className="rounded-2xl border border-black/8 bg-white">
+              <section className="rounded-2xl border border-border bg-white">
                 <button
                   type="button"
                   className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
@@ -1542,17 +1537,15 @@ function AdminConsoleInner() {
                 >
                   <span>
                     <span className="text-sm font-semibold">Staff history</span>
-                    <span className="mt-0.5 block text-[13px] text-[#6b6f76]">
+                    <span className="mt-0.5 block text-[13px] text-muted-foreground">
                       What you (and other staff) already did on this account
                     </span>
                   </span>
-                  <ChevronDown
-                    className={`size-4 shrink-0 text-[#8a8f98] transition ${showHistory ? "rotate-180" : ""}`}
-                  />
+                  <HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={2} className={`size-4 shrink-0 text-muted-foreground transition ${showHistory ? "rotate-180" : ""}`} />
                 </button>
                 {showHistory ? (
                   <>
-                    <div className="flex gap-2 border-t border-black/8 px-5 py-2.5">
+                    <div className="flex gap-2 border-t border-border px-5 py-2.5">
                       <Button
                         type="button"
                         size="xs"
@@ -1570,13 +1563,13 @@ function AdminConsoleInner() {
                         Quota blocks
                       </Button>
                     </div>
-                  <ul className="max-h-72 space-y-0 overflow-auto border-t border-black/8">
+                  <ul className="max-h-72 space-y-0 overflow-auto border-t border-border">
                     {historyRows === undefined ? (
-                      <li className="px-5 py-4 text-sm text-[#8a8f98]">
+                      <li className="px-5 py-4 text-sm text-muted-foreground">
                         Loading…
                       </li>
                     ) : historyRows.length === 0 ? (
-                      <li className="px-5 py-4 text-sm text-[#8a8f98]">
+                      <li className="px-5 py-4 text-sm text-muted-foreground">
                         {historyFilter === "quota"
                           ? "No Resend quota blocks on this account"
                           : "No staff actions yet"}
@@ -1598,17 +1591,17 @@ function AdminConsoleInner() {
                             <span className="text-sm font-medium">
                               {humanAction(row.action)}
                               {row.revokedAt ? (
-                                <span className="ml-2 text-[11px] font-normal text-[#8a8f98]">
+                                <span className="ml-2 text-[11px] font-normal text-muted-foreground">
                                   (revoked)
                                 </span>
                               ) : null}
                             </span>
-                            <span className="text-[12px] text-[#8a8f98]">
+                            <span className="text-[12px] text-muted-foreground">
                               {new Date(row.createdAt).toLocaleString()}
                             </span>
                           </div>
                           {row.reason ? (
-                            <p className="mt-1 text-[13px] text-[#6b6f76]">
+                            <p className="mt-1 text-[13px] text-muted-foreground">
                               {row.reason}
                             </p>
                           ) : null}

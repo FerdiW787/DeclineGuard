@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { TriangleAlert } from "lucide-react";
 import {
   SettingsCard,
   SettingsRow,
   SettingsSection,
 } from "./SettingsFields";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Alert02Icon } from "@hugeicons/core-free-icons";
 
 export function StoreTab({
   storeName,
@@ -39,7 +40,7 @@ export function StoreTab({
           title="API key"
           description="Only the last four characters are stored in the browser."
         >
-          <code className="text-[13px] text-[#6b6f76]">···{apiKeyLast4}</code>
+          <code className="text-[13px] text-muted-foreground">···{apiKeyLast4}</code>
         </SettingsRow>
         <SettingsRow
           title="Environment"
@@ -49,7 +50,7 @@ export function StoreTab({
               : "Live mode — webhooks come from your production store."
           }
         >
-          <span className="text-[13px] font-medium text-[#08090a]">
+          <span className="text-[13px] font-medium text-foreground">
             {testMode ? "Test" : "Live"}
           </span>
         </SettingsRow>
@@ -60,7 +61,7 @@ export function StoreTab({
           {allowDisconnect && !readOnly ? (
             <button
               type="button"
-              className="rounded-lg border border-black/8 px-3 py-1.5 text-[12px] font-semibold text-[#6b6f76] transition hover:bg-black/[0.04] hover:text-[#08090a]"
+              className="rounded-lg border border-border px-3 py-1.5 text-[12px] font-semibold text-muted-foreground transition hover:bg-black/[0.04] hover:text-foreground"
               onClick={() => {
                 setDisconnectConfirm("");
                 setDisconnectError(null);
@@ -70,7 +71,7 @@ export function StoreTab({
               Disconnect
             </button>
           ) : (
-            <span className="text-[12px] font-medium text-[#8a8f98]">
+            <span className="text-[12px] font-medium text-muted-foreground">
               Disabled
             </span>
           )}
@@ -89,26 +90,26 @@ export function StoreTab({
             }
           }}
         >
-          <div className="w-full max-w-md rounded-xl border border-black/8 bg-white p-6 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.45)]">
+          <div className="w-full max-w-md rounded-xl border border-border bg-white p-6 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.45)]">
             <div className="flex items-start gap-3">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-red-500/10">
-                <TriangleAlert className="size-5 text-red-600" />
+                <HugeiconsIcon icon={Alert02Icon} strokeWidth={2} className="size-5 text-red-600" />
               </span>
               <div className="min-w-0">
                 <h2
                   id="disconnect-title"
-                  className="text-lg font-semibold tracking-tight text-[#08090a]"
+                  className="text-lg font-semibold tracking-tight text-foreground"
                 >
                   Disconnect {storeName}?
                 </h2>
-                <p className="mt-2 text-sm leading-relaxed text-[#6b6f76]">
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                   This permanently removes your Lemon Squeezy connection and
                   all recovery history for this account. It cannot be undone.
                 </p>
               </div>
             </div>
 
-            <ul className="mt-4 space-y-2 rounded-lg bg-black/[0.03] px-4 py-3 text-[13px] leading-relaxed text-[#6b6f76]">
+            <ul className="mt-4 space-y-2 rounded-lg bg-black/[0.03] px-4 py-3 text-[13px] leading-relaxed text-muted-foreground">
               <li>Failed payments, recoveries, and activity feed are deleted</li>
               <li>Pending Day 2 / Day 5 recovery emails are cancelled</li>
               <li>Webhook event log for this store is cleared</li>
@@ -116,7 +117,7 @@ export function StoreTab({
             </ul>
 
             <label className="mt-5 block">
-              <span className="text-xs font-semibold text-[#08090a]">
+              <span className="text-xs font-semibold text-foreground">
                 Type <span className="font-mono">{storeName}</span> to confirm
               </span>
               <input
@@ -130,7 +131,7 @@ export function StoreTab({
                 spellCheck={false}
                 placeholder={storeName}
                 disabled={disconnectBusy}
-                className="mt-2 w-full rounded-lg border border-black/12 bg-white px-3.5 py-2.5 text-sm text-[#08090a] outline-none placeholder:text-[#8a8f98] focus:border-black/30"
+                className="mt-2 w-full rounded-lg border border-black/12 bg-white px-3.5 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-black/30"
               />
             </label>
 
@@ -143,7 +144,7 @@ export function StoreTab({
             <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
               <button
                 type="button"
-                className="rounded-lg border border-black/8 px-4 py-2.5 text-xs font-semibold text-[#6b6f76] transition hover:bg-black/[0.04]"
+                className="rounded-lg border border-border px-4 py-2.5 text-xs font-semibold text-muted-foreground transition hover:bg-black/[0.04]"
                 disabled={disconnectBusy}
                 onClick={() => setDisconnectOpen(false)}
               >

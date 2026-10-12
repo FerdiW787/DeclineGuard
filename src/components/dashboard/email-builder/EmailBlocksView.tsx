@@ -189,7 +189,7 @@ function BlockView({
     case "spacer":
       return <div style={{ height: block.height }} aria-hidden />;
     case "divider":
-      return <hr style={style} className="border-black/8" />;
+      return <hr style={style} className="border-border" />;
     case "linkRow":
       return (
         <p

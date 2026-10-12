@@ -149,17 +149,17 @@ export default function EmailLayoutStudio({
   return (
     <div
       className={cn(
-        "rounded-xl border border-black/8 bg-white",
+        "rounded-xl border border-border bg-white",
         variant === "page" ? "p-5 md:p-6" : "p-4",
         className,
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8a8f98]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             Email layout
           </p>
-          <p className="mt-1 text-[13px] text-[#6b6f76]">
+          <p className="mt-1 text-[13px] text-muted-foreground">
             Same layout on every lifecycle email. Brand colors and the CTA
             stay yours — we assign the kit.
           </p>
@@ -177,7 +177,7 @@ export default function EmailLayoutStudio({
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11px] text-[#8a8f98]">
+        <p className="text-[11px] text-muted-foreground">
           {draft.stylingMode === "preset"
             ? "Showing the DeclineGuard theme for this layout."
             : "Showing your store colors, buttons, and links."}
@@ -199,12 +199,12 @@ export default function EmailLayoutStudio({
             : "grid-cols-1",
         )}
       >
-        <div className="overflow-hidden rounded-lg border border-black/8">
+        <div className="overflow-hidden rounded-lg border border-border">
           <div className="border-b border-black/6 px-3 py-2">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8a8f98]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               Preview · {LIFECYCLE_EMAIL_META[emailType].label}
             </p>
-            <p className="mt-0.5 truncate text-[11px] text-[#6b6f76]">
+            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
               {built.subject}
             </p>
           </div>
@@ -228,7 +228,7 @@ export default function EmailLayoutStudio({
               <legend className="text-[11px] font-medium uppercase tracking-[0.08em] text-black/45">
                 Colors
               </legend>
-              <p className="text-[11px] leading-relaxed text-[#8a8f98]">
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
                 {draft.stylingMode === "preset"
                   ? "Edits apply when you switch to Configured. The layout stays."
                   : "These are your store tokens."}
@@ -281,7 +281,7 @@ export default function EmailLayoutStudio({
               <legend className="text-[11px] font-medium uppercase tracking-[0.08em] text-black/45">
                 Short copy
               </legend>
-              <p className="text-[11px] text-[#8a8f98]">
+              <p className="text-[11px] text-muted-foreground">
                 Overrides for {LIFECYCLE_EMAIL_META[emailType].label} only.
               </p>
               <TextField
@@ -326,21 +326,21 @@ function ColorField({
 }) {
   const hex = /^#([0-9a-fA-F]{6})$/.test(value) ? value : "#0c0c0c";
   return (
-    <label className="flex items-center justify-between gap-2 rounded-md border border-black/8 px-2.5 py-2">
-      <span className="text-[12px] font-medium text-[#08090a]">{label}</span>
+    <label className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-2">
+      <span className="text-[12px] font-medium text-foreground">{label}</span>
       <span className="flex items-center gap-1.5">
         <input
           type="color"
           value={hex}
           onChange={(e) => onChange(e.target.value)}
-          className="h-7 w-8 shrink-0 cursor-pointer rounded border border-black/10 bg-transparent p-0.5"
+          className="h-7 w-8 shrink-0 cursor-pointer rounded border border-border bg-transparent p-0.5"
         />
         <input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           spellCheck={false}
-          className="w-[5.5rem] rounded-md border border-black/10 px-1.5 py-1 font-mono text-[11px] outline-none focus:border-black/25"
+          className="w-[5.5rem] rounded-md border border-border px-1.5 py-1 font-mono text-[11px] outline-none focus:border-black/25"
         />
       </span>
     </label>
@@ -361,7 +361,7 @@ function TextField({
   multiline?: boolean;
 }) {
   const fieldClass =
-    "w-full rounded-md border border-black/10 bg-white px-2.5 py-1.5 text-[13px] outline-none focus:border-black/25";
+    "w-full rounded-md border border-border bg-white px-2.5 py-1.5 text-[13px] outline-none focus:border-black/25";
   return (
     <label className="block space-y-1">
       <span className="text-[11px] font-medium text-black/50">{label}</span>

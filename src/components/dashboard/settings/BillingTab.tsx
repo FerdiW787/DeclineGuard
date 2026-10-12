@@ -147,7 +147,7 @@ function BillingTabView({
             subscriptionStatus,
           })}
         >
-          <p className="text-[15px] font-semibold text-[#08090a]">
+          <p className="text-[15px] font-semibold text-foreground">
             {displayPlanTier}
           </p>
         </SettingsRow>
@@ -195,7 +195,7 @@ function BillingTabView({
                   : `${feesSummary.recoveryFeePercent}% of attributed recovered revenue this calendar month.`
               }
             >
-              <p className="text-[15px] font-semibold tabular-nums text-[#08090a]">
+              <p className="text-[15px] font-semibold tabular-nums text-foreground">
                 {formatMoneyAmount(
                   feesSummary.owedThisMonthCents,
                   feesSummary.currency ?? "USD",
@@ -208,7 +208,7 @@ function BillingTabView({
                 feesSummary.owedCount === 1 ? "" : "s"
               }`}
             >
-              <p className="text-[13px] font-medium tabular-nums text-[#6b6f76]">
+              <p className="text-[13px] font-medium tabular-nums text-muted-foreground">
                 {formatMoneyAmount(
                   feesSummary.owedAllTimeCents,
                   feesSummary.currency ?? "USD",
@@ -236,12 +236,12 @@ function BillingTabView({
             description={emailQuotaHint(emailQuota)}
           >
             <div className="w-40">
-              <p className="text-right text-[15px] font-semibold tabular-nums text-[#08090a]">
+              <p className="text-right text-[15px] font-semibold tabular-nums text-foreground">
                 {emailQuota.sent} / {emailQuota.included}
               </p>
               <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-black/8">
                 <div
-                  className="h-full rounded-full bg-[#08090a]"
+                  className="h-full rounded-full bg-primary"
                   style={{
                     width: `${emailQuotaBarPercent(emailQuota)}%`,
                   }}

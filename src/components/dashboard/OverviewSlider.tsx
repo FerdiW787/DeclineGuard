@@ -336,7 +336,7 @@ function OverviewKpi({
 
   return (
     <div
-      className="relative z-10 isolate rounded-md border border-black/8 px-3.5 py-3 md:px-4 md:py-3.5"
+      className="relative z-10 isolate rounded-md border border-border px-3.5 py-3 md:px-4 md:py-3.5"
       style={{ backgroundColor: "#ffffff" }}
     >
       <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-black/45">

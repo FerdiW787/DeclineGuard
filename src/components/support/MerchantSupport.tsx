@@ -4,14 +4,12 @@ import gsap from "gsap";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import {
-  ArrowLeft,
   Headphones,
   KeyRound,
-  MessageCircle,
-  Send,
-  ShieldAlert,
-  X,
+  ShieldAlert
 } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowLeft02Icon, MessageIcon, SentIcon, Cancel01Icon } from "@hugeicons/core-free-icons";
 
 type Topic = "account" | "billing" | "lemon_squeezy" | "bug" | "other";
 
@@ -447,12 +445,12 @@ export default function MerchantSupport({
         ref={panelRef}
         className="relative flex h-full w-full max-w-md flex-col bg-white shadow-xl will-change-transform"
       >
-        <header className="flex items-center justify-between gap-3 border-b border-black/8 px-4 py-3">
+        <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
           <div className="flex min-w-0 items-center gap-2">
             {view !== "list" ? (
               <button
                 type="button"
-                className="rounded-lg p-1.5 text-black/50 hover:bg-black/5 hover:text-black"
+                className="rounded-lg p-1.5 text-black/50 hover:bg-black/5 hover:text-foreground"
                 onClick={() => {
                   setView("list");
                   setActiveId(null);
@@ -460,7 +458,7 @@ export default function MerchantSupport({
                 }}
                 aria-label="Back"
               >
-                <ArrowLeft className="size-4" />
+                <HugeiconsIcon icon={ArrowLeft02Icon} strokeWidth={2} className="size-4" />
               </button>
             ) : (
               <Headphones className="size-4 text-black/50" />
@@ -489,11 +487,11 @@ export default function MerchantSupport({
           </div>
           <button
             type="button"
-            className="rounded-lg p-1.5 text-black/40 hover:bg-black/5 hover:text-black"
+            className="rounded-lg p-1.5 text-black/40 hover:bg-black/5 hover:text-foreground"
             onClick={onClose}
             aria-label="Close"
           >
-            <X className="size-4" />
+            <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-4" />
           </button>
         </header>
 
@@ -512,7 +510,7 @@ export default function MerchantSupport({
                 </p>
               ) : threads.length === 0 ? (
                 <div className="px-6 py-14 text-center">
-                  <MessageCircle className="mx-auto size-8 text-black/20" />
+                  <HugeiconsIcon icon={MessageIcon} strokeWidth={2} className="mx-auto size-8 text-black/20" />
                   <p className="mt-3 text-sm text-black/55">
                     No chats yet. Tell us what’s going on — we’ll help.
                   </p>
@@ -566,10 +564,10 @@ export default function MerchantSupport({
                 </ul>
               )}
             </div>
-            <div className="border-t border-black/8 p-4">
+            <div className="border-t border-border p-4">
               <button
                 type="button"
-                className="w-full rounded-xl bg-[#111] px-4 py-2.5 text-sm font-semibold text-white hover:bg-black"
+                className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary/80"
                 onClick={() => {
                   setView("new");
                   setError(null);
@@ -595,8 +593,8 @@ export default function MerchantSupport({
                   onClick={() => setTopic(t.id)}
                   className={`rounded-full border px-3 py-1.5 text-[12px] font-medium transition ${
                     topic === t.id
-                      ? "border-black bg-[#111] text-white"
-                      : "border-black/10 text-black/60 hover:border-black/20"
+                      ? "border-black bg-primary text-white"
+                      : "border-border text-black/60 hover:border-black/20"
                   }`}
                 >
                   {t.label}
@@ -605,7 +603,7 @@ export default function MerchantSupport({
             </div>
 
             {topic === "lemon_squeezy" ? (
-              <div className="mt-4 space-y-3 rounded-xl border border-black/8 bg-black/[0.02] p-3">
+              <div className="mt-4 space-y-3 rounded-xl border border-border bg-black/[0.02] p-3">
                 <p className="text-[12px] font-semibold text-black/60">
                   Quick details (helps us fix this faster)
                 </p>
@@ -617,8 +615,8 @@ export default function MerchantSupport({
                       onClick={() => setLsIssue(item.id)}
                       className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${
                         lsIssue === item.id
-                          ? "border-black bg-[#111] text-white"
-                          : "border-black/10 text-black/55"
+                          ? "border-black bg-primary text-white"
+                          : "border-border text-black/55"
                       }`}
                     >
                       {item.label}
@@ -632,7 +630,7 @@ export default function MerchantSupport({
                   value={storeNameHint}
                   onChange={(e) => setStoreNameHint(e.target.value)}
                   placeholder="e.g. Acme Shop"
-                  className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black/25"
+                  className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none focus:border-black/25"
                 />
                 <div className="flex flex-wrap gap-1.5">
                   {(
@@ -648,8 +646,8 @@ export default function MerchantSupport({
                       onClick={() => setModeHint(m.id)}
                       className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${
                         modeHint === m.id
-                          ? "border-black bg-[#111] text-white"
-                          : "border-black/10 text-black/55"
+                          ? "border-black bg-primary text-white"
+                          : "border-border text-black/55"
                       }`}
                     >
                       {m.label}
@@ -673,7 +671,7 @@ export default function MerchantSupport({
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="e.g. Can’t connect my store"
-              className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-black/25"
+              className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-black/25"
             />
             <label className="mt-3 block text-[12px] font-medium text-black/50">
               What’s going on?
@@ -687,7 +685,7 @@ export default function MerchantSupport({
                   ? "What did you try? Any error text?"
                   : "Describe the problem…"
               }
-              className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-black/25"
+              className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-black/25"
             />
             <p className="mt-2 text-[11px] text-black/40">
               We usually reply within a few hours on weekdays.
@@ -696,7 +694,7 @@ export default function MerchantSupport({
               type="button"
               disabled={busy || body.trim().length < 3}
               onClick={() => void handleCreate()}
-              className="mt-3 rounded-xl bg-[#111] px-4 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-45"
+              className="mt-3 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary/80 disabled:opacity-45"
             >
               {busy ? "Sending…" : "Send to support"}
             </button>
@@ -786,7 +784,7 @@ export default function MerchantSupport({
                     return (
                       <div
                         key={m._id}
-                        className="mx-auto max-w-[95%] rounded-xl border border-black/8 bg-black/[0.03] px-3.5 py-2.5 text-center text-[12px] leading-relaxed text-black/60"
+                        className="mx-auto max-w-[95%] rounded-xl border border-border bg-black/[0.03] px-3.5 py-2.5 text-center text-[12px] leading-relaxed text-black/60"
                       >
                         {m.body}
                       </div>
@@ -843,7 +841,7 @@ export default function MerchantSupport({
                         <div
                           className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
                             mine
-                              ? "bg-[#111] text-white"
+                              ? "bg-primary text-white"
                               : "bg-black/[0.05] text-black"
                           }`}
                         >
@@ -876,7 +874,7 @@ export default function MerchantSupport({
                               activeThread?.status === "closed"
                             }
                             onClick={() => void handleGiveAccess(m._id)}
-                            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-black/10 bg-white px-3 py-2 text-[13px] font-semibold text-black shadow-sm transition hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-border bg-white px-3 py-2 text-[13px] font-semibold text-black shadow-sm transition hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             <KeyRound className="size-3.5" />
                             {grantActive || activeGrant
@@ -921,11 +919,11 @@ export default function MerchantSupport({
               <div ref={bottomRef} />
             </div>
             {activeThread?.status === "closed" ? (
-              <div className="border-t border-black/8 px-4 py-3 text-sm text-black/50">
+              <div className="border-t border-border px-4 py-3 text-sm text-black/50">
                 This chat was closed. Start a new one if you still need help.
               </div>
             ) : (
-              <div className="border-t border-black/8 p-3">
+              <div className="border-t border-border p-3">
                 {activeThread?.status === "resolved" ? (
                   <p className="mb-2 text-[12px] text-black/45">
                     Marked resolved — sending a message reopens it for support.
@@ -942,16 +940,16 @@ export default function MerchantSupport({
                       }
                     }}
                     placeholder="Write a reply…"
-                    className="min-w-0 flex-1 rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-black/25"
+                    className="min-w-0 flex-1 rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-black/25"
                   />
                   <button
                     type="button"
                     disabled={busy || reply.trim().length < 1}
                     onClick={() => void handleSend()}
-                    className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#111] text-white hover:bg-black disabled:opacity-45"
+                    className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white hover:bg-primary/80 disabled:opacity-45"
                     aria-label="Send"
                   >
-                    <Send className="size-4" />
+                    <HugeiconsIcon icon={SentIcon} strokeWidth={2} className="size-4" />
                   </button>
                 </div>
               </div>

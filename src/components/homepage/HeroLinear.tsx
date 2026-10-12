@@ -1,18 +1,19 @@
 import { SignedIn, SignedOut } from "@clerk/astro/react";
-import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HomeNav } from "./HomeNav";
 import { YellowStory } from "./YellowStory";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 
 export function HeroLinear() {
   return (
     <div className="relative flex h-dvh min-h-dvh flex-col overflow-x-clip bg-white">
-      <section className="ln-hero relative z-10 isolate text-[#08090a]">
+      <section className="ln-hero relative z-10 isolate text-foreground">
         <HomeNav />
 
         <div className="relative z-10 mx-auto w-full max-w-[1440px] px-6 lg:px-10">
           <div className="mx-auto flex max-w-[920px] flex-col items-center pt-[132px] text-center md:pt-[152px]">
-            <p className="mb-5 flex flex-wrap items-center justify-center gap-y-1 text-[13px] font-medium tracking-[-0.01em] text-[#8a8f98]">
+            <p className="mb-5 flex flex-wrap items-center justify-center gap-y-1 text-[13px] font-medium tracking-[-0.01em] text-muted-foreground">
               <span>Built for</span>
               <span className="relative ml-1.5 mr-2 inline-block h-[1rem] aspect-[212/28] overflow-visible md:h-[1.125rem]">
                 <img
@@ -27,12 +28,12 @@ export function HeroLinear() {
             </p>
 
             <div className="flex flex-col items-center gap-7 md:gap-8">
-              <h1 className="ln-h1 text-center text-[clamp(2.25rem,4.8vw,3.75rem)] font-medium leading-[1.06] tracking-[-0.022em] text-[#08090a]">
+              <h1 className="ln-h1 text-center text-[clamp(2.25rem,4.8vw,3.75rem)] font-medium leading-[1.06] tracking-[-0.022em] text-foreground">
                 The revenue recovery system
                 <br className="hidden sm:block" /> for your Lemon Squeezy stores
               </h1>
 
-              <p className="mx-auto max-w-[34rem] text-center text-[15px] leading-[1.6] tracking-[-0.011em] text-[#8a8f98]">
+              <p className="mx-auto max-w-[34rem] text-center text-[15px] leading-[1.6] tracking-[-0.011em] text-muted-foreground">
                 When a card declines, customers get an email that sounds like you.<br />
                 Connect once — you only pay if the payment comes back.
               </p>
@@ -42,7 +43,7 @@ export function HeroLinear() {
                   <Button asChild size="lg">
                     <a href="/a/sign-up">
                       Start recovering free
-                      <ArrowRight className="size-4" />
+                      <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
                     </a>
                   </Button>
                   <Button asChild variant="outline" size="lg">
@@ -53,7 +54,7 @@ export function HeroLinear() {
                   <Button asChild size="lg">
                     <a href="/a/dashboard">
                       Open dashboard
-                      <ArrowRight className="size-4" />
+                      <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
                     </a>
                   </Button>
                 </SignedIn>

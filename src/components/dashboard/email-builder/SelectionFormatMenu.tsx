@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Bold, Italic, Link2, Underline } from "lucide-react";
+import { Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ColorPalette from "./ColorPalette";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { TextBoldIcon, TextItalicIcon, TextUnderlineIcon } from "@hugeicons/core-free-icons";
 
 export const TEXT_SWATCHES = [
   { id: "ink", label: "Ink", color: "#08090a" },
@@ -90,27 +92,27 @@ export default function SelectionFormatMenu({
           flip ? "flex-row-reverse origin-right" : "origin-left",
         )}
       >
-        <div className="flex flex-col items-center gap-0.5 rounded border border-black/8 bg-white p-1 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
+        <div className="flex flex-col items-center gap-0.5 rounded border border-border bg-white p-1 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
           <FormatBtn
             label="Bold"
             active={bold}
             onClick={() => onToggle("bold")}
           >
-            <Bold className="size-3.5" />
+            <HugeiconsIcon icon={TextBoldIcon} strokeWidth={2} className="size-3.5" />
           </FormatBtn>
           <FormatBtn
             label="Italic"
             active={italic}
             onClick={() => onToggle("italic")}
           >
-            <Italic className="size-3.5" />
+            <HugeiconsIcon icon={TextItalicIcon} strokeWidth={2} className="size-3.5" />
           </FormatBtn>
           <FormatBtn
             label="Underline"
             active={underline}
             onClick={() => onToggle("underline")}
           >
-            <Underline className="size-3.5" />
+            <HugeiconsIcon icon={TextUnderlineIcon} strokeWidth={2} className="size-3.5" />
           </FormatBtn>
           <button
             type="button"
@@ -121,8 +123,8 @@ export default function SelectionFormatMenu({
             className={cn(
               "inline-flex size-8 flex-col items-center justify-center rounded-sm transition-colors",
               colorOpen
-                ? "bg-black/[0.08] text-[#08090a]"
-                : "text-[#6b6f76] hover:bg-black/5 hover:text-[#08090a]",
+                ? "bg-black/[0.08] text-foreground"
+                : "text-muted-foreground hover:bg-black/5 hover:text-foreground",
             )}
           >
             <span className="text-[13px] font-semibold leading-none">A</span>
@@ -141,7 +143,7 @@ export default function SelectionFormatMenu({
         </div>
 
         {colorOpen ? (
-          <div className="rounded border border-black/8 bg-white p-2 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
+          <div className="rounded border border-border bg-white p-2 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
             <ColorPalette
               usedColors={emailColors}
               general={swatches}
@@ -152,8 +154,8 @@ export default function SelectionFormatMenu({
         ) : null}
 
         {linkOpen ? (
-          <div className="w-[220px] rounded border border-black/8 bg-white p-2 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
-            <p className="mb-1.5 px-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-[#8a8f98]">
+          <div className="w-[220px] rounded border border-border bg-white p-2 shadow-[0_10px_36px_-16px_rgba(8,9,10,0.35)]">
+            <p className="mb-1.5 px-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
               Link
             </p>
             <input
@@ -169,14 +171,14 @@ export default function SelectionFormatMenu({
                   onApplyLink();
                 }
               }}
-              className="h-8 w-full rounded-sm border border-black/10 bg-white px-2 text-[12px] text-[#08090a] outline-none placeholder:text-[#8a8f98] focus:border-black/20"
+              className="h-8 w-full rounded-sm border border-border bg-white px-2 text-[12px] text-foreground outline-none placeholder:text-muted-foreground focus:border-black/20"
             />
             <div className="mt-1.5 flex items-center justify-end gap-1">
               {linked ? (
                 <button
                   type="button"
                   onClick={onUnlink}
-                  className="h-7 rounded-sm px-2 text-[11px] font-medium text-[#6b6f76] hover:bg-black/5 hover:text-[#08090a]"
+                  className="h-7 rounded-sm px-2 text-[11px] font-medium text-muted-foreground hover:bg-black/5 hover:text-foreground"
                 >
                   Remove
                 </button>
@@ -184,7 +186,7 @@ export default function SelectionFormatMenu({
               <button
                 type="button"
                 onClick={onApplyLink}
-                className="h-7 rounded-sm bg-[#08090a] px-2.5 text-[11px] font-medium text-[#f7f8f8] hover:bg-[#2a2b2e]"
+                className="h-7 rounded-sm bg-primary px-2.5 text-[11px] font-medium text-foreground hover:bg-[#2a2b2e]"
               >
                 Apply
               </button>
@@ -218,8 +220,8 @@ function FormatBtn({
       className={cn(
         "inline-flex size-8 items-center justify-center rounded-sm transition-colors",
         active
-          ? "bg-black/[0.08] text-[#08090a]"
-          : "text-[#6b6f76] hover:bg-black/5 hover:text-[#08090a]",
+          ? "bg-black/[0.08] text-foreground"
+          : "text-muted-foreground hover:bg-black/5 hover:text-foreground",
       )}
     >
       {children}

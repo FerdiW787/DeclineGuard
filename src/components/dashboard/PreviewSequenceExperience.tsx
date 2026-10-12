@@ -150,7 +150,7 @@ function PreviewInboxToast({
   return (
     <div
       ref={rootRef}
-      className="pointer-events-auto w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_12px_40px_rgba(0,0,0,0.12)]"
+      className="pointer-events-auto w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border bg-white shadow-[0_12px_40px_rgba(0,0,0,0.12)]"
       role="status"
     >
       <div className="px-4 pt-3.5 pb-3">
@@ -455,7 +455,7 @@ function BootGlyph({ phase }: { phase: SetupPhase }) {
   return (
     <div
       ref={iconRef}
-      className="relative h-12 w-12 will-change-transform"
+      className="relative h-12 w-12 text-primary will-change-transform"
       role="status"
       aria-live="polite"
     >
@@ -470,7 +470,7 @@ function BootGlyph({ phase }: { phase: SetupPhase }) {
             cy="24"
             r={RING_R}
             fill="none"
-            stroke="#0c0c0c"
+            stroke="currentColor"
             strokeWidth="3.25"
             strokeLinecap="round"
             strokeDasharray={`${SPIN_DASH} ${RING_C - SPIN_DASH}`}
@@ -486,7 +486,7 @@ function BootGlyph({ phase }: { phase: SetupPhase }) {
           ref={checkRef}
           d="M14.5 24.5 L21 31 L33.5 17.5"
           fill="none"
-          stroke="#0c0c0c"
+          stroke="currentColor"
           strokeWidth="3.25"
           strokeLinecap="round"
           strokeLinejoin="round"

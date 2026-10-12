@@ -4,21 +4,16 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import {
   Headphones,
-  MessageSquare,
-  Send,
   UserPlus,
   Unlock,
-  CheckCircle2,
-  ArrowUpRight,
   Ban,
-  ExternalLink,
   KeyRound,
-  LayoutDashboard,
-  MoreHorizontal,
   ShieldAlert,
 } from "lucide-react";
 import StaffDashboardSim from "@/components/support/StaffDashboardSim";
 import { Button } from "@/components/ui/button";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Message01Icon, SentIcon, CheckmarkCircle02Icon, ArrowUpRightIcon, LinkSquare02Icon, DashboardSquare01Icon, MoreHorizontalCircle01Icon } from "@hugeicons/core-free-icons";
 
 const GIVE_ACCESS_TOKEN = "[Give Access]";
 const TAKEOVER_CONSENT_TOKEN = "[Allow Admin Takeover]";
@@ -303,23 +298,23 @@ export default function StaffInbox({
 
   return (
     <section
-      className={`flex flex-col rounded-2xl border border-black/8 bg-white ${
+      className={`flex flex-col rounded-2xl border border-border bg-white ${
         fillHeight ? "h-full min-h-0" : ""
       }`}
     >
       <div
-        className={`flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-black/8 px-5 ${
+        className={`flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border px-5 ${
           fillHeight ? "py-3" : "items-start py-4"
         }`}
       >
         {fillHeight ? (
           <div className="flex flex-wrap items-center gap-2">
             {typeof unclaimedCount === "number" && unclaimedCount > 0 ? (
-              <span className="rounded-full bg-[#111] px-2 py-0.5 text-[10px] font-bold text-white">
+              <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white">
                 {unclaimedCount} waiting
               </span>
             ) : (
-              <span className="text-[12px] font-semibold text-[#6b6f76]">
+              <span className="text-[12px] font-semibold text-muted-foreground">
                 Inbox
               </span>
             )}
@@ -334,10 +329,10 @@ export default function StaffInbox({
         ) : (
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold">
-              <Headphones className="size-4 text-[#8a8f98]" />
+              <Headphones className="size-4 text-muted-foreground" />
               Support inbox
               {typeof unclaimedCount === "number" && unclaimedCount > 0 ? (
-                <span className="rounded-full bg-[#111] px-2 py-0.5 text-[10px] font-bold text-white">
+                <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white">
                   {unclaimedCount} waiting
                 </span>
               ) : null}
@@ -349,7 +344,7 @@ export default function StaffInbox({
                 </span>
               ) : null}
             </div>
-            <p className="mt-1 max-w-xl text-[13px] leading-relaxed text-[#6b6f76]">
+            <p className="mt-1 max-w-xl text-[13px] leading-relaxed text-muted-foreground">
               Claim → reply → mark done. One person per chat.{" "}
               <a
                 href="/a/admin/docs/support"
@@ -399,7 +394,7 @@ export default function StaffInbox({
         }`}
       >
         <ul
-          className={`divide-y divide-black/6 overflow-auto border-b border-black/8 lg:border-b-0 lg:border-r ${
+          className={`divide-y divide-black/6 overflow-auto border-b border-border lg:border-b-0 lg:border-r ${
             fillHeight ? "max-h-52 lg:max-h-none lg:h-full" : "max-h-52 lg:max-h-none"
           }`}
         >
@@ -471,7 +466,7 @@ export default function StaffInbox({
           {!activeId || !active ? (
             <div className="flex flex-1 items-center justify-center px-6 py-12 text-center">
               <div className="max-w-xs">
-                <MessageSquare className="mx-auto size-8 text-black/20" />
+                <HugeiconsIcon icon={Message01Icon} strokeWidth={2} className="mx-auto size-8 text-black/20" />
                 <p className="mt-3 text-sm font-medium text-black/60">
                   Pick a chat on the left
                 </p>
@@ -486,7 +481,7 @@ export default function StaffInbox({
             </div>
           ) : (
             <>
-              <div className="shrink-0 space-y-3 border-b border-black/8 px-4 py-3">
+              <div className="shrink-0 space-y-3 border-b border-border px-4 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -584,7 +579,7 @@ export default function StaffInbox({
                           )
                         }
                       >
-                        <CheckCircle2 className="size-3.5" />
+                        <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} className="size-3.5" />
                         {busy === "resolve" ? "…" : "Mark done"}
                       </Button>
                     ) : null}
@@ -601,7 +596,7 @@ export default function StaffInbox({
                           setShowForce(false);
                         }}
                       >
-                        <ArrowUpRight className="size-3.5" />
+                        <HugeiconsIcon icon={ArrowUpRightIcon} strokeWidth={2} className="size-3.5" />
                         Ask an Admin
                       </Button>
                     ) : null}
@@ -613,7 +608,7 @@ export default function StaffInbox({
                         size="sm"
                         onClick={() => onOpenMerchant(active.userId)}
                       >
-                        <ExternalLink className="size-3.5" />
+                        <HugeiconsIcon icon={LinkSquare02Icon} strokeWidth={2} className="size-3.5" />
                         Account tools
                       </Button>
                     ) : null}
@@ -631,7 +626,7 @@ export default function StaffInbox({
                         }}
                         aria-expanded={showMore}
                       >
-                        <MoreHorizontal className="size-3.5" />
+                        <HugeiconsIcon icon={MoreHorizontalCircle01Icon} strokeWidth={2} className="size-3.5" />
                         More
                       </Button>
                     ) : null}
@@ -659,7 +654,7 @@ export default function StaffInbox({
                 ) : null}
 
                 {showMore ? (
-                  <div className="flex flex-wrap gap-2 rounded-xl border border-black/8 bg-black/[0.02] px-3 py-2.5">
+                  <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-black/[0.02] px-3 py-2.5">
                     {isMine || isAdmin ? (
                       <Button
                         type="button"
@@ -952,7 +947,7 @@ export default function StaffInbox({
                         size="xs"
                         onClick={() => setShowDashSim(true)}
                       >
-                        <LayoutDashboard className="size-3" />
+                        <HugeiconsIcon icon={DashboardSquare01Icon} strokeWidth={2} className="size-3" />
                         Look at Dashboard
                       </Button>
                     )}
@@ -1003,7 +998,7 @@ export default function StaffInbox({
                     onChange={(e) => setTakeoverReason(e.target.value)}
                     rows={2}
                     placeholder="e.g. Testing Create store flow they reported…"
-                    className="mt-2 w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-black/25"
+                    className="mt-2 w-full rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-black/25"
                   />
                   <div className="mt-2 flex flex-wrap justify-end gap-2">
                     <Button
@@ -1052,7 +1047,7 @@ export default function StaffInbox({
                       return (
                         <div
                           key={m._id}
-                          className="mx-auto max-w-[92%] rounded-xl border border-black/8 bg-black/[0.03] px-3.5 py-2 text-center text-[12px] text-black/55"
+                          className="mx-auto max-w-[92%] rounded-xl border border-border bg-black/[0.03] px-3.5 py-2 text-center text-[12px] text-black/55"
                         >
                           {m.body}
                         </div>
@@ -1071,7 +1066,7 @@ export default function StaffInbox({
                             internal
                               ? "border border-amber-200 bg-amber-50 text-amber-950"
                               : staffSide
-                                ? "bg-[#111] text-white"
+                                ? "bg-primary text-white"
                                 : "bg-black/[0.05] text-black"
                           }`}
                         >
@@ -1097,11 +1092,11 @@ export default function StaffInbox({
               </div>
 
               {active.status === "closed" ? (
-                <p className="shrink-0 border-t border-black/8 px-4 py-3 text-sm text-black/45">
+                <p className="shrink-0 border-t border-border px-4 py-3 text-sm text-black/45">
                   Closed — no further replies. Merchant must start a new chat.
                 </p>
               ) : needsClaim ? (
-                <div className="shrink-0 border-t border-black/8 bg-amber-50/40 px-4 py-4">
+                <div className="shrink-0 border-t border-border bg-amber-50/40 px-4 py-4">
                   <p className="text-[13px] font-medium text-black/70">
                     {isEscalated
                       ? "Staff asked for an Admin on this one"
@@ -1138,7 +1133,7 @@ export default function StaffInbox({
                   Waiting on an Admin — Staff can’t claim this one.
                 </div>
               ) : claimedByOther ? (
-                <div className="shrink-0 border-t border-black/8 px-4 py-4 text-[13px] text-black/50">
+                <div className="shrink-0 border-t border-border px-4 py-4 text-[13px] text-black/50">
                   {active.assigneeName ?? "A teammate"} is helping.
                   {isAdmin
                     ? " Use Take over above if you need to jump in."
@@ -1149,7 +1144,7 @@ export default function StaffInbox({
                   className={`shrink-0 space-y-2 border-t p-3 ${
                     internalNote
                       ? "border-amber-100 bg-amber-50/40"
-                      : "border-black/8 bg-white"
+                      : "border-border bg-white"
                   }`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1246,7 +1241,7 @@ export default function StaffInbox({
                       className={`min-w-0 flex-1 resize-none rounded-xl border px-3 py-2 text-sm outline-none focus:border-black/25 ${
                         internalNote
                           ? "border-amber-200 bg-white"
-                          : "border-black/10 bg-white"
+                          : "border-border bg-white"
                       }`}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
@@ -1282,12 +1277,12 @@ export default function StaffInbox({
                       }
                       aria-label="Send"
                     >
-                      <Send className="size-4" />
+                      <HugeiconsIcon icon={SentIcon} strokeWidth={2} className="size-4" />
                     </Button>
                   </div>
                 </div>
               ) : (
-                <p className="shrink-0 border-t border-black/8 px-4 py-3 text-sm text-black/45">
+                <p className="shrink-0 border-t border-border px-4 py-3 text-sm text-black/45">
                   This chat is marked done. If they write again, it returns to
                   Waiting.
                 </p>
@@ -1297,7 +1292,7 @@ export default function StaffInbox({
         </div>
 
         <aside
-          className={`hidden min-h-0 flex-col overflow-y-auto border-l border-black/8 bg-black/[0.015] xl:flex ${
+          className={`hidden min-h-0 flex-col overflow-y-auto border-l border-border bg-black/[0.015] xl:flex ${
             active ? "" : "items-center justify-center"
           }`}
         >

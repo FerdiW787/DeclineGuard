@@ -96,18 +96,18 @@ export default function AdminTemplates() {
                       active ? "bg-black/[0.04]" : "hover:bg-black/[0.02]"
                     }`}
                   >
-                    <span className="mt-0.5 w-5 shrink-0 text-[12px] font-semibold tabular-nums text-[#8a8f98]">
+                    <span className="mt-0.5 w-5 shrink-0 text-[12px] font-semibold tabular-nums text-muted-foreground">
                       {index + 1}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-[#08090a]">
+                      <span className="block text-sm font-semibold text-foreground">
                         {meta.label}
                       </span>
-                      <span className="mt-0.5 block text-[12px] text-[#8a8f98]">
+                      <span className="mt-0.5 block text-[12px] text-muted-foreground">
                         {id}
                       </span>
                     </span>
-                    <span className="font-display shrink-0 text-lg tabular-nums tracking-tight text-[#08090a]">
+                    <span className="font-display shrink-0 text-lg tabular-nums tracking-tight text-foreground">
                       {row
                         ? formatAdminMetricValue(row.recoveries, "count")
                         : ranking === undefined
@@ -134,13 +134,13 @@ export default function AdminTemplates() {
             <AdminCard className="p-5 md:p-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8a8f98]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     {kitId}
                   </p>
-                  <h2 className="font-display mt-1 text-2xl tracking-tight text-[#08090a]">
+                  <h2 className="font-display mt-1 text-2xl tracking-tight text-foreground">
                     {selected.label}
                   </h2>
-                  <p className="mt-1.5 text-sm leading-relaxed text-[#6b6f76]">
+                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                     {selected.blurb}
                   </p>
                 </div>
@@ -151,18 +151,18 @@ export default function AdminTemplates() {
                     </span>
                   ) : null}
                   {detail?.recoveredCurrencyMixed ? (
-                    <span className="rounded-full border border-black/8 bg-[#f7f8f8] px-2.5 py-1 text-[11px] font-semibold text-[#6b6f76]">
+                    <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
                       Mixed currencies
                     </span>
                   ) : null}
                 </div>
               </div>
-              <p className="font-display mt-5 text-4xl tracking-tight tabular-nums text-[#08090a]">
+              <p className="font-display mt-5 text-4xl tracking-tight tabular-nums text-foreground">
                 {recoveriesPair
                   ? formatAdminMetricValue(recoveriesPair.current.total, "count")
                   : "—"}
               </p>
-              <p className="mt-1 text-[13px] text-[#8a8f98]">
+              <p className="mt-1 text-[13px] text-muted-foreground">
                 Recoveries
                 {recoveriesDelta ? ` · ${recoveriesDelta.label}` : ""}
                 {recoveredPair
@@ -172,7 +172,7 @@ export default function AdminTemplates() {
                     : ""}
               </p>
               {detail && detail.unattributed > 0 ? (
-                <p className="mt-1 text-[12px] text-[#8a8f98]">
+                <p className="mt-1 text-[12px] text-muted-foreground">
                   {formatAdminMetricValue(detail.unattributed, "count")}{" "}
                   unattributed
                 </p>
@@ -202,15 +202,15 @@ export default function AdminTemplates() {
                   : null;
                 return (
                   <AdminCard key={step} className="p-4 md:p-5">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8a8f98]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                       {meta.day}
                     </p>
-                    <p className="font-display mt-2 text-2xl tracking-tight tabular-nums text-[#08090a]">
+                    <p className="font-display mt-2 text-2xl tracking-tight tabular-nums text-foreground">
                       {pair
                         ? formatAdminMetricValue(pair.current.total, "count")
                         : "—"}
                     </p>
-                    <p className="mt-1 text-[12px] text-[#8a8f98]">
+                    <p className="mt-1 text-[12px] text-muted-foreground">
                       {meta.label}
                       {listRow
                         ? ` · ${formatAdminMetricValue(

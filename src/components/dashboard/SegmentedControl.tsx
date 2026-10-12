@@ -104,7 +104,7 @@ export default function SegmentedControl<T extends string>({
       role="tablist"
       aria-label={ariaLabel}
       className={cn(
-        "relative inline-flex items-center gap-0.5 rounded-lg border border-black/8 bg-[#f0f0f2] p-1 dark:border-white/[0.08] dark:bg-white/[0.04]",
+        "relative inline-flex items-center gap-0.5 rounded-lg border border-border bg-[#f0f0f2] p-1 dark:border-white/[0.08] dark:bg-white/[0.04]",
         equal && "w-full",
         className,
       )}
@@ -134,7 +134,7 @@ export default function SegmentedControl<T extends string>({
                 "relative cursor-pointer rounded-md px-3 py-1.5 text-[12px] font-semibold tracking-[-0.01em] outline-none transition-colors duration-300 ease-out focus:outline-none focus-visible:outline-none max-lg:min-h-11 max-lg:py-2",
                 equal && "flex-1",
                 active
-                  ? "text-black dark:text-[#f7f8f8]"
+                  ? "text-black dark:text-foreground"
                   : "text-black/45 hover:text-black/70 dark:text-white/45 dark:hover:text-white/75",
               )}
             >

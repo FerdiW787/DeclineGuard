@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { SignedIn, SignedOut } from "@clerk/astro/react";
-import { ChevronDown } from "lucide-react";
 import Mascot from "./Mascot";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 
 /**
  * Header layout twin of seline.com:
@@ -47,14 +48,14 @@ export default function SelineHeader() {
         <nav className="hidden items-center justify-center gap-0.5 justify-self-center lg:flex">
           <a
             href="#pricing"
-            className="rounded-md px-3 py-2 text-[15px] font-medium text-[#1a1a1a]/85 transition hover:text-black"
+            className="rounded-md px-3 py-2 text-[15px] font-medium text-[#1a1a1a]/85 transition hover:text-foreground"
           >
             Pricing
           </a>
 
           <a
             href="#how"
-            className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-[15px] font-medium text-[#1a1a1a]/85 transition hover:text-black"
+            className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-[15px] font-medium text-[#1a1a1a]/85 transition hover:text-foreground"
           >
             About us
             <span className="flex -space-x-1.5" aria-hidden>
@@ -86,19 +87,17 @@ export default function SelineHeader() {
               onClick={() =>
                 setOpen((v) => (v === "product" ? null : "product"))
               }
-              className="inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-2 text-[15px] font-medium text-[#1a1a1a]/85 transition hover:text-black"
+              className="inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-2 text-[15px] font-medium text-[#1a1a1a]/85 transition hover:text-foreground"
             >
               Product
-              <ChevronDown
-                className={`size-3.5 opacity-55 transition ${
-                  open === "product" ? "rotate-180" : ""
-                }`}
-              />
+              <HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={2} className={`size-3.5 opacity-55 transition ${
+                                            open === "product" ? "rotate-180" : ""
+                                          }`} />
             </button>
             {open === "product" ? (
               <div
                 id={productId}
-                className="absolute left-1/2 top-full z-50 mt-1 min-w-[11rem] -translate-x-1/2 overflow-hidden rounded-xl border border-black/8 bg-white py-1.5 shadow-[0_16px_40px_-20px_rgba(0,0,0,0.35)]"
+                className="absolute left-1/2 top-full z-50 mt-1 min-w-[11rem] -translate-x-1/2 overflow-hidden rounded-xl border border-border bg-white py-1.5 shadow-[0_16px_40px_-20px_rgba(0,0,0,0.35)]"
               >
                 {[
                   ["#product", "Overview"],
@@ -110,7 +109,7 @@ export default function SelineHeader() {
                     key={label}
                     href={href}
                     onClick={() => setOpen(null)}
-                    className="block px-3.5 py-2 text-sm font-medium text-black/75 hover:bg-black/[0.04] hover:text-black"
+                    className="block px-3.5 py-2 text-sm font-medium text-black/75 hover:bg-black/[0.04] hover:text-foreground"
                   >
                     {label}
                   </a>
@@ -127,19 +126,17 @@ export default function SelineHeader() {
               onClick={() =>
                 setOpen((v) => (v === "resources" ? null : "resources"))
               }
-              className="inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-2 text-[15px] font-medium text-[#1a1a1a]/85 transition hover:text-black"
+              className="inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-2 text-[15px] font-medium text-[#1a1a1a]/85 transition hover:text-foreground"
             >
               Resources
-              <ChevronDown
-                className={`size-3.5 opacity-55 transition ${
-                  open === "resources" ? "rotate-180" : ""
-                }`}
-              />
+              <HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={2} className={`size-3.5 opacity-55 transition ${
+                                            open === "resources" ? "rotate-180" : ""
+                                          }`} />
             </button>
             {open === "resources" ? (
               <div
                 id={resourcesId}
-                className="absolute left-1/2 top-full z-50 mt-1 min-w-[11rem] -translate-x-1/2 overflow-hidden rounded-xl border border-black/8 bg-white py-1.5 shadow-[0_16px_40px_-20px_rgba(0,0,0,0.35)]"
+                className="absolute left-1/2 top-full z-50 mt-1 min-w-[11rem] -translate-x-1/2 overflow-hidden rounded-xl border border-border bg-white py-1.5 shadow-[0_16px_40px_-20px_rgba(0,0,0,0.35)]"
               >
                 {[
                   ["#pricing", "Pricing"],
@@ -150,7 +147,7 @@ export default function SelineHeader() {
                     key={label}
                     href={href}
                     onClick={() => setOpen(null)}
-                    className="block px-3.5 py-2 text-sm font-medium text-black/75 hover:bg-black/[0.04] hover:text-black"
+                    className="block px-3.5 py-2 text-sm font-medium text-black/75 hover:bg-black/[0.04] hover:text-foreground"
                   >
                     {label}
                   </a>
@@ -169,7 +166,7 @@ export default function SelineHeader() {
           <SignedOut>
             <a
               href="/a/sign-in"
-              className="hidden px-2.5 py-2 text-[15px] font-medium text-[#1a1a1a]/75 transition hover:text-black sm:inline"
+              className="hidden px-2.5 py-2 text-[15px] font-medium text-[#1a1a1a]/75 transition hover:text-foreground sm:inline"
             >
               Sign in
             </a>

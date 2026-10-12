@@ -1,4 +1,3 @@
-import { ArrowRight } from "lucide-react";
 import { SignedIn, SignedOut } from "@clerk/astro/react";
 import {
   MarketingProductPreview,
@@ -7,6 +6,8 @@ import {
 } from "@/components/homepage/marketing/MarketingProductPreview";
 import { Button } from "@/components/ui/button";
 import { LinearCta } from "../LinearCta";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 
 type Props = {
   tab: MarketingProductTab;
@@ -34,7 +35,7 @@ export function LinearHero({ tab, onTabChange }: Props) {
             Stop losing subscribers to failed payments
           </h1>
 
-          <p className="mt-5 max-w-lg text-base leading-relaxed text-[#8a8a8e] md:text-lg">
+          <p className="mt-5 max-w-lg text-base leading-relaxed text-muted-foreground md:text-lg">
             Branded recovery emails that sound like you — and you only pay when
             the money comes back.
           </p>
@@ -43,7 +44,7 @@ export function LinearHero({ tab, onTabChange }: Props) {
             <SignedOut>
               <LinearCta href="/a/sign-up">
                 Grab a founding spot
-                <ArrowRight className="size-4" />
+                <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
               </LinearCta>
               <LinearCta href="/pricing" variant="ghost">
                 See pricing
@@ -52,7 +53,7 @@ export function LinearHero({ tab, onTabChange }: Props) {
             <SignedIn>
               <LinearCta href="/a/dashboard">
                 Open dashboard
-                <ArrowRight className="size-4" />
+                <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
               </LinearCta>
             </SignedIn>
           </div>

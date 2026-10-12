@@ -34,7 +34,7 @@ export function LinearFeatures({ tab, onTabChange }: Props) {
           <h2 className="mt-4 text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.03em] text-white">
             Everything you need to recover revenue
           </h2>
-          <p className="mt-4 text-base leading-relaxed text-[#8a8a8e] md:text-[17px]">
+          <p className="mt-4 text-base leading-relaxed text-muted-foreground md:text-[17px]">
             A focused toolkit for Lemon Squeezy merchants — sequences, branding,
             and a recovered-€ number your team can trust.
           </p>
@@ -70,7 +70,7 @@ export function LinearFeatures({ tab, onTabChange }: Props) {
               <h3 className="text-[15px] font-semibold tracking-tight text-white">
                 {item.title}
               </h3>
-              <p className="mt-2 text-sm leading-relaxed text-[#8a8a8e]">
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                 {item.body}
               </p>
             </div>

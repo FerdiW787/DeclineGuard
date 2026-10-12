@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Check, Loader2, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import {
   DEFAULT_EMAIL_COPY,
   TEMPLATE_META,
@@ -27,6 +27,8 @@ import {
   type EmailFontId,
 } from "@/lib/emailFonts";
 import { useEmailFontLoader } from "./useEmailFontLoader";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Tick02Icon, Loading03Icon } from "@hugeicons/core-free-icons";
 
 export type EmailCustomizationValues = {
   brandColor: string;
@@ -349,7 +351,7 @@ const EmailCustomizePanel = forwardRef<EmailCustomizeHandle, Props>(
                 className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${
                   activeIsDefault
                     ? "cursor-not-allowed text-black/25"
-                    : "cursor-pointer text-black/50 hover:bg-black/5 hover:text-black"
+                    : "cursor-pointer text-black/50 hover:bg-black/5 hover:text-foreground"
                 }`}
               >
                 <RotateCcw className="size-3" aria-hidden />
@@ -369,7 +371,7 @@ const EmailCustomizePanel = forwardRef<EmailCustomizeHandle, Props>(
                     className={`dg-interactive flex w-full items-center gap-2.5 rounded-md border px-2.5 py-2 text-left ${
                       active
                         ? "border-teal-600/25 bg-teal-50/70"
-                        : "border-black/8 bg-transparent"
+                        : "border-border bg-transparent"
                     }`}
                   >
                     <span
@@ -452,7 +454,7 @@ const EmailCustomizePanel = forwardRef<EmailCustomizeHandle, Props>(
                     className={`dg-interactive flex w-full items-center justify-between rounded-md border px-3 py-2 text-left ${
                       active
                         ? "border-teal-600/25 bg-teal-50/70"
-                        : "border-black/8 bg-transparent"
+                        : "border-border bg-transparent"
                     }`}
                   >
                     <span
@@ -462,7 +464,7 @@ const EmailCustomizePanel = forwardRef<EmailCustomizeHandle, Props>(
                       {option.label}
                     </span>
                     {active ? (
-                      <Check className="size-3.5 shrink-0 text-teal-600" />
+                      <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-3.5 shrink-0 text-teal-600" />
                     ) : null}
                   </button>
                 );
@@ -474,7 +476,7 @@ const EmailCustomizePanel = forwardRef<EmailCustomizeHandle, Props>(
             <legend className="text-[11px] font-medium uppercase tracking-[0.08em] text-black/45">
               Sender
             </legend>
-            <p className="text-[11px] leading-relaxed text-[#6b6f76]">
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
               From name and Reply-To live here. From address and API key are in
               Settings → Email.
             </p>
@@ -549,7 +551,7 @@ const EmailCustomizePanel = forwardRef<EmailCustomizeHandle, Props>(
           </fieldset>
 
           {showDeclineGuardBadge ? (
-            <div className="rounded-md border border-black/8 bg-black/[0.02] px-3 py-2.5 text-[11px] leading-relaxed text-black/50">
+            <div className="rounded-md border border-border bg-black/[0.02] px-3 py-2.5 text-[11px] leading-relaxed text-black/50">
               Free plan emails include “Recovery sent by DeclineGuard” in the
               footer.
             </div>
@@ -568,7 +570,7 @@ const EmailCustomizePanel = forwardRef<EmailCustomizeHandle, Props>(
                 canSave
                   ? "dg-btn dg-btn-primary !px-3.5 !py-2 cursor-pointer"
                   : saving
-                    ? "cursor-wait bg-[#0c0c0c] text-white"
+                    ? "cursor-wait bg-primary text-white"
                     : "cursor-not-allowed bg-black/10 text-black/35"
               }`}
             >
@@ -580,9 +582,7 @@ const EmailCustomizePanel = forwardRef<EmailCustomizeHandle, Props>(
                 }`}
                 aria-hidden
               >
-                <Loader2
-                  className={`size-3.5 shrink-0 ${saving ? "animate-spin" : ""}`}
-                />
+                <HugeiconsIcon icon={Loading03Icon} strokeWidth={2} className={`size-3.5 shrink-0 ${saving ? "animate-spin" : ""}`} />
               </span>
               Save
             </button>
@@ -594,7 +594,7 @@ const EmailCustomizePanel = forwardRef<EmailCustomizeHandle, Props>(
               }`}
               aria-live="polite"
             >
-              <Check className="size-3.5 shrink-0" aria-hidden />
+              <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-3.5 shrink-0" aria-hidden />
               Saved
             </span>
             {error ? (
@@ -693,7 +693,7 @@ function ColorField({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="block space-y-1.5 rounded-md border border-black/8 px-3 py-2.5">
+    <label className="block space-y-1.5 rounded-md border border-border px-3 py-2.5">
       <span className="flex items-center justify-between gap-2">
         <span className="text-[12px] font-semibold">{label}</span>
         <span className="text-[10px] text-black/40">{hint}</span>
@@ -703,14 +703,14 @@ function ColorField({
           type="color"
           value={/^#[0-9a-fA-F]{6}$/.test(value) ? value : "#0c0c0c"}
           onChange={(e) => onChange(e.target.value)}
-          className="h-8 w-10 shrink-0 cursor-pointer rounded-md border border-black/10 bg-transparent p-0.5"
+          className="h-8 w-10 shrink-0 cursor-pointer rounded-md border border-border bg-transparent p-0.5"
         />
         <input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           spellCheck={false}
-          className="min-w-0 flex-1 rounded-md border border-black/10 px-2 py-1 font-mono text-[12px] outline-none focus:border-black/25"
+          className="min-w-0 flex-1 rounded-md border border-border px-2 py-1 font-mono text-[12px] outline-none focus:border-black/25"
         />
       </span>
     </label>
@@ -718,4 +718,4 @@ function ColorField({
 }
 
 const inputClass =
-  "w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-black/25";
+  "w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:border-black/25";

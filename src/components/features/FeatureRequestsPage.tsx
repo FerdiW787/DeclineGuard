@@ -20,13 +20,7 @@ import {
   useReducedMotion,
 } from "motion/react";
 import {
-  ArrowUp,
-  Check,
-  Loader2,
-  RotateCcw,
-  Send,
-  Trash2,
-  Users,
+  RotateCcw
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -41,6 +35,8 @@ import {
 } from "./featureRequestsCache";
 import { getOrCreateAnonVoterKey } from "./featureVoter";
 import { useDebouncedVotes } from "./useDebouncedVotes";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowUpIcon, Tick02Icon, Loading03Icon, SentIcon, Delete02Icon, UserGroupIcon } from "@hugeicons/core-free-icons";
 
 type Tab = FeatureTab;
 
@@ -276,7 +272,7 @@ function FeatureRequestsPageInner() {
   }
 
   return (
-    <div className="ln-surface min-h-dvh bg-[#f7f8f8] text-[#08090a]">
+    <div className="ln-surface min-h-dvh bg-background text-foreground">
       <HomeNav
         homeAnchors={false}
         current="requests"
@@ -298,7 +294,7 @@ function FeatureRequestsPageInner() {
             </h1>
             <p
               data-fr-enter
-              className="mt-3 text-[15px] leading-relaxed text-[#8a8f98]"
+              className="mt-3 text-[15px] leading-relaxed text-muted-foreground"
             >
               Suggest what DeclineGuard should build next. Everyone can vote —
               click once to support, again to take it back.
@@ -311,7 +307,7 @@ function FeatureRequestsPageInner() {
                 className="mt-8 space-y-4"
               >
                 <label className="block">
-                  <span className="text-[12px] font-medium text-[#8a8f98]">
+                  <span className="text-[12px] font-medium text-muted-foreground">
                     Title
                   </span>
                   <input
@@ -319,12 +315,12 @@ function FeatureRequestsPageInner() {
                     onChange={(e) => setTitle(e.target.value)}
                     maxLength={80}
                     placeholder="e.g. Slack alerts when a recovery succeeds"
-                    className="mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-sm text-[#08090a] outline-none transition focus:border-black focus:shadow-[0_3px_0_#10b981]"
+                    className="mt-1.5 w-full rounded-xl border border-border bg-white px-3.5 py-2.5 text-sm text-foreground outline-none transition focus:border-black focus:shadow-[0_3px_0_var(--primary)]"
                     required
                   />
                 </label>
                 <label className="block">
-                  <span className="text-[12px] font-medium text-[#8a8f98]">
+                  <span className="text-[12px] font-medium text-muted-foreground">
                     Why it matters
                   </span>
                   <textarea
@@ -333,13 +329,13 @@ function FeatureRequestsPageInner() {
                     maxLength={1000}
                     rows={4}
                     placeholder="A short note on the problem and how you’d use it…"
-                    className="mt-1.5 w-full resize-none rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-sm text-[#08090a] outline-none transition focus:border-black focus:shadow-[0_3px_0_#10b981]"
+                    className="mt-1.5 w-full resize-none rounded-xl border border-border bg-white px-3.5 py-2.5 text-sm text-foreground outline-none transition focus:border-black focus:shadow-[0_3px_0_var(--primary)]"
                     required
                   />
                 </label>
                 {formError ? (
                   <p
-                    className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-black/70"
+                    className="rounded-xl border border-border bg-white px-3 py-2 text-sm text-black/70"
                     role="alert"
                   >
                     {formError}
@@ -351,9 +347,9 @@ function FeatureRequestsPageInner() {
                   className="dg-btn dg-btn-primary dg-btn-wide disabled:opacity-60"
                 >
                   {submitting ? (
-                    <Loader2 className="size-4 animate-spin" />
+                    <HugeiconsIcon icon={Loading03Icon} strokeWidth={2} className="size-4 animate-spin" />
                   ) : (
-                    <Send className="size-4" />
+                    <HugeiconsIcon icon={SentIcon} strokeWidth={2} className="size-4" />
                   )}
                   Send request
                 </button>
@@ -362,7 +358,7 @@ function FeatureRequestsPageInner() {
 
             <SignedOut>
               <div data-fr-enter className="mt-8 space-y-4">
-                <p className="rounded-xl border border-black/10 bg-white px-4 py-3 text-sm text-[#8a8f98]">
+                <p className="rounded-xl border border-border bg-white px-4 py-3 text-sm text-muted-foreground">
                   Sign in to suggest a feature. You can still vote on the right
                   without an account.
                 </p>
@@ -377,12 +373,12 @@ function FeatureRequestsPageInner() {
 
             <p
               data-fr-enter
-              className="mt-10 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[#8a8f98]"
+              className="mt-10 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted-foreground"
             >
-              <a href="/legal/privacy" className="hover:text-[#08090a]">
+              <a href="/legal/privacy" className="hover:text-foreground">
                 Privacy
               </a>
-              <a href="/legal/terms" className="hover:text-[#08090a]">
+              <a href="/legal/terms" className="hover:text-foreground">
                 Terms
               </a>
             </p>
@@ -398,7 +394,7 @@ function FeatureRequestsPageInner() {
                   ? "Request Features"
                   : "Request Features Added"}
               </h2>
-              <p className="mt-0.5 text-[13px] text-[#8a8f98]">
+              <p className="mt-0.5 text-[13px] text-muted-foreground">
                 Vote to push what matters up the list.
               </p>
             </div>
@@ -415,7 +411,7 @@ function FeatureRequestsPageInner() {
 
           {actionError ? (
             <p
-              className="mt-4 rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-sm text-black/70"
+              className="mt-4 rounded-xl border border-border bg-white px-3.5 py-2.5 text-sm text-black/70"
               role="alert"
             >
               {actionError}
@@ -475,7 +471,7 @@ function FeatureRequestsPageInner() {
                         },
                       }}
                       data-fr-item
-                      className="flex gap-3 rounded-2xl border border-black/10 bg-white px-3.5 py-3.5 sm:gap-4 sm:px-4"
+                      className="flex gap-3 rounded-2xl border border-border bg-white px-3.5 py-3.5 sm:gap-4 sm:px-4"
                     >
                       <button
                         type="button"
@@ -508,15 +504,15 @@ function FeatureRequestsPageInner() {
                         }
                         className={`flex w-12 shrink-0 flex-col items-center justify-center rounded-xl border py-2 transition ${
                           votingLocked
-                            ? "cursor-default border-black/10 bg-white text-black/40"
+                            ? "cursor-default border-border bg-white text-black/40"
                             : blackFill
                               ? "cursor-pointer border-black bg-black text-white"
                               : voted
                                 ? "cursor-pointer border-black/15 bg-white text-black"
-                                : "cursor-pointer border-black/10 bg-white text-black"
+                                : "cursor-pointer border-border bg-white text-black"
                         } ${pulsing && !votingLocked ? "scale-[1.04]" : ""} disabled:opacity-50`}
                       >
-                        <ArrowUp className="size-4" strokeWidth={2.25} />
+                        <HugeiconsIcon icon={ArrowUpIcon} className="size-4" strokeWidth={2.25} />
                         <span className="mt-0.5 text-[13px] font-semibold tabular-nums">
                           {display.voteCount}
                         </span>
@@ -537,7 +533,7 @@ function FeatureRequestsPageInner() {
                                 }
                                 className="dg-btn dg-btn-primary cursor-pointer !gap-1 !px-2.5 !py-1.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-50"
                               >
-                                <Check className="size-3" />
+                                <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-3" />
                                 Mark added
                               </button>
                             ) : (
@@ -555,7 +551,7 @@ function FeatureRequestsPageInner() {
                             )
                           ) : null}
                         </div>
-                        <p className="mt-1 whitespace-pre-wrap text-[13.5px] leading-relaxed text-[#8a8f98]">
+                        <p className="mt-1 whitespace-pre-wrap text-[13.5px] leading-relaxed text-muted-foreground">
                           {item.body}
                         </p>
                         <div className="mt-2 flex flex-wrap items-end justify-between gap-2">
@@ -573,8 +569,8 @@ function FeatureRequestsPageInner() {
                               )}
                             </span>
                             {isStaff && item.signedInVoteCount != null ? (
-                              <span className="inline-flex items-center gap-1 rounded-md bg-[#a855f7]/12 px-1.5 py-0.5 font-medium text-[#6b21a8]">
-                                <Users className="size-3" strokeWidth={2} />
+                              <span className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-1.5 py-0.5 font-medium text-primary-foreground">
+                                <HugeiconsIcon icon={UserGroupIcon} className="size-3" strokeWidth={2} />
                                 {item.signedInVoteCount} signed-in
                                 {item.voteCount > 0
                                   ? ` · ${Math.max(0, item.voteCount - item.signedInVoteCount)} anon`
@@ -595,7 +591,7 @@ function FeatureRequestsPageInner() {
                               aria-label="Delete request"
                               className="dg-btn dg-btn-danger shrink-0 cursor-pointer !gap-1 !px-2.5 !py-1.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                              <Trash2 className="size-3" />
+                              <HugeiconsIcon icon={Delete02Icon} strokeWidth={2} className="size-3" />
                               Delete
                             </button>
                           ) : null}
@@ -670,7 +666,7 @@ function FeatureRequestsPageInner() {
               >
                 Delete this request?
               </h2>
-              <p className="mt-2 text-sm leading-relaxed text-[#8a8f98]">
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                 <span className="font-medium text-black/80">
                   “{deleteTarget.title}”
                 </span>{" "}
@@ -682,7 +678,7 @@ function FeatureRequestsPageInner() {
                   type="button"
                   disabled={deleteBusy}
                   onClick={() => setDeleteTarget(null)}
-                  className="cursor-pointer rounded-xl px-3.5 py-2 text-sm font-medium text-[#8a8f98] hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="cursor-pointer rounded-xl px-3.5 py-2 text-sm font-medium text-muted-foreground hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Keep it
                 </button>
@@ -693,9 +689,9 @@ function FeatureRequestsPageInner() {
                   className="dg-btn dg-btn-danger cursor-pointer !px-3.5 !py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {deleteBusy ? (
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <HugeiconsIcon icon={Loading03Icon} strokeWidth={2} className="size-3.5 animate-spin" />
                   ) : (
-                    <Trash2 className="size-3.5" />
+                    <HugeiconsIcon icon={Delete02Icon} strokeWidth={2} className="size-3.5" />
                   )}
                   Delete
                 </button>

@@ -36,19 +36,19 @@ export function LinearFooter() {
         <div className="grid gap-10 md:grid-cols-[1.2fr_1fr_1fr_1fr]">
           <div>
             <BrandLogo size="sm" href="/" />
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-[#8a8a8e]">
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
               Branded recovery for Lemon Squeezy merchants.
             </p>
           </div>
           {columns.map((col) => (
             <div key={col.title}>
-              <p className="text-[13px] font-medium text-[#08090a]">{col.title}</p>
+              <p className="text-[13px] font-medium text-foreground">{col.title}</p>
               <ul className="mt-4 space-y-2.5">
                 {col.links.map((link) => (
                   <li key={link.href + link.label}>
                     <a
                       href={link.href}
-                      className="text-sm text-[#8a8a8e] hover:text-white"
+                      className="text-sm text-muted-foreground hover:text-white"
                     >
                       {link.label}
                     </a>
@@ -59,7 +59,7 @@ export function LinearFooter() {
           ))}
         </div>
 
-        <p className="mt-12 border-t border-white/10 pt-6 text-sm text-[#8a8a8e]">
+        <p className="mt-12 border-t border-white/10 pt-6 text-sm text-muted-foreground">
           © {new Date().getFullYear()} DeclineGuard
         </p>
       </div>

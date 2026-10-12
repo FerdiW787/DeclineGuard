@@ -364,7 +364,7 @@ export default function ScrollHero({ welcome = false }: { welcome?: boolean }) {
             textLength="103.6"
             lengthAdjust="spacingAndGlyphs"
             fill="rgba(12,12,12,0.08)"
-            fontFamily="Syne, ui-sans-serif, system-ui, sans-serif"
+            fontFamily="var(--font-heading)"
             fontSize="16"
             fontWeight="800"
             fontStyle="normal"
@@ -497,7 +497,7 @@ export default function ScrollHero({ welcome = false }: { welcome?: boolean }) {
               </div>
 
               <div className="flex min-h-[380px] md:min-h-[500px]">
-                <aside className="dg-dash-shell hidden w-48 shrink-0 border-r border-black/6 bg-[#f7f7f8] p-4 md:block">
+                <aside className="dg-dash-shell hidden w-48 shrink-0 border-r border-black/6 bg-muted p-4 md:block">
                   <div className="flex items-center gap-2 px-1">
                     <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-foreground text-[10px] font-bold text-background">
                       CS

@@ -1,5 +1,4 @@
 import {
-  Check,
   Mail,
   Radio,
   Shield,
@@ -27,6 +26,8 @@ import type { MarketingProductTab } from "./MarketingProductPreview";
 import { MarketingDesktopProvider } from "./MarketingDesktopContext";
 import { useHeroStoryBeat } from "../HeroStoryContext";
 import { formatStoryEuros, HERO_STORY } from "../heroStory";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Tick02Icon } from "@hugeicons/core-free-icons";
 
 type Props = {
   tab: MarketingProductTab;
@@ -200,7 +201,7 @@ function DemoSettingsPanel() {
         <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-white/40">
           Settings
         </p>
-        <h2 className="ln-h1 mt-2 text-3xl font-medium tracking-tight text-[#f7f8f8] md:text-4xl">
+        <h2 className="ln-h1 mt-2 text-3xl font-medium tracking-tight text-foreground md:text-4xl">
           Store & delivery
         </h2>
         <p className="mt-2 text-sm text-white/45">
@@ -259,12 +260,12 @@ function DemoSettingRow({
         <Icon className="size-4" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-[#f7f8f8]">{label}</p>
+        <p className="text-sm font-semibold text-foreground">{label}</p>
         <p className="truncate text-[12px] text-white/45">{value}</p>
       </div>
       {ok ? (
         <span className="inline-flex items-center gap-1 rounded-full bg-teal-500/15 px-2 py-0.5 text-[10px] font-semibold text-teal-300">
-          <Check className="size-3" />
+          <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-3" />
           OK
         </span>
       ) : null}

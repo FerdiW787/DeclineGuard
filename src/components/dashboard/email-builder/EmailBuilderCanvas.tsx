@@ -15,12 +15,7 @@ import {
   ChevronDown,
   ChevronUp,
   Copy,
-  GripVertical,
-  ImageIcon,
-  Minus,
   MousePointerClick,
-  Plus,
-  Square,
   Trash2,
   Type,
   Link2,
@@ -73,6 +68,8 @@ import EmailShellRadiusHandles from "./EmailShellRadiusHandles";
 import ImageBlockHandles from "./ImageBlockHandles";
 import ImageBlockEditBar from "./ImageBlockEditBar";
 import InlineRichText from "./InlineRichText";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { DragDropVerticalIcon, Image01Icon, MinusSignIcon, Add01Icon, StopCircleIcon } from "@hugeicons/core-free-icons";
 
 type Vars = { product: string; amount: string; firstName?: string };
 type Device = "desktop" | "mobile";
@@ -527,7 +524,7 @@ export default function EmailBuilderCanvas({
                     : "border-black/12 text-black/40 hover:border-black/25 hover:text-black/70"
                 }`}
               >
-                <Plus className="size-3.5" />
+                <HugeiconsIcon icon={Add01Icon} strokeWidth={2} className="size-3.5" />
                 Add block
               </button>
               {addAt === ADD_END ? (
@@ -689,7 +686,7 @@ function AddGap({
         <button
           type="button"
           onClick={() => (open ? onClose() : onOpen())}
-          className={`inline-flex items-center gap-1 rounded-full border border-black/10 bg-white px-2 py-0.5 text-[10px] font-semibold text-black/50 shadow-sm transition-colors hover:border-black/20 hover:text-black ${
+          className={`inline-flex items-center gap-1 rounded-full border border-border bg-white px-2 py-0.5 text-[10px] font-semibold text-black/50 shadow-sm transition-colors hover:border-black/20 hover:text-foreground ${
             suppressed
               ? "pointer-events-none"
               : "pointer-events-auto cursor-pointer"
@@ -697,7 +694,7 @@ function AddGap({
           aria-label="Add block"
           tabIndex={suppressed ? -1 : 0}
         >
-          <Plus className="size-3" />
+          <HugeiconsIcon icon={Add01Icon} strokeWidth={2} className="size-3" />
           Add
         </button>
         {open ? (
@@ -713,7 +710,7 @@ function AddGap({
 /** Grid of insertable block types with icon + label + description. */
 function BlockPalette({ onPick }: { onPick: (t: EmailBlockType) => void }) {
   return (
-    <div className="grid grid-cols-2 gap-1 rounded-md border border-black/10 bg-white p-1.5 shadow-[0_12px_32px_-16px_rgba(0,0,0,0.4)]">
+    <div className="grid grid-cols-2 gap-1 rounded-md border border-border bg-white p-1.5 shadow-[0_12px_32px_-16px_rgba(0,0,0,0.4)]">
       {ADDABLE.map((type) => (
         <button
           key={type}
@@ -764,7 +761,7 @@ function ToolbarBtn({
       className={`flex size-6 items-center justify-center rounded transition-colors disabled:opacity-25 ${
         danger
           ? "cursor-pointer text-black/45 hover:bg-red-50 hover:text-red-600"
-          : "cursor-pointer text-black/45 hover:bg-black/5 hover:text-black"
+          : "cursor-pointer text-black/45 hover:bg-black/5 hover:text-foreground"
       } disabled:cursor-not-allowed disabled:hover:bg-transparent`}
     >
       <Icon className="size-3.5" />
@@ -777,13 +774,13 @@ function BlockTypeIcon({ type }: { type: EmailBlockType }) {
     case "text":
       return <Type className="size-3" />;
     case "image":
-      return <ImageIcon className="size-3" />;
+      return <HugeiconsIcon icon={Image01Icon} strokeWidth={2} className="size-3" />;
     case "button":
-      return <Square className="size-3" />;
+      return <HugeiconsIcon icon={StopCircleIcon} strokeWidth={2} className="size-3" />;
     case "spacer":
       return <MousePointerClick className="size-3" />;
     case "divider":
-      return <Minus className="size-3" />;
+      return <HugeiconsIcon icon={MinusSignIcon} strokeWidth={2} className="size-3" />;
     case "linkRow":
       return <Link2 className="size-3" />;
     default: {
@@ -1089,7 +1086,7 @@ function CanvasBlock({
 
       {selected && !editing ? (
         <div
-          className="absolute -top-3.5 right-1.5 z-20 flex items-center gap-0.5 rounded-md border border-black/10 bg-white px-0.5 py-0.5 shadow-[0_6px_20px_-8px_rgba(0,0,0,0.35)]"
+          className="absolute -top-3.5 right-1.5 z-20 flex items-center gap-0.5 rounded-md border border-border bg-white px-0.5 py-0.5 shadow-[0_6px_20px_-8px_rgba(0,0,0,0.35)]"
           onClick={(e) => e.stopPropagation()}
         >
           <span
@@ -1097,7 +1094,7 @@ function CanvasBlock({
             aria-hidden
             title="Drag to reorder"
           >
-            <GripVertical className="size-3.5" />
+            <HugeiconsIcon icon={DragDropVerticalIcon} strokeWidth={2} className="size-3.5" />
           </span>
           <ToolbarBtn
             icon={ChevronUp}
@@ -1291,7 +1288,7 @@ function BlockContent({
           boxSizing: "border-box",
         }}
       >
-        <ImageIcon className="mx-auto size-5 text-black/30" />
+        <HugeiconsIcon icon={Image01Icon} strokeWidth={2} className="mx-auto size-5 text-black/30" />
         <p className="mt-2 text-[12px] font-medium text-black/45">
           Add an image to show it here
         </p>
@@ -1339,7 +1336,7 @@ function BlockContent({
   if (block.type === "spacer") {
     return (
       <div
-        className="flex items-center justify-center border border-dashed border-black/10 bg-black/[0.02] text-[10px] font-medium text-black/35"
+        className="flex items-center justify-center border border-dashed border-border bg-black/[0.02] text-[10px] font-medium text-black/35"
         style={{ height: Math.max(block.height, 16) }}
       >
         {block.height}px
@@ -1348,7 +1345,7 @@ function BlockContent({
   }
 
   if (block.type === "divider") {
-    return <hr className="border-black/8" />;
+    return <hr className="border-border" />;
   }
 
   if (block.type === "linkRow") {

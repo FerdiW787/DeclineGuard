@@ -32,7 +32,7 @@ export function EmailTab({
   if (emailSetup === undefined) {
     return (
       <SettingsSection title="Email" description="How recovery emails are sent.">
-        <p className="text-sm text-[#8a8f98]">Loading email setup…</p>
+        <p className="text-sm text-muted-foreground">Loading email setup…</p>
       </SettingsSection>
     );
   }
@@ -40,7 +40,7 @@ export function EmailTab({
   if (emailSetup === null) {
     return (
       <SettingsSection title="Email" description="How recovery emails are sent.">
-        <p className="text-sm text-[#8a8f98]">Email setup unavailable.</p>
+        <p className="text-sm text-muted-foreground">Email setup unavailable.</p>
       </SettingsSection>
     );
   }
@@ -56,7 +56,7 @@ export function EmailTab({
           description="Production sending needs a verified domain in Resend."
         >
           <div className="text-right">
-            <p className="max-w-[16rem] truncate text-[13px] font-medium text-[#08090a]">
+            <p className="max-w-[16rem] truncate text-[13px] font-medium text-foreground">
               {emailSetup.fromAddress}
             </p>
             <span
@@ -73,7 +73,7 @@ export function EmailTab({
       </SettingsCard>
 
       {!emailSetup.isProduction ? (
-        <p className="text-[12px] leading-relaxed text-[#8a8f98]">
+        <p className="text-[12px] leading-relaxed text-muted-foreground">
           Still on Resend’s test sender — you can only email your Resend account
           address. Verify a domain at resend.com/domains, then set{" "}
           <code className="rounded bg-black/5 px-1 py-0.5">RESEND_FROM_EMAIL</code>{" "}
@@ -99,7 +99,7 @@ export function EmailTab({
         }}
       >
         <label className="block">
-          <span className="text-[12px] font-medium text-[#6b6f76]">
+          <span className="text-[12px] font-medium text-muted-foreground">
             From display name
           </span>
           <input
@@ -112,7 +112,7 @@ export function EmailTab({
           />
         </label>
         <label className="block">
-          <span className="text-[12px] font-medium text-[#6b6f76]">
+          <span className="text-[12px] font-medium text-muted-foreground">
             Reply-To email
           </span>
           <input
@@ -123,7 +123,7 @@ export function EmailTab({
             placeholder="support@yourdomain.com"
             disabled={readOnly || senderBusy}
           />
-          <span className="mt-1 block text-[12px] text-[#8a8f98]">
+          <span className="mt-1 block text-[12px] text-muted-foreground">
             Optional — where customer replies go.
           </span>
         </label>
@@ -131,12 +131,12 @@ export function EmailTab({
           <button
             type="submit"
             disabled={readOnly || senderBusy}
-            className="rounded-lg bg-[#08090a] px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-black/85 disabled:opacity-50"
+            className="rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-primary/80 disabled:opacity-50"
           >
             {senderBusy ? "Saving…" : "Save sender"}
           </button>
           {senderMsg ? (
-            <span className="text-[12px] text-[#8a8f98]">{senderMsg}</span>
+            <span className="text-[12px] text-muted-foreground">{senderMsg}</span>
           ) : null}
         </div>
       </form>

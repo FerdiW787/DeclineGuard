@@ -13,12 +13,9 @@ import { useClerkUser } from "@/components/auth/useClerkClient";
 import BrandLogo from "@/components/BrandLogo";
 import { withConvexClerkProvider } from "@/lib/withConvexClerkProvider";
 import {
-  ChevronsUpDown,
   Headphones,
   LayoutDashboard,
   Palette,
-  Plus,
-  Settings,
   Store,
   Wallet,
   Workflow,
@@ -51,6 +48,8 @@ import {
   useEmailThemeQuery,
   usePersistEmailTheme,
 } from "@/lib/useEmailThemeApi";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { UnfoldMoreIcon, Add01Icon, SettingsIcon } from "@hugeicons/core-free-icons";
 
 type DayRow = {
   date: string;
@@ -720,7 +719,7 @@ function Dashboard() {
     <>
       {showShell ? (
     <div
-      className={`dg-shell light ln-surface relative flex h-dvh overflow-hidden text-[#08090a] transition-colors duration-500 ${
+      className={`dg-shell light ln-surface relative flex h-dvh overflow-hidden text-foreground transition-colors duration-500 ${
         shellWiggle ? "dg-shell-wiggle" : ""
       }`}
       style={emailFocusMode ? { background: "#ffffff" } : undefined}
@@ -728,7 +727,7 @@ function Dashboard() {
       {/* ── Left sidebar — only after a store is connected ── */}
       {lsConnected ? (
       <aside
-        className={`relative z-20 flex w-[248px] shrink-0 flex-col bg-[#f7f8f8] max-lg:hidden transition-[margin] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        className={`relative z-20 flex w-[248px] shrink-0 flex-col bg-background max-lg:hidden transition-[margin] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
           storeMenuOpen && !emailFocusMode ? "overflow-visible" : "overflow-hidden"
         } ${emailFocusMode ? "-ml-[248px] pointer-events-none" : ""}`}
       >
@@ -747,14 +746,14 @@ function Dashboard() {
                 className="flex w-full items-center gap-2 rounded-lg p-2 text-left transition hover:bg-black/[0.04] data-[state=open]:bg-black/[0.05]"
                 data-state={storeMenuOpen ? "open" : "closed"}
               >
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#08090a] text-[#f7f8f8]">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-foreground">
                   <Store className="size-4" />
                 </span>
                 <span className="min-w-0 flex-1 grid text-left text-sm leading-tight">
-                  <span className="truncate font-semibold text-[#08090a]">
+                  <span className="truncate font-semibold text-foreground">
                     {connection.storeName}
                   </span>
-                  <span className="truncate text-xs text-[#8a8f98]">
+                  <span className="truncate text-xs text-muted-foreground">
                     {storesRefreshing
                       ? "Updating…"
                       : connection.testMode
@@ -762,16 +761,16 @@ function Dashboard() {
                         : "Live"}
                   </span>
                 </span>
-                <ChevronsUpDown className="ml-auto size-4 shrink-0 text-[#8a8f98]" />
+                <HugeiconsIcon icon={UnfoldMoreIcon} strokeWidth={2} className="ml-auto size-4 shrink-0 text-muted-foreground" />
               </button>
 
               {storeMenuOpen ? (
                 <div
                   role="menu"
                   aria-label="Stores"
-                  className="dg-menu-in absolute left-full top-0 z-50 ml-2 w-56 overflow-hidden rounded-lg border border-black/8 bg-white text-[#08090a] shadow-[0_18px_40px_-16px_rgba(0,0,0,0.16)]"
+                  className="dg-menu-in absolute left-full top-0 z-50 ml-2 w-56 overflow-hidden rounded-lg border border-border bg-white text-foreground shadow-[0_18px_40px_-16px_rgba(0,0,0,0.16)]"
                 >
-                  <div className="px-2 py-1.5 text-xs font-medium text-[#8a8f98]">
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
                     Stores
                   </div>
                   <ul className="max-h-56 overflow-y-auto px-1 pb-1">
@@ -800,18 +799,18 @@ function Dashboard() {
                             }}
                             className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition ${
                               selected
-                                ? "bg-black/[0.06] font-medium text-[#08090a]"
-                                : "text-[#6b6f76] hover:bg-black/[0.04]"
+                                ? "bg-black/[0.06] font-medium text-foreground"
+                                : "text-muted-foreground hover:bg-black/[0.04]"
                             }`}
                           >
-                            <span className="flex size-6 shrink-0 items-center justify-center rounded-sm border border-black/8 bg-black/[0.03]">
-                              <Store className="size-3.5 text-[#6b6f76]" />
+                            <span className="flex size-6 shrink-0 items-center justify-center rounded-sm border border-border bg-black/[0.03]">
+                              <Store className="size-3.5 text-muted-foreground" />
                             </span>
                             <span className="min-w-0 flex-1 truncate text-left">
                               {store.name}
                             </span>
                             {shortcut ? (
-                              <span className="ml-auto text-xs tracking-widest text-[#8a8f98]">
+                              <span className="ml-auto text-xs tracking-widest text-muted-foreground">
                                 {shortcut}
                               </span>
                             ) : null}
@@ -829,10 +828,10 @@ function Dashboard() {
                         setStoreMenuOpen(false);
                         setLsSetupOpen(true);
                       }}
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[#6b6f76] outline-none transition hover:bg-black/[0.04]"
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground outline-none transition hover:bg-black/[0.04]"
                     >
-                      <span className="flex size-6 shrink-0 items-center justify-center rounded-md border border-black/8 bg-transparent">
-                        <Plus className="size-3.5" />
+                      <span className="flex size-6 shrink-0 items-center justify-center rounded-md border border-border bg-transparent">
+                        <HugeiconsIcon icon={Add01Icon} strokeWidth={2} className="size-3.5" />
                       </span>
                       Add store
                     </button>
@@ -883,8 +882,8 @@ function Dashboard() {
                       onClick={() => requestNav(item.id)}
                       className={`group relative z-10 flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm outline-none transition-[background-color,color,transform,box-shadow] duration-200 ease-out focus:outline-none focus-visible:outline-none ${
                         active
-                          ? "font-semibold text-[#08090a]"
-                          : "font-medium text-[#8a8f98] hover:bg-black/[0.04] hover:text-[#08090a]"
+                          ? "font-semibold text-foreground"
+                          : "font-medium text-muted-foreground hover:bg-black/[0.04] hover:text-foreground"
                       }`}
                     >
                       <Icon className="size-4 shrink-0 transition-transform duration-200 ease-out" />
@@ -897,13 +896,13 @@ function Dashboard() {
 
             <div
               aria-hidden
-              className={`pointer-events-none absolute inset-x-0 top-0 z-10 h-7 bg-gradient-to-b from-[#f7f8f8] to-transparent transition-opacity duration-200 ${
+              className={`pointer-events-none absolute inset-x-0 top-0 z-10 h-7 bg-gradient-to-b from-background to-transparent transition-opacity duration-200 ${
                 sidebarScrollShadow.top ? "opacity-100" : "opacity-0"
               }`}
             />
             <div
               aria-hidden
-              className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 h-7 bg-gradient-to-t from-[#f7f8f8] to-transparent transition-opacity duration-200 ${
+              className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 h-7 bg-gradient-to-t from-background to-transparent transition-opacity duration-200 ${
                 sidebarScrollShadow.bottom ? "opacity-100" : "opacity-0"
               }`}
             />
@@ -918,8 +917,8 @@ function Dashboard() {
               }}
               className={`${FOOTER_TAB} w-full ${
                 helpOpen
-                  ? "bg-black/[0.06] font-semibold text-[#08090a]"
-                  : "font-medium text-[#8a8f98] hover:bg-black/[0.04] hover:text-[#08090a]"
+                  ? "bg-black/[0.06] font-semibold text-foreground"
+                  : "font-medium text-muted-foreground hover:bg-black/[0.04] hover:text-foreground"
               }`}
             >
               <Headphones className="size-4 shrink-0" />
@@ -935,35 +934,35 @@ function Dashboard() {
               onClick={() => openSettings()}
               className={`${FOOTER_TAB} w-full ${
                 settingsOpen
-                  ? "bg-black/[0.06] font-semibold text-[#08090a]"
-                  : "font-medium text-[#8a8f98] hover:bg-black/[0.04] hover:text-[#08090a]"
+                  ? "bg-black/[0.06] font-semibold text-foreground"
+                  : "font-medium text-muted-foreground hover:bg-black/[0.04] hover:text-foreground"
               }`}
             >
-              <Settings className="size-4 shrink-0" />
+              <HugeiconsIcon icon={SettingsIcon} strokeWidth={2} className="size-4 shrink-0" />
               <span>Settings</span>
             </button>
-            <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 border-t border-black/6 pt-4 text-[11px] text-[#8a8f98]">
+            <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 border-t border-black/6 pt-4 text-[11px] text-muted-foreground">
               <a
                 href="/legal/impressum"
-                className="transition-colors hover:text-[#08090a]"
+                className="transition-colors hover:text-foreground"
               >
                 Impressum
               </a>
               <a
                 href="/legal/privacy"
-                className="transition-colors hover:text-[#08090a]"
+                className="transition-colors hover:text-foreground"
               >
                 Privacy
               </a>
               <a
                 href="/legal/terms"
-                className="transition-colors hover:text-[#08090a]"
+                className="transition-colors hover:text-foreground"
               >
                 Terms
               </a>
               <a
                 href="/legal/dpa"
-                className="transition-colors hover:text-[#08090a]"
+                className="transition-colors hover:text-foreground"
               >
                 DPA
               </a>
@@ -977,7 +976,7 @@ function Dashboard() {
       {/* ── Main content ── */}
       <div className="relative z-10 flex min-w-0 flex-1 overflow-hidden max-lg:p-0">
         {/* Mobile top bar */}
-        <div className={`absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 border-b border-black/6 bg-[#f7f8f8] px-4 py-3 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] lg:hidden ${
+        <div className={`absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 border-b border-black/6 bg-background px-4 py-3 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] lg:hidden ${
           emailFocusMode ? "-translate-y-full" : ""
         }`}>
           <BrandLogo size="sm" />
@@ -988,12 +987,12 @@ function Dashboard() {
                 setHelpSubject(undefined);
                 setHelpOpen(true);
               }}
-              className="relative inline-flex items-center gap-1 rounded-lg border border-black/8 px-2.5 py-1.5 text-xs font-semibold text-[#6b6f76]"
+              className="relative inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-muted-foreground"
             >
               <Headphones className="size-3.5" />
               Support
               {typeof unreadHelpCount === "number" && unreadHelpCount > 0 ? (
-                <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#111] px-1 text-[10px] font-bold text-white">
+                <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-white">
                   {unreadHelpCount > 9 ? "9+" : unreadHelpCount}
                 </span>
               ) : null}
@@ -1001,9 +1000,9 @@ function Dashboard() {
             <button
               type="button"
               onClick={() => openSettings()}
-              className="inline-flex items-center gap-1 rounded-lg border border-black/8 px-2.5 py-1.5 text-xs font-semibold text-[#6b6f76]"
+              className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-muted-foreground"
             >
-              <Settings className="size-3.5" />
+              <HugeiconsIcon icon={SettingsIcon} strokeWidth={2} className="size-3.5" />
               Settings
             </button>
           </div>
@@ -1143,7 +1142,7 @@ function Dashboard() {
                             onClick={() => requestNav(item.id)}
                             className={`shrink-0 rounded-full px-3.5 py-1.5 transition ${
                               nav === item.id
-                                ? "bg-[#111] text-white"
+                                ? "bg-primary text-white"
                                 : "text-black/55 hover:bg-black/5"
                             }`}
                           >
@@ -1219,7 +1218,7 @@ function Dashboard() {
                           onClick={() => requestNav(item.id)}
                           className={`shrink-0 rounded-full px-3.5 py-1.5 transition ${
                             nav === item.id
-                              ? "bg-[#111] text-white"
+                              ? "bg-primary text-white"
                               : "text-black/55 hover:bg-black/5"
                           }`}
                         >
@@ -1254,7 +1253,7 @@ function Dashboard() {
                           onClick={() => requestNav(item.id)}
                           className={`shrink-0 rounded-full px-3.5 py-1.5 transition ${
                             nav === item.id
-                              ? "bg-[#111] text-white"
+                              ? "bg-primary text-white"
                               : "text-black/55 hover:bg-black/5"
                           }`}
                         >
@@ -1354,7 +1353,7 @@ function Dashboard() {
                           onClick={() => requestNav(item.id)}
                           className={`shrink-0 rounded-full px-3.5 py-1.5 transition ${
                             nav === item.id
-                              ? "bg-[#111] text-white"
+                              ? "bg-primary text-white"
                               : "text-black/55 hover:bg-black/5"
                           }`}
                         >
@@ -1515,7 +1514,7 @@ function Dashboard() {
           aria-modal="true"
           aria-labelledby="unsaved-title"
         >
-          <div className="w-full max-w-md rounded-md border border-black/10 bg-white p-6 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.45)] dark:border-white/10 dark:bg-[#161618]">
+          <div className="w-full max-w-md rounded-md border border-border bg-white p-6 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.45)] dark:border-white/10 dark:bg-[#161618]">
             <h2
               id="unsaved-title"
               className="font-display text-xl tracking-tight text-black dark:text-zinc-100"

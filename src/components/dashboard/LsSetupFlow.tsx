@@ -44,15 +44,10 @@ import {
   fieldLabel,
 } from "@/components/auth/authFieldClasses";
 import {
-  Check,
-  Copy,
-  ExternalLink,
-  Eye,
-  EyeOff,
-  Globe,
-  Loader2,
   Webhook,
 } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Tick02Icon, Copy01Icon, LinkSquare02Icon, EyeIcon, ViewOffIcon, Globe02Icon, Loading03Icon } from "@hugeicons/core-free-icons";
 
 type StoreOption = {
   id: string;
@@ -708,14 +703,14 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
   return (
     <div
       ref={overlayRef}
-      className="dg-shell light ln-surface fixed inset-0 z-[90] overflow-hidden bg-[#f7f8f8] text-[#08090a]"
+      className="dg-shell light ln-surface fixed inset-0 z-[90] overflow-hidden bg-background text-foreground"
       aria-modal
       role="dialog"
       aria-label="Connect Lemon Squeezy store"
     >
       {preview ? (
         <div className="absolute left-6 top-5 z-10">
-          <span className="text-[11px] font-medium tracking-[-0.01em] text-[#8a8f98]">
+          <span className="text-[11px] font-medium tracking-[-0.01em] text-muted-foreground">
             Preview
           </span>
         </div>
@@ -785,10 +780,10 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                             href="https://app.lemonsqueezy.com/settings/api"
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-[12px] font-medium text-[#8a8f98] transition hover:text-[#08090a]"
+                            className="inline-flex items-center gap-1 text-[12px] font-medium text-muted-foreground transition hover:text-foreground"
                           >
                             Open settings
-                            <ExternalLink className="size-3 opacity-70" />
+                            <HugeiconsIcon icon={LinkSquare02Icon} strokeWidth={2} className="size-3 opacity-70" />
                           </a>
                         </div>
                         <div className="relative">
@@ -820,16 +815,16 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                           />
                           <button
                             type="button"
-                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-[#8a8f98] transition hover:text-[#08090a]"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted-foreground transition hover:text-foreground"
                             onClick={() => setShowKey((v) => !v)}
                             aria-label={
                               showKey ? "Hide API key" : "Show API key"
                             }
                           >
                             {showKey ? (
-                              <EyeOff className="size-4" />
+                              <HugeiconsIcon icon={ViewOffIcon} strokeWidth={2} className="size-4" />
                             ) : (
-                              <Eye className="size-4" />
+                              <HugeiconsIcon icon={EyeIcon} strokeWidth={2} className="size-4" />
                             )}
                           </button>
                         </div>
@@ -851,22 +846,22 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                                     className={`flex w-full items-center justify-between rounded-lg border px-3.5 py-2.5 text-left text-[14px] transition ${
                                       active
                                         ? "border-black/20 bg-white"
-                                        : "border-black/[0.08] bg-white hover:border-black/15"
+                                        : "border-border bg-white hover:border-black/15"
                                     }`}
                                     disabled={linking}
                                   >
                                     <span>
-                                      <span className="font-medium text-[#08090a]">
+                                      <span className="font-medium text-foreground">
                                         {store.name}
                                       </span>
                                       {store.slug ? (
-                                        <span className="mt-0.5 block text-[12px] text-[#8a8f98]">
+                                        <span className="mt-0.5 block text-[12px] text-muted-foreground">
                                           {store.slug}
                                         </span>
                                       ) : null}
                                     </span>
                                     {active ? (
-                                      <Check className="size-4 shrink-0 text-[#08090a]" />
+                                      <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-4 shrink-0 text-foreground" />
                                     ) : null}
                                   </button>
                                 </li>
@@ -897,7 +892,7 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                         >
                           {linking ? (
                             <>
-                              <Loader2 className="size-3.5 animate-spin" />
+                              <HugeiconsIcon icon={Loading03Icon} strokeWidth={2} className="size-3.5 animate-spin" />
                               Connecting…
                             </>
                           ) : (
@@ -910,7 +905,7 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
 
                   {step === "webhook" ? (
                     <div className="mt-7 text-left">
-                      <div className="overflow-hidden rounded-xl border border-black/[0.08] bg-white">
+                      <div className="overflow-hidden rounded-xl border border-border bg-white">
                         {[
                           "Failed and recovered payments reach DeclineGuard automatically",
                           "Recovery emails can start without waiting on a real decline",
@@ -920,12 +915,12 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                             key={line}
                             className={`flex items-start gap-2.5 px-3.5 py-3 ${
                               i < lines.length - 1
-                                ? "border-b border-black/[0.06]"
+                                ? "border-b border-border"
                                 : ""
                             }`}
                           >
-                            <Check className="mt-0.5 size-3.5 shrink-0 text-[#08090a]" />
-                            <p className="text-[13px] leading-relaxed text-[#6b6f76]">
+                            <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="mt-0.5 size-3.5 shrink-0 text-foreground" />
+                            <p className="text-[13px] leading-relaxed text-muted-foreground">
                               {line}
                             </p>
                           </div>
@@ -948,7 +943,7 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                       !webhookSetup.serverConfigured ? (
                         <p className="mt-5 text-[13px] leading-relaxed text-amber-700">
                           Automatic install needs{" "}
-                          <code className="rounded bg-black/[0.04] px-1.5 py-0.5 text-[11px] text-[#08090a]">
+                          <code className="rounded bg-black/[0.04] px-1.5 py-0.5 text-[11px] text-foreground">
                             LEMONSQUEEZY_WEBHOOK_SECRET
                           </code>{" "}
                           on Convex.
@@ -957,7 +952,7 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                       {webhookSetup === null ? (
                         <p className="mt-5 text-[13px] leading-relaxed text-amber-700">
                           Automatic install needs{" "}
-                          <code className="rounded bg-black/[0.04] px-1.5 py-0.5 text-[11px] text-[#08090a]">
+                          <code className="rounded bg-black/[0.04] px-1.5 py-0.5 text-[11px] text-foreground">
                             CONVEX_SITE_URL
                           </code>{" "}
                           on Convex.
@@ -978,7 +973,7 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                           >
                             {installingWebhook ? (
                               <>
-                                <Loader2 className="size-3.5 animate-spin" />
+                                <HugeiconsIcon icon={Loading03Icon} strokeWidth={2} className="size-3.5 animate-spin" />
                                 Creating webhook in Lemon Squeezy…
                               </>
                             ) : (
@@ -990,21 +985,21 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                           </button>
                           <button
                             type="button"
-                            className="w-full text-center text-[12px] font-medium text-[#8a8f98] transition hover:text-[#08090a]"
+                            className="w-full text-center text-[12px] font-medium text-muted-foreground transition hover:text-foreground"
                             onClick={() => setShowManualWebhook(true)}
                           >
                             I’ll create it myself
                           </button>
                         </div>
                       ) : (
-                        <div className="mt-6 space-y-4 border-t border-black/[0.06] pt-5">
+                        <div className="mt-6 space-y-4 border-t border-border pt-5">
                           <div className="flex items-center justify-between gap-3">
-                            <p className="text-[13px] font-medium text-[#08090a]">
+                            <p className="text-[13px] font-medium text-foreground">
                               Manual webhook
                             </p>
                             <button
                               type="button"
-                              className="text-[12px] font-medium text-[#8a8f98] transition hover:text-[#08090a]"
+                              className="text-[12px] font-medium text-muted-foreground transition hover:text-foreground"
                               onClick={() => {
                                 setShowManualWebhook(false);
                                 setWebhookError("");
@@ -1048,10 +1043,10 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                               href="https://app.lemonsqueezy.com/settings/webhooks"
                               target="_blank"
                               rel="noreferrer"
-                              className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-medium text-[#08090a] underline decoration-black/20 underline-offset-4 transition hover:decoration-black/50"
+                              className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground underline decoration-black/20 underline-offset-4 transition hover:decoration-black/50"
                             >
                               Open Lemon Squeezy → Webhooks
-                              <ExternalLink className="size-3 opacity-70" />
+                              <HugeiconsIcon icon={LinkSquare02Icon} strokeWidth={2} className="size-3 opacity-70" />
                             </a>
                           </div>
 
@@ -1059,7 +1054,7 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                           !webhookSetup.serverConfigured ? (
                             <p className="text-[12px] leading-relaxed text-amber-700">
                               Also set{" "}
-                              <code className="rounded bg-black/[0.04] px-1 py-0.5 text-[11px] text-[#08090a]">
+                              <code className="rounded bg-black/[0.04] px-1 py-0.5 text-[11px] text-foreground">
                                 LEMONSQUEEZY_WEBHOOK_SECRET
                               </code>{" "}
                               on Convex.
@@ -1092,19 +1087,19 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                     <div className="mt-8 space-y-5 text-left">
                       <ul className="space-y-4">
                         <li>
-                          <p className="text-[14px] font-medium text-[#08090a]">
+                          <p className="text-[14px] font-medium text-foreground">
                             Harmless signed ping
                           </p>
-                          <p className="mt-0.5 text-[13px] leading-relaxed text-[#6b6f76]">
+                          <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">
                             Confirms URL + secret without waiting on a real
                             failed payment
                           </p>
                         </li>
                         <li>
-                          <p className="text-[14px] font-medium text-[#08090a]">
+                          <p className="text-[14px] font-medium text-foreground">
                             Or wait for a real event
                           </p>
-                          <p className="mt-0.5 text-[13px] leading-relaxed text-[#6b6f76]">
+                          <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">
                             A live delivery also unlocks this step
                           </p>
                         </li>
@@ -1119,7 +1114,7 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                       <div className="flex items-center justify-end gap-4 pt-2">
                         <button
                           type="button"
-                          className="text-[13px] font-medium text-[#8a8f98] transition hover:text-[#08090a]"
+                          className="text-[13px] font-medium text-muted-foreground transition hover:text-foreground"
                           onClick={() => {
                             verifyFailHandledRef.current = false;
                             setShowManualWebhook(true);
@@ -1140,7 +1135,7 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                         >
                           {pinging ? (
                             <>
-                              <Loader2 className="size-3.5 animate-spin" />
+                              <HugeiconsIcon icon={Loading03Icon} strokeWidth={2} className="size-3.5 animate-spin" />
                               Sending…
                             </>
                           ) : (
@@ -1163,7 +1158,7 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                               Marketing domain
                             </label>
                             <div className="relative">
-                              <Globe className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#5c5c5c]" />
+                              <HugeiconsIcon icon={Globe02Icon} strokeWidth={2} className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#5c5c5c]" />
                               <input
                                 id="ls-brand-domain"
                                 type="text"
@@ -1188,19 +1183,19 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                           </div>
 
                           {brandPhase === "scanning" ? (
-                            <div className="rounded-lg border border-black/[0.08] bg-white px-3.5 py-3">
+                            <div className="rounded-lg border border-border bg-white px-3.5 py-3">
                               <div className="flex items-center gap-2.5">
-                                <Loader2 className="size-4 animate-spin text-[#08090a]" />
+                                <HugeiconsIcon icon={Loading03Icon} strokeWidth={2} className="size-4 animate-spin text-foreground" />
                                 <div>
-                                  <p className="text-[13px] font-medium text-[#08090a]">
+                                  <p className="text-[13px] font-medium text-foreground">
                                     Building your emails
                                   </p>
-                                  <p className="mt-0.5 text-[12px] text-[#8a8f98]">
+                                  <p className="mt-0.5 text-[12px] text-muted-foreground">
                                     Capturing {brandDomain.trim() || "your site"}…
                                   </p>
                                 </div>
                               </div>
-                              <ul className="mt-3 space-y-1.5 text-[12px] text-[#8a8f98]">
+                              <ul className="mt-3 space-y-1.5 text-[12px] text-muted-foreground">
                                 <li>Reading homepage colors</li>
                                 <li>Matching hero button</li>
                                 <li>Merging with Lemon Squeezy</li>
@@ -1226,7 +1221,7 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                             >
                               {brandPhase === "scanning" ? (
                                 <>
-                                  <Loader2 className="size-3.5 animate-spin" />
+                                  <HugeiconsIcon icon={Loading03Icon} strokeWidth={2} className="size-3.5 animate-spin" />
                                   Building…
                                 </>
                               ) : (
@@ -1239,9 +1234,9 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
 
                       {brandPhase === "ready" || brandPhase === "saving" ? (
                         <>
-                          <div className="overflow-hidden rounded-lg border border-black/[0.08] bg-white">
-                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/[0.06] px-3.5 py-2.5">
-                              <p className="text-[11px] font-medium text-[#8a8f98]">
+                          <div className="overflow-hidden rounded-lg border border-border bg-white">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3.5 py-2.5">
+                              <p className="text-[11px] font-medium text-muted-foreground">
                                 {brandKit?.domain} · Day 0
                               </p>
                               <div className="flex flex-wrap gap-1.5">
@@ -1304,7 +1299,7 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                           <div className="flex items-center justify-end gap-4 pt-1">
                             <button
                               type="button"
-                              className="text-[13px] font-medium text-[#8a8f98] transition hover:text-[#08090a]"
+                              className="text-[13px] font-medium text-muted-foreground transition hover:text-foreground"
                               onClick={() => {
                                 setBrandPhase("idle");
                                 setBrandKit(null);
@@ -1322,7 +1317,7 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                             >
                               {brandPhase === "saving" ? (
                                 <>
-                                  <Loader2 className="size-3.5 animate-spin" />
+                                  <HugeiconsIcon icon={Loading03Icon} strokeWidth={2} className="size-3.5 animate-spin" />
                                   Saving…
                                 </>
                               ) : (
@@ -1376,7 +1371,7 @@ export default function LsSetupFlow({ open, preview = false, onReveal, onComplet
                       <div className="flex items-center justify-end gap-4 pt-1">
                         <button
                           type="button"
-                          className="text-[13px] font-medium text-[#8a8f98] transition hover:text-[#08090a]"
+                          className="text-[13px] font-medium text-muted-foreground transition hover:text-foreground"
                           onClick={() => setStep("brand")}
                         >
                           Back
@@ -1428,26 +1423,26 @@ function SetupCopyField({
         {label}
       </p>
       <div className="mt-1.5 flex items-stretch gap-2">
-        <code className="min-w-0 flex-1 truncate rounded-lg border border-black/[0.08] bg-white px-3 py-2.5 font-mono text-[12px] text-[#08090a]">
+        <code className="min-w-0 flex-1 truncate rounded-lg border border-border bg-white px-3 py-2.5 font-mono text-[12px] text-foreground">
           {display}
         </code>
         {secret ? (
           <button
             type="button"
-            className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-black/[0.08] bg-white text-[#8a8f98] transition hover:text-[#08090a]"
+            className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-white text-muted-foreground transition hover:text-foreground"
             aria-label={revealed ? "Hide secret" : "Show secret"}
             onClick={() => setRevealed((v) => !v)}
           >
             {revealed ? (
-              <EyeOff className="size-4" />
+              <HugeiconsIcon icon={ViewOffIcon} strokeWidth={2} className="size-4" />
             ) : (
-              <Eye className="size-4" />
+              <HugeiconsIcon icon={EyeIcon} strokeWidth={2} className="size-4" />
             )}
           </button>
         ) : null}
         <button
           type="button"
-          className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg border border-black/[0.08] bg-white px-3 text-xs font-medium text-[#8a8f98] transition hover:text-[#08090a]"
+          className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-white px-3 text-xs font-medium text-muted-foreground transition hover:text-foreground"
           onClick={() => {
             void navigator.clipboard.writeText(value).then(() => {
               setCopied(true);
@@ -1457,12 +1452,12 @@ function SetupCopyField({
         >
           {copied ? (
             <>
-              <Check className="size-3.5 text-[#08090a]" />
+              <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-3.5 text-foreground" />
               Copied
             </>
           ) : (
             <>
-              <Copy className="size-3.5" />
+              <HugeiconsIcon icon={Copy01Icon} strokeWidth={2} className="size-3.5" />
               Copy
             </>
           )}

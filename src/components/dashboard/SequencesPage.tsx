@@ -1,14 +1,5 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  ArrowRight,
-  ChevronRight,
-  Clock,
-  Palette,
-  Send,
-  Users,
-  Zap,
-} from "lucide-react";
-import {
   useMarketingDesktop,
   whenDesktop,
 } from "@/components/homepage/marketing/MarketingDesktopContext";
@@ -55,6 +46,8 @@ import {
   LAYOUT_PRESET_IDS,
   type LayoutPresetId,
 } from "@/lib/emailTheme";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowRight01Icon, Clock01Icon, PaintBoardIcon, SentIcon, UserGroupIcon, ZapIcon } from "@hugeicons/core-free-icons";
 
 const STEPS = [
   {
@@ -123,7 +116,7 @@ const STAGE_LABEL: Record<SequenceStage, string> = {
 };
 
 const STAGE_BADGE: Record<SequenceStage, string> = {
-  queued: "bg-black/5 text-black/55",
+  queued: "bg-muted text-muted-foreground",
   day0: "bg-emerald-100 text-emerald-800",
   day2: "bg-yellow-100 text-yellow-800",
   day5: "bg-red-100 text-red-800",
@@ -371,7 +364,7 @@ export default function SequencesPage({
                 onClick={onGoToCustomizations}
                 className="dg-btn shrink-0 cursor-pointer !gap-1.5 !px-3 !py-1.5 text-[11px]"
               >
-                <Palette className="size-3.5" />
+                <HugeiconsIcon icon={PaintBoardIcon} strokeWidth={2} className="size-3.5" />
                 Customize brand
               </button>
             ) : null}
@@ -384,7 +377,7 @@ export default function SequencesPage({
               }}
               className="dg-btn dg-btn-primary shrink-0 cursor-pointer !gap-1.5 !px-3.5 !py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Send className="size-3.5" />
+              <HugeiconsIcon icon={SentIcon} strokeWidth={2} className="size-3.5" />
               Send preview to me
             </button>
           </div>
@@ -392,7 +385,7 @@ export default function SequencesPage({
       />
 
       {/* ── Mobile pane toggle ── */}
-      <div className="flex shrink-0 gap-1 rounded-md border border-black/8 bg-white p-1 lg:hidden">
+      <div className="flex shrink-0 gap-1 rounded-md border border-border bg-card p-1 lg:hidden">
         {(
           [
             { id: "people" as const, label: "People" },
@@ -405,8 +398,8 @@ export default function SequencesPage({
             onClick={() => setMobilePane(item.id)}
             className={`flex-1 rounded-[6px] px-3 py-1.5 text-[12px] font-semibold ${
               mobilePane === item.id
-                ? "bg-[#08090a] text-white"
-                : "text-[#6b6f76]"
+                ? "bg-primary text-white"
+                : "text-muted-foreground"
             }`}
           >
             {item.label}
@@ -442,23 +435,23 @@ export default function SequencesPage({
             >
               <div className="flex items-center gap-2">
                 <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-black text-white">
-                  <Zap className="size-3.5" strokeWidth={2.4} />
+                  <HugeiconsIcon icon={ZapIcon} className="size-3.5" strokeWidth={2.4} />
                 </span>
-                <span className="text-[13px] font-semibold text-[#08090a]">
+                <span className="text-[13px] font-semibold text-foreground">
                   Trigger
                 </span>
               </div>
               <div className="mt-3 flex items-baseline gap-1">
-                <span className="font-display text-[1.8rem] leading-none tracking-tight tabular-nums text-[#08090a]">
+                <span className="font-display text-[1.8rem] leading-none tracking-tight tabular-nums text-foreground">
                   {openFailures === undefined
                     ? "…"
                     : pipeline.byStage.queued.length}
                 </span>
-                <span className="text-[11px] font-medium text-[#8a8f98]">
+                <span className="text-[11px] font-medium text-muted-foreground">
                   queued
                 </span>
               </div>
-              <p className="mt-1.5 truncate text-[11px] text-[#8a8f98]">
+              <p className="mt-1.5 truncate text-[11px] text-muted-foreground">
                 Payment fails
               </p>
             </FunnelBox>
@@ -484,7 +477,7 @@ export default function SequencesPage({
                       )}
                       aria-hidden
                     />
-                    <span className="text-[13px] font-semibold text-[#08090a]">
+                    <span className="text-[13px] font-semibold text-foreground">
                       Email {s.number}
                     </span>
                     <span
@@ -494,16 +487,16 @@ export default function SequencesPage({
                     </span>
                   </div>
                   <div className="mt-3 flex items-baseline gap-1">
-                    <span className="font-display text-[1.8rem] leading-none tracking-tight tabular-nums text-[#08090a]">
+                    <span className="font-display text-[1.8rem] leading-none tracking-tight tabular-nums text-foreground">
                       {openFailures === undefined ? "…" : count}
                     </span>
-                    <span className="text-[11px] font-medium text-[#8a8f98]">
+                    <span className="text-[11px] font-medium text-muted-foreground">
                       on this step
                     </span>
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    <span className="inline-flex items-center gap-1 text-[11px] text-[#8a8f98]">
-                      <Clock className="size-3" />
+                    <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className="size-3" />
                       {s.shortWhen}
                     </span>
                     {overdue > 0 ? (
@@ -526,13 +519,13 @@ export default function SequencesPage({
           >
           <div className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8a8f98]">
+              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 People
               </p>
-              <h3 className="font-display mt-1 text-2xl tracking-tight text-[#08090a]">
+              <h3 className="font-display mt-1 text-2xl tracking-tight text-foreground">
                 {peopleTitle}
               </h3>
-              <p className="mt-1 text-[12px] leading-relaxed text-[#6b6f76]">
+              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
                 {openFailures === undefined
                   ? "Loading people…"
                   : peopleInView.length === 0
@@ -556,7 +549,7 @@ export default function SequencesPage({
               <button
                 type="button"
                 onClick={() => setPeopleScope("all")}
-                className="shrink-0 rounded-full border border-black/8 bg-white px-2.5 py-1 text-[11px] font-semibold text-[#6b6f76] transition hover:border-black/20 hover:text-[#08090a]"
+                className="shrink-0 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition hover:border-foreground/20 hover:text-foreground"
               >
                 Show everyone
               </button>
@@ -565,16 +558,16 @@ export default function SequencesPage({
 
           <div className="min-h-0 flex-1 overflow-y-auto">
             {openFailures === undefined ? (
-              <p className="mt-6 text-sm text-[#8a8f98]">Loading people…</p>
+              <p className="mt-6 text-sm text-muted-foreground">Loading people…</p>
             ) : peopleInView.length === 0 ? (
-              <div className="mt-6 flex flex-col items-center rounded-md bg-black/[0.03] px-4 py-12 text-center">
-                <Users className="size-7 text-[#8a8f98]" />
-                <p className="mt-3 text-sm font-semibold text-[#08090a]">
+              <div className="mt-6 flex flex-col items-center rounded-md bg-muted px-4 py-12 text-center">
+                <HugeiconsIcon icon={UserGroupIcon} strokeWidth={2} className="size-7 text-muted-foreground" />
+                <p className="mt-3 text-sm font-semibold text-foreground">
                   {peopleScope === "all"
                     ? "No one in this sequence"
                     : "This step is empty"}
                 </p>
-                <p className="mt-1 max-w-[18rem] text-[12px] leading-relaxed text-[#6b6f76]">
+                <p className="mt-1 max-w-[18rem] text-[12px] leading-relaxed text-muted-foreground">
                   New declines land here automatically and move through Email 1 →
                   3 until they pay or the drip ends.
                 </p>
@@ -602,13 +595,13 @@ export default function SequencesPage({
                         className={cn(
                           "dg-interactive group flex w-full items-start justify-between gap-2.5 rounded-md border px-2.5 py-2.5 text-left",
                           selected
-                            ? "border-black/12 bg-[#f7f8f8]"
+                            ? "border-border bg-background"
                             : "border-transparent",
                         )}
                       >
                         <div className="min-w-0 flex-1">
                           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                            <p className="truncate text-sm font-semibold text-[#08090a]">
+                            <p className="truncate text-sm font-semibold text-foreground">
                               {displayName}
                             </p>
                             <span
@@ -630,7 +623,7 @@ export default function SequencesPage({
                               <PersonBadge tone="neutral">Test</PersonBadge>
                             ) : null}
                           </div>
-                          <p className="mt-0.5 truncate text-[11px] text-black/40">
+                          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
                             {[
                               row.productName?.trim() || null,
                               peopleScope === "all"
@@ -646,24 +639,21 @@ export default function SequencesPage({
                               .join(" · ")}
                           </p>
                           {row.customerName?.trim() ? (
-                            <p className="truncate text-[11px] text-black/35">
+                            <p className="truncate text-[11px] text-muted-foreground">
                               {row.customerEmail}
                             </p>
                           ) : null}
                         </div>
                         <span className="flex shrink-0 items-center gap-1 pt-0.5">
-                          <span className="text-sm font-semibold tabular-nums text-black/70">
+                          <span className="text-sm font-semibold tabular-nums text-foreground/80">
                             {amount}
                           </span>
-                          <ChevronRight
-                            className={cn(
-                              "size-4 shrink-0 transition-all",
-                              selected
-                                ? "text-[#08090a]"
-                                : "text-black/25 group-hover:translate-x-0.5 group-hover:text-black/55",
-                            )}
-                            aria-hidden
-                          />
+                          <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className={cn(
+                                                                "size-4 shrink-0 transition-all",
+                                                                selected
+                                                                  ? "text-foreground"
+                                                                  : "text-muted-foreground/50 group-hover:translate-x-0.5 group-hover:text-muted-foreground",
+                                                              )} aria-hidden />
                         </span>
                       </button>
                     </li>
@@ -679,10 +669,10 @@ export default function SequencesPage({
               onClick={() =>
                 onGoToRecoveries(peopleScope === "all" ? "all" : peopleScope)
               }
-              className="dg-link-arrow-host mt-4 inline-flex shrink-0 cursor-pointer items-center gap-1 text-xs font-semibold text-[#08090a] underline-offset-2 hover:underline"
+              className="dg-link-arrow-host mt-4 inline-flex shrink-0 cursor-pointer items-center gap-1 text-xs font-semibold text-foreground underline-offset-2 hover:underline"
             >
               Manage in Recoveries
-              <ArrowRight className="dg-link-arrow size-3.5" />
+              <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="dg-link-arrow size-3.5" />
             </button>
           ) : null}
           </Panel>
@@ -698,12 +688,12 @@ export default function SequencesPage({
         >
           <div className="mb-4 flex items-end justify-between gap-3">
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8a8f98]">
+              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 {previewSample.fromCase
                   ? "Preview for this person"
                   : "Live preview"}
               </p>
-              <h3 className="font-display mt-1 flex flex-wrap items-center gap-2 text-xl tracking-tight text-[#08090a]">
+              <h3 className="font-display mt-1 flex flex-wrap items-center gap-2 text-xl tracking-tight text-foreground">
                 Email {step.number}
                 <span
                   className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${TONE_BADGE[step.tone]}`}
@@ -712,12 +702,12 @@ export default function SequencesPage({
                 </span>
               </h3>
             </div>
-            <p className="text-right text-[12px] leading-tight text-[#6b6f76]">
+            <p className="text-right text-[12px] leading-tight text-muted-foreground">
               {step.whenLabel}
             </p>
           </div>
           <div className="mb-3">
-            <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8a8f98]">
+            <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
               Preview kit
             </p>
             <div
@@ -737,8 +727,8 @@ export default function SequencesPage({
                     className={cn(
                       "rounded-full px-2.5 py-1 text-[11px] font-semibold transition",
                       selected
-                        ? "bg-[#08090a] text-white"
-                        : "border border-black/8 bg-white text-[#6b6f76] hover:border-black/20 hover:text-[#08090a]",
+                        ? "bg-primary text-white"
+                        : "border border-border bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground",
                     )}
                   >
                     {LAYOUT_PRESET_CATALOG[id]?.name ?? id}
@@ -746,13 +736,13 @@ export default function SequencesPage({
                 );
               })}
             </div>
-            <p className="mt-1.5 text-[11px] text-[#8a8f98]">
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
               Same three emails — Gentle, Direct, Urgent. Pick a kit before
               sending a preview to yourself.
             </p>
           </div>
           <div className="mx-auto w-full max-w-[512px]">
-            <div className="dg-keep-light overflow-hidden rounded-md border border-black/8 bg-white">
+            <div className="dg-keep-light overflow-hidden rounded-md border border-border bg-white">
               <div className="border-b border-black/6 bg-[#fafafa] px-5 py-3">
                 <p className="truncate text-[10px] font-medium uppercase tracking-[0.08em] text-black/40">
                   From
@@ -805,7 +795,7 @@ export default function SequencesPage({
               />
             </div>
           </div>
-          <p className="mt-3 text-[11px] text-[#8a8f98]">
+          <p className="mt-3 text-[11px] text-muted-foreground">
             {previewSample.fromCase
               ? `Personalized with ${previewSample.customer}’s case. Card-fix links live in Recoveries.`
               : "Sample personalization. Card-fix links and people live in Recoveries."}
@@ -893,7 +883,7 @@ function FunnelBox({
       </span>
       <span
         className={cn(
-          "relative z-10 block h-full rounded-t-[13px] border border-b-0 border-black/8 bg-white px-4 py-4 transition-shadow duration-300",
+          "relative z-10 block h-full rounded-t-[13px] border border-b-0 border-border bg-card px-4 py-4 transition-shadow duration-300",
           active ? "" : FUNNEL_INNER_SHADOW,
         )}
       >
@@ -914,11 +904,8 @@ function FunnelConnector() {
       className="relative z-20 hidden min-w-5 flex-1 items-center self-center sm:flex"
       aria-hidden
     >
-      <span className="h-0 flex-1 border-t-2 border-dotted border-black/25" />
-      <ArrowRight
-        className="-ml-1 size-4 shrink-0 text-black/35"
-        strokeWidth={2.5}
-      />
+      <span className="h-0 flex-1 border-t-2 border-dotted border-border" />
+      <HugeiconsIcon icon={ArrowRight01Icon} className="-ml-1 size-4 shrink-0 text-muted-foreground" strokeWidth={2.5} />
     </div>
   );
 }
@@ -935,7 +922,7 @@ function PersonBadge({
       ? "bg-amber-50 text-amber-900"
       : tone === "danger"
         ? "bg-rose-50 text-rose-800"
-        : "bg-black/5 text-black/55";
+        : "bg-muted text-muted-foreground";
   return (
     <span
       className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${cls}`}
